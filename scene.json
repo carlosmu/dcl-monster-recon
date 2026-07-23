@@ -1,0 +1,78 @@
+{
+  "ecs7": true,
+  "runtimeVersion": "7",
+  "display": {
+    "title": "monster-recon",
+    "description": "Empty Scene Template",
+    "favicon": "favicon_asset",
+    "navmapThumbnail": ""
+  },
+  "owner": "",
+  "contact": {
+    "name": "SDK",
+    "email": ""
+  },
+  "main": "bin/index.js",
+  "tags": [],
+  "scene": {
+    "parcels": [
+      "0,3",
+      "1,3",
+      "2,3",
+      "3,3",
+      "0,2",
+      "1,2",
+      "2,2",
+      "3,2",
+      "0,1",
+      "1,1",
+      "2,1",
+      "3,1",
+      "0,0",
+      "1,0",
+      "2,0",
+      "3,0"
+    ],
+    "base": "0,0"
+  },
+  "spawnPoints": [
+    {
+      "name": "SpawnArea1",
+      "default": true,
+      "position": {
+        "x": [
+          28.5,
+          31.5
+        ],
+        "y": [
+          0,
+          0
+        ],
+        "z": [
+          28.5,
+          31.5
+        ]
+      },
+      "cameraTarget": {
+        "x": 8,
+        "y": 1,
+        "z": 8
+      }
+    }
+  ],
+  "requiredPermissions": [
+    "ALLOW_TO_TRIGGER_AVATAR_EMOTE",
+    "ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE"
+  ],
+  "featureToggles": {
+    "voiceChat": "enabled",
+    "portableExperiences": "enabled",
+    "nearbyVoiceChat": "enabled"
+  },
+  "creator": "",
+  "skyboxConfig": {},
+  "source": {
+    "origin": "creator-hub",
+    "projectId": "9e5e61d5-04b2-426f-91f9-29e9b58ff48f"
+  }
+}
