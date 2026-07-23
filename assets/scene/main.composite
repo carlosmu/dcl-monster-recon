@@ -65,16 +65,16 @@
               "y": 0,
               "z": 29
             },
+            "scale": {
+              "x": 10,
+              "y": 10,
+              "z": 10
+            },
             "rotation": {
               "x": 0,
               "y": 0,
               "z": 0,
               "w": 1
-            },
-            "scale": {
-              "x": 10,
-              "y": 10,
-              "z": 10
             },
             "parent": 0
           }
@@ -264,7 +264,7 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
+        "0": {
           "json": {
             "gizmo": 0
           }
@@ -1148,14 +1148,12 @@
           "json": {
             "name": "monster-recon",
             "description": "Empty Scene Template",
+            "thumbnail": "",
             "categories": [],
             "author": "SDK",
+            "email": "",
             "tags": [],
             "layout": {
-              "base": {
-                "x": 0,
-                "y": 0
-              },
               "parcels": [
                 {
                   "x": 0,
@@ -1221,8 +1219,14 @@
                   "x": 3,
                   "y": 0
                 }
-              ]
+              ],
+              "base": {
+                "x": 0,
+                "y": 0
+              }
             },
+            "silenceVoiceChat": false,
+            "disablePortableExperiences": false,
             "spawnPoints": [
               {
                 "name": "SpawnArea1",
@@ -1236,8 +1240,11 @@
                     ]
                   },
                   "y": {
-                    "$case": "single",
-                    "value": 0
+                    "$case": "range",
+                    "value": [
+                      0,
+                      0
+                    ]
                   },
                   "z": {
                     "$case": "range",
@@ -1254,7 +1261,9 @@
                 }
               }
             ],
-            "skyboxConfig": {}
+            "skyboxConfig": {},
+            "creator": "",
+            "disableNearbyVoiceChat": false
           }
         }
       }

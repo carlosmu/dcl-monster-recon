@@ -1,6 +1,6 @@
 import { InputAction, engine, pointerEventsSystem } from '@dcl/sdk/ecs'
 import { EntityNames } from '../assets/scene/entity-names'
-import { setupUi, showHelloWorld } from './ui'
+import { setupUi, showBoard } from './ui'
 
 export function main() {
   setupUi()
@@ -14,10 +14,10 @@ export function main() {
   pointerEventsSystem.onPointerDown(
     {
       entity: buttonEntity,
-      opts: { button: InputAction.IA_POINTER, hoverText: 'Show message' }
+      opts: { button: InputAction.IA_POINTER, hoverText: 'Play' }
     },
     () => {
-      showHelloWorld()
+      showBoard()
     }
   )
 }
