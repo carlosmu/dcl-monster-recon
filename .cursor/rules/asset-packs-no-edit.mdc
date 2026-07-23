@@ -1,0 +1,10 @@
+---
+description: No modificar assets bajo asset-packs; sobreescribir comportamiento solo fuera de ahí (src, escena).
+alwaysApply: true
+---
+
+# `assets/asset-packs` — no editar in-place
+
+- **No modificar** archivos bajo `assets/asset-packs/**` (p. ej. `composite.json` de packs, configs embebidas). Los updates del pack, del Creator o de plantillas pueden **pisar** cambios y generar conflictos difíciles de revisar.
+- Para cambiar comportamiento (Sit Spot, prompts, pointers, etc.): **solo** en `src/` (runtime: mutar `PointerEvents`, `pointerEventsSystem`, sistemas ECS, etc.) o en artefactos de escena que el equipo trate como “nuestros” (p. ej. `assets/scene/`), **nunca** sustituyendo contenido dentro de `asset-packs/`.
+- Si hace falta un pack distinto: **fork** con otro path, copia versionada en `assets/...` propio, o contribución upstream — no mantener diffs permanentes dentro de `asset-packs/`.
