@@ -49,6 +49,8 @@ let elapsedTime = 0
 let revealedUnmatched: CellState[] = []
 let timeRemaining = GAME_DURATION
 let gameOver = false
+let won = false
+let wonMonsterQuadrant = 0
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -90,6 +92,10 @@ function flipCell(cell: CellState) {
       a.matched = true
       b.matched = true
       revealedUnmatched = []
+      if (cells.every((c) => c.matched)) {
+        won = true
+        wonMonsterQuadrant = Math.floor(Math.random() * GRID * GRID)
+      }
     }
   }
 }
@@ -109,7 +115,7 @@ export function setupUi() {
       })
     }
 
-    if (boardVisible && !gameOver) {
+    if (boardVisible && !gameOver && !won) {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
@@ -125,9 +131,12 @@ export function setupUi() {
 }
 
 export function showBoard() {
+  cells = buildCells()
+  revealedUnmatched = []
   boardVisible = true
   timeRemaining = GAME_DURATION
   gameOver = false
+  won = false
 }
 
 const MemoryMatchUi = () => (
@@ -198,5 +207,35 @@ const MemoryMatchUi = () => (
         ))}
       </UiEntity>
     </UiEntity>
+    {(won || gameOver) && (
+      <UiEntity
+        uiTransform={{
+          width: '100%',
+          height: '100%',
+          positionType: 'absolute',
+          position: { top: 0, left: 0 },
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column'
+        }}
+        uiBackground={{ color: Color4.create(0, 0, 0, 0.8) }}
+      >
+        {won ? (
+          <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+            <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+            <UiEntity
+              uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
+              uiBackground={{
+                textureMode: 'stretch',
+                texture: { src: FRONT_IMAGE },
+                uvs: getUvsForQuadrant(wonMonsterQuadrant)
+              }}
+            />
+          </UiEntity>
+        ) : (
+          <Label value="Time's up" fontSize={36} color={Color4.White()} />
+        )}
+      </UiEntity>
+    )}
   </UiEntity>
 )
