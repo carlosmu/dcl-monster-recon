@@ -3,7 +3,7 @@ import { Color4 } from '@dcl/sdk/math'
 import { engine, UiCanvasInformation } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 
-const DEBUG_CELL_BOUNDS = true
+const DEBUG_CELL_LABELS = true
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const FRONT_IMAGE = 'assets/images/collection_01.png'
@@ -215,8 +215,7 @@ const MemoryMatchUi = () => (
                 key={rowIndex * COLS + colIndex}
                 uiTransform={{
                   width: cellSize,
-                  height: cellSize,
-                  ...(DEBUG_CELL_BOUNDS ? { borderColor: Color4.Red(), borderWidth: 3 } : {})
+                  height: cellSize
                 }}
                 uiBackground={
                   cell.revealed
@@ -225,7 +224,7 @@ const MemoryMatchUi = () => (
                 }
                 onMouseDown={() => flipCell(cell)}
               >
-                {DEBUG_CELL_BOUNDS && (
+                {DEBUG_CELL_LABELS && (
                   <Label
                     value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
                     fontSize={28}
