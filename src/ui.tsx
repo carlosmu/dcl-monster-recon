@@ -9,17 +9,41 @@ const BACK_IMAGE = 'assets/images/atlas_01.png'
 const FRONT_IMAGE = 'assets/images/collection_01.png'
 const GRID = 5
 const BACK_QUADRANT_A1 = 0 // col 0, row 0 of atlas_01.png
-const COLS = 3
-const ROWS = 2
-// Max seconds a face-up, unmatched cell stays revealed before auto-hiding. Lower this for harder levels.
-const FLIP_TIMEOUT = 1
+
+type Difficulty = 'easy' | 'medium' | 'hard'
+
+interface DifficultyConfig {
+  cols: number
+  rows: number
+  duration: number
+  flipTimeout: number
+  scoreMultiplier: number
+}
+
+const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
+  easy: { cols: 3, rows: 2, duration: 30, flipTimeout: 1, scoreMultiplier: 1 },
+  medium: { cols: 4, rows: 3, duration: 30, flipTimeout: 1, scoreMultiplier: 1.5 },
+  hard: { cols: 4, rows: 4, duration: 30, flipTimeout: 1, scoreMultiplier: 2 }
+}
+
+const CURRENT_DIFFICULTY: Difficulty = 'easy'
+const {
+  cols: COLS,
+  rows: ROWS,
+  duration: GAME_DURATION,
+  flipTimeout: FLIP_TIMEOUT,
+  scoreMultiplier: SCORE_MULTIPLIER
+} = DIFFICULTIES[CURRENT_DIFFICULTY]
+
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
 const BOARD_HEIGHT_FRACTION = 400 / 1080
-// Seconds allowed to complete the board. Will become per-level configurable later.
-const GAME_DURATION = 30
 const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
+
+const BASE_POINTS_PER_PAIR = 100
+const TIME_BONUS_MAX = 200
+const ERROR_PENALTY = 10
 
 let cellSize = 200 // fallback until the first canvas read
 
@@ -51,6 +75,8 @@ let timeRemaining = GAME_DURATION
 let gameOver = false
 let won = false
 let wonMonsterQuadrant = 0
+let errors = 0
+let score = 0
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -95,7 +121,12 @@ function flipCell(cell: CellState) {
       if (cells.every((c) => c.matched)) {
         won = true
         wonMonsterQuadrant = Math.floor(Math.random() * GRID * GRID)
+        const pairCount = (COLS * ROWS) / 2
+        const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
+        score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
       }
+    } else {
+      errors++
     }
   }
 }
@@ -137,6 +168,8 @@ export function showBoard() {
   timeRemaining = GAME_DURATION
   gameOver = false
   won = false
+  errors = 0
+  score = 0
 }
 
 const MemoryMatchUi = () => (
@@ -223,6 +256,7 @@ const MemoryMatchUi = () => (
         {won ? (
           <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
             <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+            <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
             <UiEntity
               uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
               uiBackground={{
