@@ -11,15 +11,13 @@ const GRID = 5
 const BACK_QUADRANT_A1 = 0 // col 0, row 0 of atlas_01.png
 const COLS = 3
 const ROWS = 2
+// Max seconds a face-up, unmatched cell stays revealed before auto-hiding. Lower this for harder levels.
+const FLIP_TIMEOUT = 1
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
 const BOARD_HEIGHT_FRACTION = 400 / 1080
 
 let cellSize = 200 // fallback until the first canvas read
-
-function randomIndex(): number {
-  return Math.floor(Math.random() * GRID * GRID)
-}
 
 function getUvsForQuadrant(index: number): number[] {
   const col = index % GRID
@@ -37,28 +35,74 @@ function getUvsForQuadrant(index: number): number[] {
 interface CellState {
   frontQuadrant: number
   revealed: boolean
+  matched: boolean
+  flippedAt: number | null
 }
 
 let boardVisible = false
 let cells: CellState[] = []
+let elapsedTime = 0
+let revealedUnmatched: CellState[] = []
 
-function buildCells(): CellState[] {
-  const result: CellState[] = []
-  for (let i = 0; i < COLS * ROWS; i++) {
-    result.push({ frontQuadrant: randomIndex(), revealed: false })
+function shuffle<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
-  return result
 }
 
-function revealCell(cell: CellState) {
-  if (cell.revealed) return
+function buildCells(): CellState[] {
+  const pairCount = (COLS * ROWS) / 2
+  const pool = Array.from({ length: GRID * GRID }, (_, i) => i)
+  shuffle(pool)
+  const values = [...pool.slice(0, pairCount), ...pool.slice(0, pairCount)]
+  shuffle(values)
+  return values.map((frontQuadrant) => ({ frontQuadrant, revealed: false, matched: false, flippedAt: null }))
+}
+
+function hideCell(cell: CellState) {
+  cell.revealed = false
+  cell.flippedAt = null
+}
+
+function flipCell(cell: CellState) {
+  if (cell.matched || cell.revealed) return
+
+  // A 3rd flip while 2 are still face-up (mismatched, not yet timed out) forces both to hide first.
+  if (revealedUnmatched.length === 2) {
+    for (const c of revealedUnmatched) hideCell(c)
+    revealedUnmatched = []
+  }
+
   cell.revealed = true
+  cell.flippedAt = elapsedTime
+  revealedUnmatched.push(cell)
+
+  if (revealedUnmatched.length === 2) {
+    const [a, b] = revealedUnmatched
+    if (a.frontQuadrant === b.frontQuadrant) {
+      a.matched = true
+      b.matched = true
+      revealedUnmatched = []
+    }
+  }
 }
 
 export function setupUi() {
   cells = buildCells()
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
-  engine.addSystem(() => {
+  engine.addSystem((dt: number) => {
+    elapsedTime += dt
+    if (revealedUnmatched.length > 0) {
+      revealedUnmatched = revealedUnmatched.filter((cell) => {
+        if (cell.flippedAt !== null && elapsedTime - cell.flippedAt >= FLIP_TIMEOUT) {
+          hideCell(cell)
+          return false
+        }
+        return true
+      })
+    }
+
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     if (canvas) {
       const baseCellSize = Math.round((BOARD_HEIGHT_FRACTION * canvas.height) / ROWS)
@@ -105,7 +149,7 @@ const MemoryMatchUi = () => (
                   ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
                   : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: getUvsForQuadrant(BACK_QUADRANT_A1) }
               }
-              onMouseDown={() => revealCell(cell)}
+              onMouseDown={() => flipCell(cell)}
             >
               {DEBUG_CELL_BOUNDS && (
                 <Label
