@@ -16,6 +16,10 @@ const FLIP_TIMEOUT = 1
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
 const BOARD_HEIGHT_FRACTION = 400 / 1080
+// Seconds allowed to complete the board. Will become per-level configurable later.
+const GAME_DURATION = 30
+const TIMER_BAR_WIDTH = 300
+const TIMER_BAR_HEIGHT = 24
 
 let cellSize = 200 // fallback until the first canvas read
 
@@ -43,6 +47,8 @@ let boardVisible = false
 let cells: CellState[] = []
 let elapsedTime = 0
 let revealedUnmatched: CellState[] = []
+let timeRemaining = GAME_DURATION
+let gameOver = false
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -66,7 +72,7 @@ function hideCell(cell: CellState) {
 }
 
 function flipCell(cell: CellState) {
-  if (cell.matched || cell.revealed) return
+  if (gameOver || cell.matched || cell.revealed) return
 
   // A 3rd flip while 2 are still face-up (mismatched, not yet timed out) forces both to hide first.
   if (revealedUnmatched.length === 2) {
@@ -103,6 +109,13 @@ export function setupUi() {
       })
     }
 
+    if (boardVisible && !gameOver) {
+      timeRemaining = Math.max(0, timeRemaining - dt)
+      if (timeRemaining === 0) {
+        gameOver = true
+      }
+    }
+
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     if (canvas) {
       const baseCellSize = Math.round((BOARD_HEIGHT_FRACTION * canvas.height) / ROWS)
@@ -113,6 +126,8 @@ export function setupUi() {
 
 export function showBoard() {
   boardVisible = true
+  timeRemaining = GAME_DURATION
+  gameOver = false
 }
 
 const MemoryMatchUi = () => (
@@ -120,50 +135,68 @@ const MemoryMatchUi = () => (
     uiTransform={{
       width: '100%',
       height: '100%',
+      flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
       display: boardVisible ? 'flex' : 'none'
     }}
     uiBackground={{ color: Color4.create(0, 0, 0, 0.2) }}
   >
     <UiEntity
-      uiTransform={{
-        width: COLS * cellSize,
-        height: ROWS * cellSize,
-        flexDirection: 'column'
-      }}
-      uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
+      uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT, margin: { top: 20 } }}
+      uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
     >
-      {Array.from({ length: ROWS }, (_, rowIndex) => (
-        <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
-          {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
-            <UiEntity
-              key={rowIndex * COLS + colIndex}
-              uiTransform={{
-                width: cellSize,
-                height: cellSize,
-                ...(DEBUG_CELL_BOUNDS ? { borderColor: Color4.Red(), borderWidth: 3 } : {})
-              }}
-              uiBackground={
-                cell.revealed
-                  ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
-                  : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: getUvsForQuadrant(BACK_QUADRANT_A1) }
-              }
-              onMouseDown={() => flipCell(cell)}
-            >
-              {DEBUG_CELL_BOUNDS && (
-                <Label
-                  value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
-                  fontSize={28}
-                  color={Color4.Yellow()}
-                  textAlign="middle-center"
-                  uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-                />
-              )}
-            </UiEntity>
-          ))}
-        </UiEntity>
-      ))}
+      <UiEntity
+        uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
+        uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
+      />
+      <Label
+        value={`${Math.ceil(timeRemaining)}s`}
+        fontSize={18}
+        color={Color4.White()}
+        textAlign="middle-center"
+        uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+      />
+    </UiEntity>
+    <UiEntity uiTransform={{ width: '100%', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <UiEntity
+        uiTransform={{
+          width: COLS * cellSize,
+          height: ROWS * cellSize,
+          flexDirection: 'column'
+        }}
+        uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
+      >
+        {Array.from({ length: ROWS }, (_, rowIndex) => (
+          <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
+            {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+              <UiEntity
+                key={rowIndex * COLS + colIndex}
+                uiTransform={{
+                  width: cellSize,
+                  height: cellSize,
+                  ...(DEBUG_CELL_BOUNDS ? { borderColor: Color4.Red(), borderWidth: 3 } : {})
+                }}
+                uiBackground={
+                  cell.revealed
+                    ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                    : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: getUvsForQuadrant(BACK_QUADRANT_A1) }
+                }
+                onMouseDown={() => flipCell(cell)}
+              >
+                {DEBUG_CELL_BOUNDS && (
+                  <Label
+                    value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
+                    fontSize={28}
+                    color={Color4.Yellow()}
+                    textAlign="middle-center"
+                    uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+                  />
+                )}
+              </UiEntity>
+            ))}
+          </UiEntity>
+        ))}
+      </UiEntity>
     </UiEntity>
   </UiEntity>
 )
