@@ -7,8 +7,14 @@ const DEBUG_CELL_LABELS = true
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const FRONT_IMAGE = 'assets/images/collection_01.png'
-const GRID = 5
-const BACK_QUADRANT_A1 = 0 // col 0, row 0 of atlas_01.png
+// Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
+// texture (no custom uvs), so the frame art had to be exported as its own file.
+const FRAME_IMAGE = 'assets/images/frame_01.png'
+// Fraction of the frame texture occupied by each corner ornament, measured so the wood/metal
+// corners (and the baked-in close button) don't get stretched.
+const FRAME_SLICE = 0.22
+const FRONT_GRID = 5 // collection_01.png grid
+const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 
 type Difficulty = 'easy' | 'medium' | 'hard'
 
@@ -40,25 +46,37 @@ const {
 const BOARD_HEIGHT_FRACTION = 400 / 1080
 const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
+// Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
+const FRAME_PADDING_FRACTION = 96 / 1080
+const LEVEL = 1
 
 const BASE_POINTS_PER_PAIR = 100
 const TIME_BONUS_MAX = 200
 const ERROR_PENALTY = 10
 
-let cellSize = 200 // fallback until the first canvas read
+// Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
+const END_SCREEN_DURATION = 3
 
-function getUvsForQuadrant(index: number): number[] {
-  const col = index % GRID
-  const row = Math.floor(index / GRID)
-  const u1 = col / GRID
-  const u2 = (col + 1) / GRID
+let cellSize = 200 // fallback until the first canvas read
+let framePadding = 32 // fallback until the first canvas read
+
+function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
+  const u1 = col / grid
+  const u2 = (col + colSpan) / grid
   // v=0 is the bottom of the texture, v=1 is the top, so row 0 (A1, top row) must map to the topmost band
-  const v1 = (GRID - row - 1) / GRID
-  const v2 = (GRID - row) / GRID
+  const v1 = (grid - row - rowSpan) / grid
+  const v2 = (grid - row) / grid
   const original: number[] = [u1, v1, u2, v1, u2, v2, u1, v2]
   // rotate 90° clockwise
   return [...original.slice(2), ...original.slice(0, 2)]
 }
+
+function getUvsForQuadrant(index: number): number[] {
+  return getUvsForBlock(index % FRONT_GRID, Math.floor(index / FRONT_GRID), 1, 1, FRONT_GRID)
+}
+
+// Card back art now spans a 2x2 block of atlas_01.png: A1, A2, B1, B2
+const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
 
 interface CellState {
   frontQuadrant: number
@@ -77,6 +95,7 @@ let won = false
 let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
+let endScreenShownAt: number | null = null
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -87,7 +106,7 @@ function shuffle<T>(arr: T[]): void {
 
 function buildCells(): CellState[] {
   const pairCount = (COLS * ROWS) / 2
-  const pool = Array.from({ length: GRID * GRID }, (_, i) => i)
+  const pool = Array.from({ length: FRONT_GRID * FRONT_GRID }, (_, i) => i)
   shuffle(pool)
   const values = [...pool.slice(0, pairCount), ...pool.slice(0, pairCount)]
   shuffle(values)
@@ -120,10 +139,11 @@ function flipCell(cell: CellState) {
       revealedUnmatched = []
       if (cells.every((c) => c.matched)) {
         won = true
-        wonMonsterQuadrant = Math.floor(Math.random() * GRID * GRID)
+        wonMonsterQuadrant = Math.floor(Math.random() * FRONT_GRID * FRONT_GRID)
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
+        endScreenShownAt = elapsedTime
       }
     } else {
       errors++
@@ -150,13 +170,21 @@ export function setupUi() {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
+        endScreenShownAt = elapsedTime
       }
+    }
+
+    if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
+      boardVisible = false
+      endScreenShownAt = null
     }
 
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     if (canvas) {
       const baseCellSize = Math.round((BOARD_HEIGHT_FRACTION * canvas.height) / ROWS)
       cellSize = isMobile() ? Math.round(baseCellSize * 1.5) : baseCellSize
+      const basePadding = Math.round(FRAME_PADDING_FRACTION * canvas.height)
+      framePadding = isMobile() ? Math.round(basePadding * 1.5) : basePadding
     }
   })
 }
@@ -170,6 +198,7 @@ export function showBoard() {
   won = false
   errors = 0
   score = 0
+  endScreenShownAt = null
 }
 
 const MemoryMatchUi = () => (
@@ -201,42 +230,51 @@ const MemoryMatchUi = () => (
     </UiEntity>
     <UiEntity uiTransform={{ width: '100%', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
       <UiEntity
-        uiTransform={{
-          width: COLS * cellSize,
-          height: ROWS * cellSize,
-          flexDirection: 'column'
+        uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+        uiBackground={{
+          textureMode: 'nine-slices',
+          texture: { src: FRAME_IMAGE },
+          textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
         }}
-        uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
       >
-        {Array.from({ length: ROWS }, (_, rowIndex) => (
-          <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
-            {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
-              <UiEntity
-                key={rowIndex * COLS + colIndex}
-                uiTransform={{
-                  width: cellSize,
-                  height: cellSize
-                }}
-                uiBackground={
-                  cell.revealed
-                    ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
-                    : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: getUvsForQuadrant(BACK_QUADRANT_A1) }
-                }
-                onMouseDown={() => flipCell(cell)}
-              >
-                {DEBUG_CELL_LABELS && (
-                  <Label
-                    value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
-                    fontSize={28}
-                    color={Color4.Yellow()}
-                    textAlign="middle-center"
-                    uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-                  />
-                )}
-              </UiEntity>
-            ))}
-          </UiEntity>
-        ))}
+        <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+        <UiEntity
+          uiTransform={{
+            width: COLS * cellSize,
+            height: ROWS * cellSize,
+            flexDirection: 'column'
+          }}
+        >
+          {Array.from({ length: ROWS }, (_, rowIndex) => (
+            <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
+              {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+                <UiEntity
+                  key={rowIndex * COLS + colIndex}
+                  uiTransform={{
+                    width: cellSize,
+                    height: cellSize
+                  }}
+                  uiBackground={
+                    cell.revealed
+                      ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                      : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
+                  }
+                  onMouseDown={() => flipCell(cell)}
+                >
+                  {DEBUG_CELL_LABELS && (
+                    <Label
+                      value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
+                      fontSize={28}
+                      color={Color4.Yellow()}
+                      textAlign="middle-center"
+                      uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+                    />
+                  )}
+                </UiEntity>
+              ))}
+            </UiEntity>
+          ))}
+        </UiEntity>
       </UiEntity>
     </UiEntity>
     {(won || gameOver) && (
