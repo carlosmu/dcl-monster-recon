@@ -48,6 +48,9 @@ const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
 // Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 96 / 1080
+// Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
+// layout and the cellSize calculation so the grid never grows wider than the column it sits in.
+const CANVAS_MAIN_WIDTH_FRACTION = 0.4
 const LEVEL = 1
 
 const BASE_POINTS_PER_PAIR = 100
@@ -181,10 +184,14 @@ export function setupUi() {
 
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     if (canvas) {
-      const baseCellSize = Math.round((BOARD_HEIGHT_FRACTION * canvas.height) / ROWS)
-      cellSize = isMobile() ? Math.round(baseCellSize * 1.5) : baseCellSize
       const basePadding = Math.round(FRAME_PADDING_FRACTION * canvas.height)
       framePadding = isMobile() ? Math.round(basePadding * 1.5) : basePadding
+
+      const heightCellSize = Math.floor((BOARD_HEIGHT_FRACTION * canvas.height) / ROWS)
+      const availableWidth = CANVAS_MAIN_WIDTH_FRACTION * canvas.width - 2 * framePadding
+      const widthCellSize = Math.floor(availableWidth / COLS)
+      const baseCellSize = Math.min(heightCellSize, widthCellSize)
+      cellSize = isMobile() ? Math.round(baseCellSize * 1.5) : baseCellSize
     }
   })
 }
@@ -212,101 +219,153 @@ const MemoryMatchUi = () => (
     }}
     uiBackground={{ color: Color4.create(0, 0, 0, 0.2) }}
   >
+    {/* canvas_main: the safe-area column. Reserves 8% top/bottom for the system bar and stays
+        within the 30%-75% horizontal safe zone (40% wide, centered). Reuse this for all scene UI;
+        a sibling "canvas_sidebar" can be added later for anything that belongs outside this column. */}
     <UiEntity
-      uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT, margin: { top: 20 } }}
-      uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+      uiTransform={{
+        width: `${CANVAS_MAIN_WIDTH_FRACTION * 100}%`,
+        height: '100%',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: { top: '1vh', bottom: '1vh' },
+        borderWidth: 2,
+        borderColor: Color4.Green()
+      }}
     >
-      <UiEntity
-        uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
-        uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
-      />
-      <Label
-        value={`${Math.ceil(timeRemaining)}s`}
-        fontSize={18}
-        color={Color4.White()}
-        textAlign="middle-center"
-        uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-      />
-    </UiEntity>
-    <UiEntity uiTransform={{ width: '100%', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <UiEntity
-        uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
-        uiBackground={{
-          textureMode: 'nine-slices',
-          texture: { src: FRAME_IMAGE },
-          textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
-        }}
-      >
-        <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
-        <UiEntity
-          uiTransform={{
-            width: COLS * cellSize,
-            height: ROWS * cellSize,
-            flexDirection: 'column'
-          }}
-        >
-          {Array.from({ length: ROWS }, (_, rowIndex) => (
-            <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
-              {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
-                <UiEntity
-                  key={rowIndex * COLS + colIndex}
-                  uiTransform={{
-                    width: cellSize,
-                    height: cellSize
-                  }}
-                  uiBackground={
-                    cell.revealed
-                      ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
-                      : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
-                  }
-                  onMouseDown={() => flipCell(cell)}
-                >
-                  {DEBUG_CELL_LABELS && (
-                    <Label
-                      value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
-                      fontSize={28}
-                      color={Color4.Yellow()}
-                      textAlign="middle-center"
-                      uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-                    />
-                  )}
-                </UiEntity>
-              ))}
-            </UiEntity>
-          ))}
-        </UiEntity>
-      </UiEntity>
-    </UiEntity>
-    {(won || gameOver) && (
+      {/* header */}
       <UiEntity
         uiTransform={{
           width: '100%',
-          height: '100%',
-          positionType: 'absolute',
-          position: { top: 0, left: 0 },
+          minHeight: '15vh',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: Color4.Red()
+        }}
+      >
+        <UiEntity
+          uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+        >
+          <UiEntity
+            uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
+            uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
+          />
+          <Label
+            value={`${Math.ceil(timeRemaining)}s`}
+            fontSize={18}
+            color={Color4.White()}
+            textAlign="middle-center"
+            uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+          />
+        </UiEntity>
+      </UiEntity>
+
+      {/* body */}
+      <UiEntity
+        uiTransform={{
+          width: '100%',
+          height: 'auto',
           alignItems: 'center',
           justifyContent: 'center',
-          flexDirection: 'column'
+          borderWidth: 2,
+          borderColor: Color4.Red()
         }}
-        uiBackground={{ color: Color4.create(0, 0, 0, 0.8) }}
       >
-        {won ? (
-          <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-            <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
-            <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
-            <UiEntity
-              uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
-              uiBackground={{
-                textureMode: 'stretch',
-                texture: { src: FRONT_IMAGE },
-                uvs: getUvsForQuadrant(wonMonsterQuadrant)
-              }}
-            />
+        <UiEntity
+          uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+          uiBackground={{
+            textureMode: 'nine-slices',
+            texture: { src: FRAME_IMAGE },
+            textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+          }}
+        >
+          <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+          <UiEntity
+            uiTransform={{
+              width: COLS * cellSize,
+              height: ROWS * cellSize,
+              flexDirection: 'column'
+            }}
+          >
+            {Array.from({ length: ROWS }, (_, rowIndex) => (
+              <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
+                {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+                  <UiEntity
+                    key={rowIndex * COLS + colIndex}
+                    uiTransform={{
+                      width: cellSize,
+                      height: cellSize
+                    }}
+                    uiBackground={
+                      cell.revealed
+                        ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                        : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
+                    }
+                    onMouseDown={() => flipCell(cell)}
+                  >
+                    {DEBUG_CELL_LABELS && (
+                      <Label
+                        value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
+                        fontSize={28}
+                        color={Color4.Yellow()}
+                        textAlign="middle-center"
+                        uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+                      />
+                    )}
+                  </UiEntity>
+                ))}
+              </UiEntity>
+            ))}
           </UiEntity>
-        ) : (
-          <Label value="Time's up" fontSize={36} color={Color4.White()} />
-        )}
+        </UiEntity>
       </UiEntity>
-    )}
+
+      {/* footer: reserved for notifications */}
+      <UiEntity
+        uiTransform={{
+          width: '100%',
+          minHeight: '15vh',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: Color4.Red()
+        }}
+      />
+
+      {(won || gameOver) && (
+        <UiEntity
+          uiTransform={{
+            width: '100%',
+            height: '100%',
+            positionType: 'absolute',
+            position: { top: 0, left: 0 },
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column'
+          }}
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.8) }}
+        >
+          {won ? (
+            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+              <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+              <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+              <UiEntity
+                uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
+                uiBackground={{
+                  textureMode: 'stretch',
+                  texture: { src: FRONT_IMAGE },
+                  uvs: getUvsForQuadrant(wonMonsterQuadrant)
+                }}
+              />
+            </UiEntity>
+          ) : (
+            <Label value="Time's up" fontSize={36} color={Color4.White()} />
+          )}
+        </UiEntity>
+      )}
+    </UiEntity>
   </UiEntity>
 )
