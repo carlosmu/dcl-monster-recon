@@ -60,6 +60,17 @@ const ERROR_PENALTY = 10
 // Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
 
+// Placeholder notification copy — will be replaced with real event-driven messages later.
+const NOTIFICATION_MESSAGES = [
+  'Cryptonauta ha capturado un pepino mutante',
+  '0xGorducho encontró un caracol con rayos láser',
+  'SatoshiWalker desenterró un sapo con casco espacial',
+  'PixelKilla atrapó una araña bioluminiscente',
+  'ByteHunter cazó un pulpo con gorra de piloto'
+]
+const NOTIFICATION_INTERVAL = 10 // seconds between notifications
+const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on screen
+
 let cellSize = 200 // fallback until the first canvas read
 let framePadding = 32 // fallback until the first canvas read
 
@@ -99,6 +110,9 @@ let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
 let endScreenShownAt: number | null = null
+
+let notificationTimer = 0
+let currentNotification: string | null = null
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -182,6 +196,14 @@ export function setupUi() {
       endScreenShownAt = null
     }
 
+    notificationTimer += dt
+    if (notificationTimer >= NOTIFICATION_INTERVAL) {
+      notificationTimer = 0
+      currentNotification = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)]
+    } else if (currentNotification !== null && notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
+      currentNotification = null
+    }
+
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     if (canvas) {
       const basePadding = Math.round(FRAME_PADDING_FRACTION * canvas.height)
@@ -191,7 +213,10 @@ export function setupUi() {
       const availableWidth = CANVAS_MAIN_WIDTH_FRACTION * canvas.width - 2 * framePadding
       const widthCellSize = Math.floor(availableWidth / COLS)
       const baseCellSize = Math.min(heightCellSize, widthCellSize)
-      cellSize = isMobile() ? Math.round(baseCellSize * 1.5) : baseCellSize
+      const boostedCellSize = isMobile() ? Math.round(baseCellSize * 1.5) : baseCellSize
+      // Re-clamp to widthCellSize: the mobile touch-size boost must never push the grid past
+      // the available width again, or the nine-slice frame overflows canvas_main in X.
+      cellSize = Math.min(boostedCellSize, widthCellSize)
     }
   })
 }
@@ -214,10 +239,9 @@ const MemoryMatchUi = () => (
       width: '100%',
       height: '100%',
       flexDirection: 'column',
-      alignItems: 'center',
-      display: boardVisible ? 'flex' : 'none'
+      alignItems: 'center'
     }}
-    uiBackground={{ color: Color4.create(0, 0, 0, 0.2) }}
+    uiBackground={{ color: boardVisible ? Color4.create(0, 0, 0, 0.2) : Color4.create(0, 0, 0, 0) }}
   >
     {/* canvas_main: the safe-area column. Reserves 8% top/bottom for the system bar and stays
         within the 30%-75% horizontal safe zone (40% wide, centered). Reuse this for all scene UI;
@@ -245,22 +269,24 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        <UiEntity
-          uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
-          uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
-        >
+        {boardVisible && (
           <UiEntity
-            uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
-            uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
-          />
-          <Label
-            value={`${Math.ceil(timeRemaining)}s`}
-            fontSize={18}
-            color={Color4.White()}
-            textAlign="middle-center"
-            uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-          />
-        </UiEntity>
+            uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
+            uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+          >
+            <UiEntity
+              uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
+              uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
+            />
+            <Label
+              value={`${Math.ceil(timeRemaining)}s`}
+              fontSize={18}
+              color={Color4.White()}
+              textAlign="middle-center"
+              uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+            />
+          </UiEntity>
+        )}
       </UiEntity>
 
       {/* body */}
@@ -274,66 +300,78 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        <UiEntity
-          uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
-          uiBackground={{
-            textureMode: 'nine-slices',
-            texture: { src: FRAME_IMAGE },
-            textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
-          }}
-        >
-          <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+        {boardVisible && (
           <UiEntity
-            uiTransform={{
-              width: COLS * cellSize,
-              height: ROWS * cellSize,
-              flexDirection: 'column'
+            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiBackground={{
+              textureMode: 'nine-slices',
+              texture: { src: FRAME_IMAGE },
+              textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
-            {Array.from({ length: ROWS }, (_, rowIndex) => (
-              <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
-                {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
-                  <UiEntity
-                    key={rowIndex * COLS + colIndex}
-                    uiTransform={{
-                      width: cellSize,
-                      height: cellSize
-                    }}
-                    uiBackground={
-                      cell.revealed
-                        ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
-                        : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
-                    }
-                    onMouseDown={() => flipCell(cell)}
-                  >
-                    {DEBUG_CELL_LABELS && (
-                      <Label
-                        value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
-                        fontSize={28}
-                        color={Color4.Yellow()}
-                        textAlign="middle-center"
-                        uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-                      />
-                    )}
-                  </UiEntity>
-                ))}
-              </UiEntity>
-            ))}
+            <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <UiEntity
+              uiTransform={{
+                width: COLS * cellSize,
+                height: ROWS * cellSize,
+                flexDirection: 'column'
+              }}
+            >
+              {Array.from({ length: ROWS }, (_, rowIndex) => (
+                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
+                  {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+                    <UiEntity
+                      key={rowIndex * COLS + colIndex}
+                      uiTransform={{
+                        width: cellSize,
+                        height: cellSize
+                      }}
+                      uiBackground={
+                        cell.revealed
+                          ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                          : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
+                      }
+                      onMouseDown={() => flipCell(cell)}
+                    >
+                      {DEBUG_CELL_LABELS && (
+                        <Label
+                          value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
+                          fontSize={28}
+                          color={Color4.Yellow()}
+                          textAlign="middle-center"
+                          uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+                        />
+                      )}
+                    </UiEntity>
+                  ))}
+                </UiEntity>
+              ))}
+            </UiEntity>
           </UiEntity>
-        </UiEntity>
+        )}
       </UiEntity>
 
-      {/* footer: reserved for notifications */}
+      {/* footer: notifications */}
       <UiEntity
         uiTransform={{
           width: '100%',
           minHeight: '15vh',
           flexDirection: 'row',
           justifyContent: 'center',
+          alignItems: 'center',
           borderWidth: 2,
           borderColor: Color4.Red()
         }}
-      />
+      >
+        {currentNotification && (
+          <UiEntity
+            uiTransform={{ padding: { top: 10, bottom: 10, left: 20, right: 20 }, borderRadius: 16 }}
+            uiBackground={{ color: Color4.create(0, 0, 0, 0.75) }}
+          >
+            <Label value={currentNotification} fontSize={16} color={Color4.White()} textAlign="middle-center" />
+          </UiEntity>
+        )}
+      </UiEntity>
 
       {(won || gameOver) && (
         <UiEntity
