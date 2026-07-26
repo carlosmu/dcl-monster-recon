@@ -193,6 +193,8 @@ export function setupUi() {
 
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
       boardVisible = false
+      won = false
+      gameOver = false
       endScreenShownAt = null
     }
 
