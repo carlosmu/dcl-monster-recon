@@ -6,14 +6,15 @@ import { isMobile } from '@dcl/sdk/platform'
 const DEBUG_CELL_LABELS = true
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
-const FRONT_IMAGE = 'assets/images/collection_01.png'
+const FRONT_IMAGE = 'assets/images/cards_01.png'
+const PRIZE_IMAGE = 'assets/images/prizes_01.png'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
 // Fraction of the frame texture occupied by each corner ornament, measured so the wood/metal
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
-const FRONT_GRID = 5 // collection_01.png grid
+const FRONT_GRID = 5 // cards_01.png / prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -80,9 +81,8 @@ function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: numb
   // v=0 is the bottom of the texture, v=1 is the top, so row 0 (A1, top row) must map to the topmost band
   const v1 = (grid - row - rowSpan) / grid
   const v2 = (grid - row) / grid
-  const original: number[] = [u1, v1, u2, v1, u2, v2, u1, v2]
-  // rotate 90° clockwise
-  return [...original.slice(2), ...original.slice(0, 2)]
+  // uvs go bottom-left, top-left, top-right, bottom-right (clockwise), per PBUiBackground
+  return [u1, v1, u1, v2, u2, v2, u2, v1]
 }
 
 function getUvsForQuadrant(index: number): number[] {
@@ -396,7 +396,7 @@ const MemoryMatchUi = () => (
                 uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
                 uiBackground={{
                   textureMode: 'stretch',
-                  texture: { src: FRONT_IMAGE },
+                  texture: { src: PRIZE_IMAGE },
                   uvs: getUvsForQuadrant(wonMonsterQuadrant)
                 }}
               />
