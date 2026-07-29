@@ -2,6 +2,7 @@ import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { engine, UiCanvasInformation } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
+import levelsData from './levels.json'
 
 const DEBUG_CELL_LABELS = true
 
@@ -17,9 +18,7 @@ const FRAME_SLICE = 0.22
 const FRONT_GRID = 5 // cards_01.png / prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 
-type Difficulty = 'easy' | 'medium' | 'hard'
-
-interface DifficultyConfig {
+interface LevelConfig {
   cols: number
   rows: number
   duration: number
@@ -27,20 +26,16 @@ interface DifficultyConfig {
   scoreMultiplier: number
 }
 
-const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
-  easy: { cols: 3, rows: 2, duration: 30, flipTimeout: 1, scoreMultiplier: 1 },
-  medium: { cols: 4, rows: 3, duration: 30, flipTimeout: 1, scoreMultiplier: 1.5 },
-  hard: { cols: 4, rows: 4, duration: 30, flipTimeout: 1, scoreMultiplier: 2 }
-}
+// One entry per level; level N's config and prize quadrant are both LEVELS[N - 1] / (N - 1),
+// so the level order and the A1..E5 prize order stay in lockstep automatically.
+const LEVELS: LevelConfig[] = levelsData
+const TOTAL_LEVELS = LEVELS.length
 
-const CURRENT_DIFFICULTY: Difficulty = 'easy'
-const {
-  cols: COLS,
-  rows: ROWS,
-  duration: GAME_DURATION,
-  flipTimeout: FLIP_TIMEOUT,
-  scoreMultiplier: SCORE_MULTIPLIER
-} = DIFFICULTIES[CURRENT_DIFFICULTY]
+let COLS = LEVELS[0].cols
+let ROWS = LEVELS[0].rows
+let GAME_DURATION = LEVELS[0].duration
+let FLIP_TIMEOUT = LEVELS[0].flipTimeout
+let SCORE_MULTIPLIER = LEVELS[0].scoreMultiplier
 
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
@@ -52,7 +47,6 @@ const FRAME_PADDING_FRACTION = 96 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
 // layout and the cellSize calculation so the grid never grows wider than the column it sits in.
 const CANVAS_MAIN_WIDTH_FRACTION = 0.4
-const LEVEL = 1
 
 const BASE_POINTS_PER_PAIR = 100
 const TIME_BONUS_MAX = 200
@@ -99,7 +93,15 @@ interface CellState {
   flippedAt: number | null
 }
 
-let boardVisible = false
+// 'hidden' until the in-world Play button opens the level select screen.
+type Screen = 'hidden' | 'levelSelect' | 'board'
+
+let screen: Screen = 'hidden'
+let currentLevel = 1
+// In-memory only for now — will be replaced by progress read from the authoritative server.
+let highestUnlockedLevel = 1
+let levelSelectCellSize = 80 // fallback until the first canvas read
+
 let cells: CellState[] = []
 let elapsedTime = 0
 let revealedUnmatched: CellState[] = []
@@ -156,7 +158,10 @@ function flipCell(cell: CellState) {
       revealedUnmatched = []
       if (cells.every((c) => c.matched)) {
         won = true
-        wonMonsterQuadrant = Math.floor(Math.random() * FRONT_GRID * FRONT_GRID)
+        wonMonsterQuadrant = currentLevel - 1
+        if (currentLevel === highestUnlockedLevel && highestUnlockedLevel < TOTAL_LEVELS) {
+          highestUnlockedLevel++
+        }
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
@@ -183,7 +188,7 @@ export function setupUi() {
       })
     }
 
-    if (boardVisible && !gameOver && !won) {
+    if (screen === 'board' && !gameOver && !won) {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
@@ -192,7 +197,7 @@ export function setupUi() {
     }
 
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
-      boardVisible = false
+      screen = 'levelSelect'
       won = false
       gameOver = false
       endScreenShownAt = null
@@ -219,14 +224,31 @@ export function setupUi() {
       // Re-clamp to widthCellSize: the mobile touch-size boost must never push the grid past
       // the available width again, or the nine-slice frame overflows canvas_main in X.
       cellSize = Math.min(boostedCellSize, widthCellSize)
+
+      // Level select is always a fixed FRONT_GRID x FRONT_GRID grid, independent of the current level's board size.
+      const selectHeightCellSize = Math.floor((BOARD_HEIGHT_FRACTION * canvas.height) / FRONT_GRID)
+      const selectWidthCellSize = Math.floor(availableWidth / FRONT_GRID)
+      levelSelectCellSize = Math.min(selectHeightCellSize, selectWidthCellSize)
     }
   })
 }
 
-export function showBoard() {
+export function showLevelSelect() {
+  screen = 'levelSelect'
+}
+
+function startLevel(level: number) {
+  const config = LEVELS[level - 1]
+  currentLevel = level
+  COLS = config.cols
+  ROWS = config.rows
+  GAME_DURATION = config.duration
+  FLIP_TIMEOUT = config.flipTimeout
+  SCORE_MULTIPLIER = config.scoreMultiplier
+
   cells = buildCells()
   revealedUnmatched = []
-  boardVisible = true
+  screen = 'board'
   timeRemaining = GAME_DURATION
   gameOver = false
   won = false
@@ -243,7 +265,7 @@ const MemoryMatchUi = () => (
       flexDirection: 'column',
       alignItems: 'center'
     }}
-    uiBackground={{ color: boardVisible ? Color4.create(0, 0, 0, 0.2) : Color4.create(0, 0, 0, 0) }}
+    uiBackground={{ color: screen === 'board' ? Color4.create(0, 0, 0, 0.2) : Color4.create(0, 0, 0, 0) }}
   >
     {/* canvas_main: the safe-area column. Reserves 8% top/bottom for the system bar and stays
         within the 30%-75% horizontal safe zone (40% wide, centered). Reuse this for all scene UI;
@@ -271,7 +293,7 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        {boardVisible && (
+        {screen === 'board' && (
           <UiEntity
             uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
             uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
@@ -302,7 +324,7 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        {boardVisible && (
+        {screen === 'board' && (
           <UiEntity
             uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
@@ -311,7 +333,7 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
-            <Label value={`Level ${LEVEL}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <Label value={`Level ${currentLevel}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity
               uiTransform={{
                 width: COLS * cellSize,
@@ -346,6 +368,56 @@ const MemoryMatchUi = () => (
                       )}
                     </UiEntity>
                   ))}
+                </UiEntity>
+              ))}
+            </UiEntity>
+          </UiEntity>
+        )}
+
+        {screen === 'levelSelect' && (
+          <UiEntity
+            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiBackground={{
+              textureMode: 'nine-slices',
+              texture: { src: FRAME_IMAGE },
+              textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+            }}
+          >
+            <Label value="Select level" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <UiEntity
+              uiTransform={{
+                width: FRONT_GRID * levelSelectCellSize,
+                height: FRONT_GRID * levelSelectCellSize,
+                flexDirection: 'column'
+              }}
+            >
+              {Array.from({ length: FRONT_GRID }, (_, rowIndex) => (
+                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: levelSelectCellSize, flexDirection: 'row' }}>
+                  {Array.from({ length: FRONT_GRID }, (_, colIndex) => {
+                    const level = rowIndex * FRONT_GRID + colIndex + 1
+                    const unlocked = level <= highestUnlockedLevel
+                    return (
+                      <UiEntity
+                        key={level}
+                        uiTransform={{
+                          width: levelSelectCellSize,
+                          height: levelSelectCellSize,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: 2
+                        }}
+                        uiBackground={{ color: unlocked ? Color4.create(0.2, 0.6, 0.9, 0.6) : Color4.create(0, 0, 0, 0.5) }}
+                        onMouseDown={unlocked ? () => startLevel(level) : undefined}
+                      >
+                        <Label
+                          value={unlocked ? `Level ${String(level).padStart(2, '0')}` : 'Locked'}
+                          fontSize={14}
+                          color={Color4.White()}
+                          textAlign="middle-center"
+                        />
+                      </UiEntity>
+                    )
+                  })}
                 </UiEntity>
               ))}
             </UiEntity>
