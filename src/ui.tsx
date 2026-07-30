@@ -104,13 +104,15 @@ interface CellState {
 }
 
 // 'hidden' until the in-world Play button opens the checkpoint select screen.
-type Screen = 'hidden' | 'checkpointSelect' | 'board'
+type Screen = 'hidden' | 'checkpointSelect' | 'board' | 'inventory'
 
 let screen: Screen = 'hidden'
 let currentCheckpoint = 1
 let currentBoardIndex = 0 // 0-based index into the current checkpoint's boards array
 // In-memory only for now — will be replaced by progress read from the authoritative server.
 let highestUnlockedCheckpoint = 1
+// One slot per checkpoint; true once that checkpoint's monster prize has been collected.
+const collectedMonsters: boolean[] = new Array(TOTAL_CHECKPOINTS).fill(false)
 const CHECKPOINT_SELECT_COLS = FRONT_GRID
 const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
 let checkpointSelectCellSize = 80 // fallback until the first canvas read
@@ -185,6 +187,7 @@ function flipCell(cell: CellState) {
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
         if (checkpointComplete) {
           wonMonsterQuadrant = currentCheckpoint - 1
+          collectedMonsters[currentCheckpoint - 1] = true
           if (currentCheckpoint === highestUnlockedCheckpoint && highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
             highestUnlockedCheckpoint++
           }
@@ -350,6 +353,14 @@ function closeCheckpointSelect() {
   screen = 'hidden'
 }
 
+function showInventory() {
+  screen = 'inventory'
+}
+
+function closeInventory() {
+  screen = 'hidden'
+}
+
 const MemoryMatchUi = () => (
   <UiEntity
     uiTransform={{
@@ -440,8 +451,9 @@ const MemoryMatchUi = () => (
               margin: { right: 8 }
             }}
             uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            onMouseDown={() => showInventory()}
           >
-            <Label value="Inventory" fontSize={14} color={Color4.White()} textAlign="middle-center" />
+            <Label value="Monster Codex" fontSize={14} color={Color4.White()} textAlign="middle-center" />
           </UiEntity>
           <UiEntity
             uiTransform={{
@@ -596,6 +608,68 @@ const MemoryMatchUi = () => (
                           color={Color4.White()}
                           textAlign="middle-center"
                         />
+                      </UiEntity>
+                    )
+                  })}
+                </UiEntity>
+              ))}
+            </UiEntity>
+          </UiEntity>
+        )}
+
+        {screen === 'inventory' && (
+          <UiEntity
+            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiBackground={{
+              textureMode: 'nine-slices',
+              texture: { src: FRAME_IMAGE },
+              textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+            }}
+          >
+            <UiEntity
+              uiTransform={{
+                width: CLOSE_BUTTON_SIZE,
+                height: CLOSE_BUTTON_SIZE,
+                positionType: 'absolute',
+                position: { top: 8, right: 8 },
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: Color4.Red() }}
+              onMouseDown={() => closeInventory()}
+            >
+              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
+            <Label value="Monster Codex" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <UiEntity
+              uiTransform={{
+                width: CHECKPOINT_SELECT_COLS * checkpointSelectCellSize,
+                height: CHECKPOINT_SELECT_ROWS * checkpointSelectCellSize,
+                flexDirection: 'column'
+              }}
+            >
+              {Array.from({ length: CHECKPOINT_SELECT_ROWS }, (_, rowIndex) => (
+                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: checkpointSelectCellSize, flexDirection: 'row' }}>
+                  {Array.from({ length: CHECKPOINT_SELECT_COLS }, (_, colIndex) => {
+                    const slot = rowIndex * CHECKPOINT_SELECT_COLS + colIndex
+                    const collected = slot < TOTAL_CHECKPOINTS && collectedMonsters[slot]
+                    return (
+                      <UiEntity
+                        key={slot}
+                        uiTransform={{
+                          width: checkpointSelectCellSize,
+                          height: checkpointSelectCellSize,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: 2
+                        }}
+                        uiBackground={
+                          collected
+                            ? { textureMode: 'stretch', texture: { src: PRIZE_IMAGE }, uvs: getUvsForQuadrant(slot) }
+                            : { color: Color4.create(0, 0, 0, 0.5) }
+                        }
+                      >
+                        {!collected && <Label value="?" fontSize={14} color={Color4.White()} textAlign="middle-center" />}
                       </UiEntity>
                     )
                   })}
