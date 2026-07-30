@@ -51,6 +51,7 @@ const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
 const HEADER_BUTTON_WIDTH = 110
 const HEADER_BUTTON_HEIGHT = 40
+const CLOSE_BUTTON_SIZE = 32
 // Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 96 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
@@ -335,6 +336,20 @@ function startCheckpoint(checkpoint: number) {
   startBoard(checkpoint, 0)
 }
 
+function closeBoard() {
+  stopBoardMusic()
+  screen = 'checkpointSelect'
+  gameOver = false
+  won = false
+  checkpointComplete = false
+  showingPrize = false
+  endScreenShownAt = null
+}
+
+function closeCheckpointSelect() {
+  screen = 'hidden'
+}
+
 const MemoryMatchUi = () => (
   <UiEntity
     uiTransform={{
@@ -463,6 +478,20 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
+            <UiEntity
+              uiTransform={{
+                width: CLOSE_BUTTON_SIZE,
+                height: CLOSE_BUTTON_SIZE,
+                positionType: 'absolute',
+                position: { top: 8, right: 8 },
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: Color4.Red() }}
+              onMouseDown={() => closeBoard()}
+            >
+              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
             <Label
               value={`Checkpoint ${currentCheckpoint} · Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
               fontSize={28}
@@ -518,6 +547,20 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
+            <UiEntity
+              uiTransform={{
+                width: CLOSE_BUTTON_SIZE,
+                height: CLOSE_BUTTON_SIZE,
+                positionType: 'absolute',
+                position: { top: 8, right: 8 },
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: Color4.Red() }}
+              onMouseDown={() => closeCheckpointSelect()}
+            >
+              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
             <Label value="Select checkpoint" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity
               uiTransform={{
