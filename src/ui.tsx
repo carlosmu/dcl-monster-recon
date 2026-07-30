@@ -11,6 +11,7 @@ const FRONT_IMAGE = 'assets/images/cards_01.png'
 const PRIZE_IMAGE = 'assets/images/prizes_01.png'
 const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
+const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
@@ -48,6 +49,8 @@ let SCORE_MULTIPLIER = CHECKPOINTS[0].boards[0].scoreMultiplier
 const BOARD_HEIGHT_FRACTION = 400 / 1080
 const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
+const HEADER_BUTTON_WIDTH = 110
+const HEADER_BUTTON_HEIGHT = 40
 // Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 96 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
@@ -118,9 +121,11 @@ let timeRemaining = GAME_DURATION
 let gameOver = false
 let won = false
 let checkpointComplete = false
+let showingPrize = false
 let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
+let totalScore = 0
 let endScreenShownAt: number | null = null
 
 let notificationTimer = 0
@@ -173,6 +178,7 @@ function flipCell(cell: CellState) {
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
+        totalScore += score
 
         const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
@@ -192,6 +198,7 @@ function flipCell(cell: CellState) {
 
 let boardMusicEntity: Entity
 let boardEndEntity: Entity
+let prizeEntity: Entity
 
 function playBoardMusic() {
   AudioSource.getMutable(boardMusicEntity).playing = true
@@ -207,6 +214,10 @@ function playBoardEndSound() {
   AudioSource.playSound(boardEndEntity, BOARD_END_CLIP, true)
 }
 
+function playPrizeSound() {
+  AudioSource.playSound(prizeEntity, PRIZE_CLIP, true)
+}
+
 export function setupUi() {
   cells = buildCells()
 
@@ -217,6 +228,10 @@ export function setupUi() {
   boardEndEntity = engine.addEntity()
   Transform.create(boardEndEntity)
   AudioSource.create(boardEndEntity, { audioClipUrl: BOARD_END_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
+  prizeEntity = engine.addEntity()
+  Transform.create(prizeEntity)
+  AudioSource.create(prizeEntity, { audioClipUrl: PRIZE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
   engine.addSystem((dt: number) => {
@@ -244,11 +259,16 @@ export function setupUi() {
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
       if (won && !checkpointComplete) {
         startBoard(currentCheckpoint, currentBoardIndex + 1)
+      } else if (won && checkpointComplete && !showingPrize) {
+        showingPrize = true
+        playPrizeSound()
+        endScreenShownAt = elapsedTime
       } else {
         screen = 'checkpointSelect'
         won = false
         gameOver = false
         checkpointComplete = false
+        showingPrize = false
         endScreenShownAt = null
       }
     }
@@ -304,6 +324,7 @@ function startBoard(checkpoint: number, boardIndex: number) {
   gameOver = false
   won = false
   checkpointComplete = false
+  showingPrize = false
   errors = 0
   score = 0
   endScreenShownAt = null
@@ -339,35 +360,87 @@ const MemoryMatchUi = () => (
         borderColor: Color4.Green()
       }}
     >
-      {/* header */}
+      {/* header: left (score + tbd), middle (timer / play), right (inventory / checkpoints) */}
       <UiEntity
         uiTransform={{
           width: '100%',
           minHeight: '15vh',
           flexDirection: 'row',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           borderWidth: 2,
           borderColor: Color4.Red()
         }}
       >
-        {screen === 'board' && (
-          <UiEntity
-            uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
-            uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
-          >
-            <UiEntity
-              uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
-              uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
-            />
-            <Label
-              value={`${Math.ceil(timeRemaining)}s`}
-              fontSize={18}
-              color={Color4.White()}
-              textAlign="middle-center"
-              uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-            />
+        <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center' }}>
+          <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center', margin: { right: 12 } }}>
+            <Label value="Score" fontSize={14} color={Color4.White()} />
+            <Label value={`${totalScore}`} fontSize={20} color={Color4.White()} />
           </UiEntity>
-        )}
+          {/* second left slot: TBD */}
+          <UiEntity uiTransform={{ width: HEADER_BUTTON_WIDTH, height: HEADER_BUTTON_HEIGHT }} />
+        </UiEntity>
+
+        <UiEntity uiTransform={{ alignItems: 'center', justifyContent: 'center' }}>
+          {screen === 'board' ? (
+            <UiEntity
+              uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
+              uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+            >
+              <UiEntity
+                uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
+                uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
+              />
+              <Label
+                value={`${Math.ceil(timeRemaining)}s`}
+                fontSize={18}
+                color={Color4.White()}
+                textAlign="middle-center"
+                uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+              />
+            </UiEntity>
+          ) : (
+            <UiEntity
+              uiTransform={{
+                width: HEADER_BUTTON_WIDTH,
+                height: HEADER_BUTTON_HEIGHT,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: Color4.create(0.2, 0.7, 0.3, 1) }}
+              onMouseDown={() => showCheckpointSelect()}
+            >
+              <Label value="PLAY" fontSize={20} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
+          )}
+        </UiEntity>
+
+        <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center' }}>
+          <UiEntity
+            uiTransform={{
+              width: HEADER_BUTTON_WIDTH,
+              height: HEADER_BUTTON_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: { right: 8 }
+            }}
+            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+          >
+            <Label value="Inventory" fontSize={14} color={Color4.White()} textAlign="middle-center" />
+          </UiEntity>
+          <UiEntity
+            uiTransform={{
+              width: HEADER_BUTTON_WIDTH,
+              height: HEADER_BUTTON_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            onMouseDown={() => showCheckpointSelect()}
+          >
+            <Label value="Checkpoints" fontSize={14} color={Color4.White()} textAlign="middle-center" />
+          </UiEntity>
+        </UiEntity>
       </UiEntity>
 
       {/* body */}
@@ -526,10 +599,9 @@ const MemoryMatchUi = () => (
           uiBackground={{ color: Color4.create(0, 0, 0, 0.8) }}
         >
           {won ? (
-            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label value={checkpointComplete ? 'Monster collected!' : 'Board complete!'} fontSize={36} color={Color4.White()} />
-              <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
-              {checkpointComplete && (
+            showingPrize ? (
+              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+                <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
                 <UiEntity
                   uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
                   uiBackground={{
@@ -538,8 +610,13 @@ const MemoryMatchUi = () => (
                     uvs: getUvsForQuadrant(wonMonsterQuadrant)
                   }}
                 />
-              )}
-            </UiEntity>
+              </UiEntity>
+            ) : (
+              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+                <Label value="Board complete!" fontSize={36} color={Color4.White()} />
+                <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+              </UiEntity>
+            )
           ) : (
             <Label value="Time's up" fontSize={36} color={Color4.White()} />
           )}
