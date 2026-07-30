@@ -702,43 +702,44 @@ const MemoryMatchUi = () => (
         )}
       </UiEntity>
 
-      {(won || gameOver) && (
-        <UiEntity
-          uiTransform={{
-            width: '100%',
-            height: '100%',
-            positionType: 'absolute',
-            position: { top: 0, left: 0 },
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column'
-          }}
-          uiBackground={{ color: Color4.create(0, 0, 0, 0.8) }}
-        >
-          {won ? (
-            showingPrize ? (
-              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-                <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
-                <UiEntity
-                  uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
-                  uiBackground={{
-                    textureMode: 'stretch',
-                    texture: { src: PRIZE_IMAGE },
-                    uvs: getUvsForQuadrant(wonMonsterQuadrant)
-                  }}
-                />
-              </UiEntity>
-            ) : (
-              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-                <Label value="Board complete!" fontSize={36} color={Color4.White()} />
-                <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
-              </UiEntity>
-            )
-          ) : (
-            <Label value="Time's up" fontSize={36} color={Color4.White()} />
-          )}
-        </UiEntity>
-      )}
     </UiEntity>
+
+    {(won || gameOver) && (
+      <UiEntity
+        uiTransform={{
+          width: '100%',
+          height: '100%',
+          positionType: 'absolute',
+          position: { top: 0, left: 0 },
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column'
+        }}
+        uiBackground={{ color: Color4.create(0, 0, 0, 0.95) }}
+      >
+        {won ? (
+          showingPrize ? (
+            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+              <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+              <UiEntity
+                uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
+                uiBackground={{
+                  textureMode: 'stretch',
+                  texture: { src: PRIZE_IMAGE },
+                  uvs: getUvsForQuadrant(wonMonsterQuadrant)
+                }}
+              />
+            </UiEntity>
+          ) : (
+            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+              <Label value="Board complete!" fontSize={36} color={Color4.White()} />
+              <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+            </UiEntity>
+          )
+        ) : (
+          <Label value="Time's up" fontSize={36} color={Color4.White()} />
+        )}
+      </UiEntity>
+    )}
   </UiEntity>
 )
