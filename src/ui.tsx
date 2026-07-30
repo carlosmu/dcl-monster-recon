@@ -1,6 +1,6 @@
 import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { engine, UiCanvasInformation } from '@dcl/sdk/ecs'
+import { engine, UiCanvasInformation, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import checkpointsData from './checkpoints.json'
 
@@ -9,6 +9,8 @@ const DEBUG_CELL_LABELS = true
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const FRONT_IMAGE = 'assets/images/cards_01.png'
 const PRIZE_IMAGE = 'assets/images/prizes_01.png'
+const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
+const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
@@ -166,6 +168,8 @@ function flipCell(cell: CellState) {
       revealedUnmatched = []
       if (cells.every((c) => c.matched)) {
         won = true
+        stopBoardMusic()
+        playBoardEndSound()
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
@@ -186,8 +190,34 @@ function flipCell(cell: CellState) {
   }
 }
 
+let boardMusicEntity: Entity
+let boardEndEntity: Entity
+
+function playBoardMusic() {
+  AudioSource.getMutable(boardMusicEntity).playing = true
+}
+
+function stopBoardMusic() {
+  AudioSource.getMutable(boardMusicEntity).playing = false
+}
+
+function playBoardEndSound() {
+  // playSound() always emits a CRDT PUT, so repeated calls reliably retrigger from the start
+  // (unlike toggling `playing` directly, which can collapse same-tick writes and no-op).
+  AudioSource.playSound(boardEndEntity, BOARD_END_CLIP, true)
+}
+
 export function setupUi() {
   cells = buildCells()
+
+  boardMusicEntity = engine.addEntity()
+  Transform.create(boardMusicEntity)
+  AudioSource.create(boardMusicEntity, { audioClipUrl: BOARD_MUSIC_CLIP, playing: false, loop: true, volume: 0.5, global: true })
+
+  boardEndEntity = engine.addEntity()
+  Transform.create(boardEndEntity)
+  AudioSource.create(boardEndEntity, { audioClipUrl: BOARD_END_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
   engine.addSystem((dt: number) => {
     elapsedTime += dt
@@ -205,6 +235,8 @@ export function setupUi() {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
+        stopBoardMusic()
+        playBoardEndSound()
         endScreenShownAt = elapsedTime
       }
     }
@@ -275,6 +307,7 @@ function startBoard(checkpoint: number, boardIndex: number) {
   errors = 0
   score = 0
   endScreenShownAt = null
+  playBoardMusic()
 }
 
 function startCheckpoint(checkpoint: number) {
