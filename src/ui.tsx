@@ -2,7 +2,7 @@ import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { engine, UiCanvasInformation } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
-import levelsData from './levels.json'
+import checkpointsData from './checkpoints.json'
 
 const DEBUG_CELL_LABELS = true
 
@@ -18,7 +18,7 @@ const FRAME_SLICE = 0.22
 const FRONT_GRID = 5 // cards_01.png / prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 
-interface LevelConfig {
+interface BoardConfig {
   cols: number
   rows: number
   duration: number
@@ -26,16 +26,20 @@ interface LevelConfig {
   scoreMultiplier: number
 }
 
-// One entry per level; level N's config and prize quadrant are both LEVELS[N - 1] / (N - 1),
-// so the level order and the A1..E5 prize order stay in lockstep automatically.
-const LEVELS: LevelConfig[] = levelsData
-const TOTAL_LEVELS = LEVELS.length
+interface CheckpointConfig {
+  boards: BoardConfig[]
+}
 
-let COLS = LEVELS[0].cols
-let ROWS = LEVELS[0].rows
-let GAME_DURATION = LEVELS[0].duration
-let FLIP_TIMEOUT = LEVELS[0].flipTimeout
-let SCORE_MULTIPLIER = LEVELS[0].scoreMultiplier
+// One entry per checkpoint; checkpoint N's prize quadrant is CHECKPOINTS[N - 1] / (N - 1),
+// so the checkpoint order and the A1..E5 prize order stay in lockstep automatically.
+const CHECKPOINTS: CheckpointConfig[] = checkpointsData
+const TOTAL_CHECKPOINTS = CHECKPOINTS.length
+
+let COLS = CHECKPOINTS[0].boards[0].cols
+let ROWS = CHECKPOINTS[0].boards[0].rows
+let GAME_DURATION = CHECKPOINTS[0].boards[0].duration
+let FLIP_TIMEOUT = CHECKPOINTS[0].boards[0].flipTimeout
+let SCORE_MULTIPLIER = CHECKPOINTS[0].boards[0].scoreMultiplier
 
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
@@ -93,14 +97,17 @@ interface CellState {
   flippedAt: number | null
 }
 
-// 'hidden' until the in-world Play button opens the level select screen.
-type Screen = 'hidden' | 'levelSelect' | 'board'
+// 'hidden' until the in-world Play button opens the checkpoint select screen.
+type Screen = 'hidden' | 'checkpointSelect' | 'board'
 
 let screen: Screen = 'hidden'
-let currentLevel = 1
+let currentCheckpoint = 1
+let currentBoardIndex = 0 // 0-based index into the current checkpoint's boards array
 // In-memory only for now — will be replaced by progress read from the authoritative server.
-let highestUnlockedLevel = 1
-let levelSelectCellSize = 80 // fallback until the first canvas read
+let highestUnlockedCheckpoint = 1
+const CHECKPOINT_SELECT_COLS = FRONT_GRID
+const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
+let checkpointSelectCellSize = 80 // fallback until the first canvas read
 
 let cells: CellState[] = []
 let elapsedTime = 0
@@ -108,6 +115,7 @@ let revealedUnmatched: CellState[] = []
 let timeRemaining = GAME_DURATION
 let gameOver = false
 let won = false
+let checkpointComplete = false
 let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
@@ -158,13 +166,18 @@ function flipCell(cell: CellState) {
       revealedUnmatched = []
       if (cells.every((c) => c.matched)) {
         won = true
-        wonMonsterQuadrant = currentLevel - 1
-        if (currentLevel === highestUnlockedLevel && highestUnlockedLevel < TOTAL_LEVELS) {
-          highestUnlockedLevel++
-        }
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
+
+        const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
+        checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
+        if (checkpointComplete) {
+          wonMonsterQuadrant = currentCheckpoint - 1
+          if (currentCheckpoint === highestUnlockedCheckpoint && highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
+            highestUnlockedCheckpoint++
+          }
+        }
         endScreenShownAt = elapsedTime
       }
     } else {
@@ -197,10 +210,15 @@ export function setupUi() {
     }
 
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
-      screen = 'levelSelect'
-      won = false
-      gameOver = false
-      endScreenShownAt = null
+      if (won && !checkpointComplete) {
+        startBoard(currentCheckpoint, currentBoardIndex + 1)
+      } else {
+        screen = 'checkpointSelect'
+        won = false
+        gameOver = false
+        checkpointComplete = false
+        endScreenShownAt = null
+      }
     }
 
     notificationTimer += dt
@@ -225,21 +243,22 @@ export function setupUi() {
       // the available width again, or the nine-slice frame overflows canvas_main in X.
       cellSize = Math.min(boostedCellSize, widthCellSize)
 
-      // Level select is always a fixed FRONT_GRID x FRONT_GRID grid, independent of the current level's board size.
-      const selectHeightCellSize = Math.floor((BOARD_HEIGHT_FRACTION * canvas.height) / FRONT_GRID)
-      const selectWidthCellSize = Math.floor(availableWidth / FRONT_GRID)
-      levelSelectCellSize = Math.min(selectHeightCellSize, selectWidthCellSize)
+      // Checkpoint select is always a fixed grid, independent of the current board's size.
+      const selectHeightCellSize = Math.floor((BOARD_HEIGHT_FRACTION * canvas.height) / CHECKPOINT_SELECT_ROWS)
+      const selectWidthCellSize = Math.floor(availableWidth / CHECKPOINT_SELECT_COLS)
+      checkpointSelectCellSize = Math.min(selectHeightCellSize, selectWidthCellSize)
     }
   })
 }
 
-export function showLevelSelect() {
-  screen = 'levelSelect'
+export function showCheckpointSelect() {
+  screen = 'checkpointSelect'
 }
 
-function startLevel(level: number) {
-  const config = LEVELS[level - 1]
-  currentLevel = level
+function startBoard(checkpoint: number, boardIndex: number) {
+  const config = CHECKPOINTS[checkpoint - 1].boards[boardIndex]
+  currentCheckpoint = checkpoint
+  currentBoardIndex = boardIndex
   COLS = config.cols
   ROWS = config.rows
   GAME_DURATION = config.duration
@@ -252,9 +271,14 @@ function startLevel(level: number) {
   timeRemaining = GAME_DURATION
   gameOver = false
   won = false
+  checkpointComplete = false
   errors = 0
   score = 0
   endScreenShownAt = null
+}
+
+function startCheckpoint(checkpoint: number) {
+  startBoard(checkpoint, 0)
 }
 
 const MemoryMatchUi = () => (
@@ -333,7 +357,12 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
-            <Label value={`Level ${currentLevel}`} fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <Label
+              value={`Checkpoint ${currentCheckpoint} · Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
+              fontSize={28}
+              color={Color4.White()}
+              uiTransform={{ margin: { bottom: 12 } }}
+            />
             <UiEntity
               uiTransform={{
                 width: COLS * cellSize,
@@ -374,7 +403,7 @@ const MemoryMatchUi = () => (
           </UiEntity>
         )}
 
-        {screen === 'levelSelect' && (
+        {screen === 'checkpointSelect' && (
           <UiEntity
             uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
@@ -383,34 +412,37 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
-            <Label value="Select level" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <Label value="Select checkpoint" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity
               uiTransform={{
-                width: FRONT_GRID * levelSelectCellSize,
-                height: FRONT_GRID * levelSelectCellSize,
+                width: CHECKPOINT_SELECT_COLS * checkpointSelectCellSize,
+                height: CHECKPOINT_SELECT_ROWS * checkpointSelectCellSize,
                 flexDirection: 'column'
               }}
             >
-              {Array.from({ length: FRONT_GRID }, (_, rowIndex) => (
-                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: levelSelectCellSize, flexDirection: 'row' }}>
-                  {Array.from({ length: FRONT_GRID }, (_, colIndex) => {
-                    const level = rowIndex * FRONT_GRID + colIndex + 1
-                    const unlocked = level <= highestUnlockedLevel
+              {Array.from({ length: CHECKPOINT_SELECT_ROWS }, (_, rowIndex) => (
+                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: checkpointSelectCellSize, flexDirection: 'row' }}>
+                  {Array.from({ length: CHECKPOINT_SELECT_COLS }, (_, colIndex) => {
+                    const checkpoint = rowIndex * CHECKPOINT_SELECT_COLS + colIndex + 1
+                    if (checkpoint > TOTAL_CHECKPOINTS) {
+                      return <UiEntity key={checkpoint} uiTransform={{ width: checkpointSelectCellSize, height: checkpointSelectCellSize, margin: 2 }} />
+                    }
+                    const unlocked = checkpoint <= highestUnlockedCheckpoint
                     return (
                       <UiEntity
-                        key={level}
+                        key={checkpoint}
                         uiTransform={{
-                          width: levelSelectCellSize,
-                          height: levelSelectCellSize,
+                          width: checkpointSelectCellSize,
+                          height: checkpointSelectCellSize,
                           alignItems: 'center',
                           justifyContent: 'center',
                           margin: 2
                         }}
                         uiBackground={{ color: unlocked ? Color4.create(0.2, 0.6, 0.9, 0.6) : Color4.create(0, 0, 0, 0.5) }}
-                        onMouseDown={unlocked ? () => startLevel(level) : undefined}
+                        onMouseDown={unlocked ? () => startCheckpoint(checkpoint) : undefined}
                       >
                         <Label
-                          value={unlocked ? `Level ${String(level).padStart(2, '0')}` : 'Locked'}
+                          value={unlocked ? `Checkpoint ${String(checkpoint).padStart(2, '0')}` : 'Locked'}
                           fontSize={14}
                           color={Color4.White()}
                           textAlign="middle-center"
@@ -462,16 +494,18 @@ const MemoryMatchUi = () => (
         >
           {won ? (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+              <Label value={checkpointComplete ? 'Monster collected!' : 'Board complete!'} fontSize={36} color={Color4.White()} />
               <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
-              <UiEntity
-                uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
-                uiBackground={{
-                  textureMode: 'stretch',
-                  texture: { src: PRIZE_IMAGE },
-                  uvs: getUvsForQuadrant(wonMonsterQuadrant)
-                }}
-              />
+              {checkpointComplete && (
+                <UiEntity
+                  uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
+                  uiBackground={{
+                    textureMode: 'stretch',
+                    texture: { src: PRIZE_IMAGE },
+                    uvs: getUvsForQuadrant(wonMonsterQuadrant)
+                  }}
+                />
+              )}
             </UiEntity>
           ) : (
             <Label value="Time's up" fontSize={36} color={Color4.White()} />
