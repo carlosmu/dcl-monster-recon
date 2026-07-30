@@ -71,6 +71,13 @@
   },
   "creator": "",
   "skyboxConfig": {},
+  "authoritativeMultiplayer": true,
+  "worldConfiguration": {
+    "name": "carlosmu.dcl.eth"
+  },
+  "logsPermissions": [
+    "0x4B538E1E044922aec2F428EC7E17A99f44205fF9"
+  ],
   "source": {
     "origin": "creator-hub",
     "projectId": "9e5e61d5-04b2-426f-91f9-29e9b58ff48f"

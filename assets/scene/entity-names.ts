@@ -5,5 +5,6 @@
  * Object containing all entity names in the scene for autocomplete support.
  */
 export enum EntityNames {
+  Admin_Tools = "Admin Tools",
   button = "button",
 } 

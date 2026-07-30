@@ -78,6 +78,27 @@
             },
             "parent": 0
           }
+        },
+        "513": {
+          "json": {
+            "position": {
+              "x": 19.25,
+              "y": 0,
+              "z": 28.25
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "parent": 0
+          }
         }
       }
     },
@@ -102,6 +123,12 @@
           "json": {
             "networkId": 0,
             "entityId": 8002
+          }
+        },
+        "513": {
+          "json": {
+            "networkId": 0,
+            "entityId": 8003
           }
         }
       }
@@ -166,6 +193,11 @@
           "json": {
             "value": "button"
           }
+        },
+        "513": {
+          "json": {
+            "value": "Admin Tools"
+          }
         }
       }
     },
@@ -217,6 +249,13 @@
             "componentIds": [
               1042,
               1020
+            ]
+          }
+        },
+        "513": {
+          "json": {
+            "componentIds": [
+              99929642
             ]
           }
         }
@@ -317,7 +356,8 @@
                 "entity": 0,
                 "open": true,
                 "children": [
-                  512
+                  512,
+                  513
                 ]
               },
               {
@@ -330,6 +370,10 @@
               },
               {
                 "entity": 512,
+                "children": []
+              },
+              {
+                "entity": 513,
                 "children": []
               }
             ]
@@ -355,6 +399,9 @@
       },
       "data": {
         "512": {
+          "json": {}
+        },
+        "513": {
           "json": {}
         }
       }
@@ -806,6 +853,23 @@
             "assetId": "89d3e0e7-b9cd-406e-bd95-8abba3b37cc6",
             "helpTooltip": {
               "text": "Configure the button's hover text and actions. Set what happens when the button is clicked by configuring triggers and actions."
+            },
+            "version": 1
+          }
+        },
+        "513": {
+          "json": {
+            "isBasicViewEnabled": true,
+            "componentName": "Admin Tools",
+            "fields": [
+              {
+                "name": "Controls",
+                "type": "asset-packs::AdminTools"
+              }
+            ],
+            "assetId": "0c419cb9-bc21-4c51-977f-41a505a097f0",
+            "helpTooltip": {
+              "text": "Admin users can play videos, send text announcements, and trigger smart item actions. People with publish permissions are automatically admin users, you can add other users manually after publishing the scene."
             },
             "version": 1
           }
@@ -1846,6 +1910,283 @@
                 "basicViewId": "trigger-when-clicked"
               }
             ]
+          }
+        }
+      }
+    },
+    {
+      "name": "asset-packs::AdminTools",
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "adminPermissions": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "default": "PUBLIC",
+            "serializationType": "enum-string",
+            "enumObject": {
+              "PUBLIC": "PUBLIC",
+              "PRIVATE": "PRIVATE"
+            }
+          },
+          "authorizedAdminUsers": {
+            "type": "object",
+            "properties": {
+              "me": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "sceneOwners": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "allowList": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "adminAllowList": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "serializationType": "utf8-string"
+                },
+                "serializationType": "array"
+              }
+            },
+            "serializationType": "map"
+          },
+          "moderationControl": {
+            "type": "object",
+            "properties": {
+              "isEnabled": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "kickCoordinates": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "serializationType": "float32"
+                  },
+                  "y": {
+                    "type": "number",
+                    "serializationType": "float32"
+                  },
+                  "z": {
+                    "type": "number",
+                    "serializationType": "float32"
+                  }
+                },
+                "serializationType": "map"
+              },
+              "allowNonOwnersManageAdminAllowList": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              }
+            },
+            "serializationType": "map"
+          },
+          "textAnnouncementControl": {
+            "type": "object",
+            "properties": {
+              "isEnabled": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "playSoundOnEachAnnouncement": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "showAuthorOnEachAnnouncement": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              }
+            },
+            "serializationType": "map"
+          },
+          "videoControl": {
+            "type": "object",
+            "properties": {
+              "isEnabled": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "disableVideoPlayersSound": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "showAuthorOnVideoPlayers": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "linkAllVideoPlayers": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "videoPlayers": {
+                "type": "array",
+                "serializationType": "optional",
+                "optionalJsonSchema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "type": "integer",
+                        "serializationType": "int32"
+                      },
+                      "customName": {
+                        "type": "string",
+                        "serializationType": "utf8-string"
+                      }
+                    },
+                    "serializationType": "map"
+                  },
+                  "serializationType": "array"
+                }
+              }
+            },
+            "serializationType": "map"
+          },
+          "smartItemsControl": {
+            "type": "object",
+            "properties": {
+              "isEnabled": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "linkAllSmartItems": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "smartItems": {
+                "type": "array",
+                "serializationType": "optional",
+                "optionalJsonSchema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "type": "integer",
+                        "serializationType": "int32"
+                      },
+                      "customName": {
+                        "type": "string",
+                        "serializationType": "utf8-string"
+                      },
+                      "defaultAction": {
+                        "type": "string",
+                        "serializationType": "utf8-string"
+                      }
+                    },
+                    "serializationType": "map"
+                  },
+                  "serializationType": "array"
+                }
+              }
+            },
+            "serializationType": "map"
+          },
+          "rewardsControl": {
+            "type": "object",
+            "properties": {
+              "isEnabled": {
+                "type": "boolean",
+                "serializationType": "boolean"
+              },
+              "rewardItems": {
+                "type": "array",
+                "serializationType": "optional",
+                "optionalJsonSchema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "type": "integer",
+                        "serializationType": "int32"
+                      },
+                      "customName": {
+                        "type": "string",
+                        "serializationType": "utf8-string"
+                      }
+                    },
+                    "serializationType": "map"
+                  },
+                  "serializationType": "array"
+                }
+              }
+            },
+            "serializationType": "map"
+          }
+        },
+        "serializationType": "map"
+      },
+      "data": {
+        "513": {
+          "json": {
+            "adminPermissions": "PUBLIC",
+            "authorizedAdminUsers": {
+              "me": true,
+              "sceneOwners": true,
+              "allowList": true,
+              "adminAllowList": []
+            },
+            "moderationControl": {
+              "isEnabled": true,
+              "kickCoordinates": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "allowNonOwnersManageAdminAllowList": false
+            },
+            "textAnnouncementControl": {
+              "isEnabled": true,
+              "playSoundOnEachAnnouncement": true,
+              "showAuthorOnEachAnnouncement": true
+            },
+            "videoControl": {
+              "isEnabled": true,
+              "disableVideoPlayersSound": false,
+              "showAuthorOnVideoPlayers": true,
+              "linkAllVideoPlayers": false,
+              "videoPlayers": []
+            },
+            "smartItemsControl": {
+              "isEnabled": true,
+              "linkAllSmartItems": false,
+              "smartItems": []
+            },
+            "rewardsControl": {
+              "isEnabled": true,
+              "rewardItems": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "asset-packs::Placeholder",
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "serializationType": "utf8-string"
+          }
+        },
+        "serializationType": "map"
+      },
+      "data": {
+        "513": {
+          "json": {
+            "src": "assets/asset-packs/admin_tools/admin_toolkit.glb"
           }
         }
       }

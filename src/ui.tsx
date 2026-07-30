@@ -2,7 +2,9 @@ import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { engine, UiCanvasInformation, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
+import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
+import { room } from './shared/messages'
 
 const DEBUG_CELL_LABELS = true
 
@@ -104,7 +106,14 @@ interface CellState {
 }
 
 // 'hidden' until the in-world Play button opens the checkpoint select screen.
-type Screen = 'hidden' | 'checkpointSelect' | 'board' | 'inventory'
+type Screen = 'hidden' | 'checkpointSelect' | 'board' | 'inventory' | 'leaderboard'
+
+interface LeaderboardEntry {
+  playerName: string
+  score: number
+}
+
+let leaderboard: LeaderboardEntry[] = []
 
 let screen: Screen = 'hidden'
 let currentCheckpoint = 1
@@ -133,6 +142,10 @@ let endScreenShownAt: number | null = null
 
 let notificationTimer = 0
 let currentNotification: string | null = null
+
+let lastServerTick = 0
+let lastServerTickAt: number | null = null
+const SERVER_OFFLINE_THRESHOLD = 3 // seconds without a tick before we consider the server offline
 
 function shuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -182,6 +195,7 @@ function flipCell(cell: CellState) {
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
         totalScore += score
+        reportScore(score)
 
         const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
@@ -222,6 +236,12 @@ function playPrizeSound() {
   AudioSource.playSound(prizeEntity, PRIZE_CLIP, true)
 }
 
+function reportScore(points: number) {
+  // room.send() queues automatically until the room is ready, so no readiness check is needed here.
+  const playerName = getPlayer()?.name ?? 'Unknown'
+  room.send('reportScore', { playerName, points })
+}
+
 export function setupUi() {
   cells = buildCells()
 
@@ -236,6 +256,15 @@ export function setupUi() {
   prizeEntity = engine.addEntity()
   Transform.create(prizeEntity)
   AudioSource.create(prizeEntity, { audioClipUrl: PRIZE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
+  room.onMessage('leaderboardUpdate', (data) => {
+    leaderboard = data.entries
+  })
+
+  room.onMessage('serverTick', (data) => {
+    lastServerTick = data.tick
+    lastServerTickAt = elapsedTime
+  })
 
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
   engine.addSystem((dt: number) => {
@@ -361,6 +390,14 @@ function closeInventory() {
   screen = 'hidden'
 }
 
+function showLeaderboard() {
+  screen = 'leaderboard'
+}
+
+function closeLeaderboard() {
+  screen = 'hidden'
+}
+
 const MemoryMatchUi = () => (
   <UiEntity
     uiTransform={{
@@ -403,8 +440,18 @@ const MemoryMatchUi = () => (
             <Label value="Score" fontSize={14} color={Color4.White()} />
             <Label value={`${totalScore}`} fontSize={20} color={Color4.White()} />
           </UiEntity>
-          {/* second left slot: TBD */}
-          <UiEntity uiTransform={{ width: HEADER_BUTTON_WIDTH, height: HEADER_BUTTON_HEIGHT }} />
+          <UiEntity
+            uiTransform={{
+              width: HEADER_BUTTON_WIDTH,
+              height: HEADER_BUTTON_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            onMouseDown={() => showLeaderboard()}
+          >
+            <Label value="Leaderboard" fontSize={14} color={Color4.White()} textAlign="middle-center" />
+          </UiEntity>
         </UiEntity>
 
         <UiEntity uiTransform={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -678,6 +725,48 @@ const MemoryMatchUi = () => (
             </UiEntity>
           </UiEntity>
         )}
+
+        {screen === 'leaderboard' && (
+          <UiEntity
+            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiBackground={{
+              textureMode: 'nine-slices',
+              texture: { src: FRAME_IMAGE },
+              textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+            }}
+          >
+            <UiEntity
+              uiTransform={{
+                width: CLOSE_BUTTON_SIZE,
+                height: CLOSE_BUTTON_SIZE,
+                positionType: 'absolute',
+                position: { top: 8, right: 8 },
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: Color4.Red() }}
+              onMouseDown={() => closeLeaderboard()}
+            >
+              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
+            <Label value="Leaderboard" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            <UiEntity uiTransform={{ width: 300, flexDirection: 'column' }}>
+              {leaderboard.length === 0 ? (
+                <Label value="No scores yet" fontSize={16} color={Color4.White()} textAlign="middle-center" />
+              ) : (
+                leaderboard.map((entry, index) => (
+                  <UiEntity
+                    key={index}
+                    uiTransform={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', padding: { top: 4, bottom: 4 } }}
+                  >
+                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={16} color={Color4.White()} />
+                    <Label value={`${entry.score}`} fontSize={16} color={Color4.White()} />
+                  </UiEntity>
+                ))
+              )}
+            </UiEntity>
+          </UiEntity>
+        )}
       </UiEntity>
 
       {/* footer: notifications */}
@@ -700,6 +789,27 @@ const MemoryMatchUi = () => (
             <Label value={currentNotification} fontSize={16} color={Color4.White()} textAlign="middle-center" />
           </UiEntity>
         )}
+
+        {(() => {
+          const serverOnline = lastServerTickAt !== null && elapsedTime - lastServerTickAt < SERVER_OFFLINE_THRESHOLD
+          return (
+            <UiEntity
+              uiTransform={{
+                positionType: 'absolute',
+                position: { bottom: 4, right: 4 },
+                padding: { top: 4, bottom: 4, left: 10, right: 10 },
+                borderRadius: 8
+              }}
+              uiBackground={{ color: serverOnline ? Color4.create(0.2, 0.7, 0.3, 0.8) : Color4.create(0.7, 0.2, 0.2, 0.8) }}
+            >
+              <Label
+                value={serverOnline ? `Server online (tick ${lastServerTick})` : 'Server offline'}
+                fontSize={12}
+                color={Color4.White()}
+              />
+            </UiEntity>
+          )
+        })()}
       </UiEntity>
 
     </UiEntity>
