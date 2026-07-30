@@ -16,11 +16,11 @@
         "scoreMultiplier": 1
       },
       {
-        "cols": 3,
-        "rows": 2,
-        "duration": 28,
+        "cols": 4,
+        "rows": 3,
+        "duration": 38,
         "flipTimeout": 1,
-        "scoreMultiplier": 1
+        "scoreMultiplier": 1.5
       }
     ]
   },
@@ -41,11 +41,11 @@
         "scoreMultiplier": 1
       },
       {
-        "cols": 3,
-        "rows": 2,
-        "duration": 25,
+        "cols": 4,
+        "rows": 3,
+        "duration": 35,
         "flipTimeout": 1,
-        "scoreMultiplier": 1
+        "scoreMultiplier": 1.5
       }
     ]
   },
@@ -66,11 +66,11 @@
         "scoreMultiplier": 1
       },
       {
-        "cols": 3,
-        "rows": 2,
-        "duration": 22,
+        "cols": 4,
+        "rows": 3,
+        "duration": 32,
         "flipTimeout": 1,
-        "scoreMultiplier": 1
+        "scoreMultiplier": 1.5
       }
     ]
   },
@@ -91,11 +91,11 @@
         "scoreMultiplier": 1
       },
       {
-        "cols": 3,
-        "rows": 2,
-        "duration": 19,
+        "cols": 4,
+        "rows": 3,
+        "duration": 29,
         "flipTimeout": 1,
-        "scoreMultiplier": 1
+        "scoreMultiplier": 1.5
       }
     ]
   },
@@ -116,11 +116,11 @@
         "scoreMultiplier": 1
       },
       {
-        "cols": 3,
-        "rows": 2,
-        "duration": 16,
+        "cols": 4,
+        "rows": 3,
+        "duration": 26,
         "flipTimeout": 1,
-        "scoreMultiplier": 1
+        "scoreMultiplier": 1.5
       }
     ]
   },
@@ -142,10 +142,10 @@
       },
       {
         "cols": 4,
-        "rows": 3,
-        "duration": 38,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "rows": 4,
+        "duration": 48,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
       }
     ]
   },
@@ -167,10 +167,10 @@
       },
       {
         "cols": 4,
-        "rows": 3,
-        "duration": 35,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "rows": 4,
+        "duration": 45,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
       }
     ]
   },
@@ -192,10 +192,10 @@
       },
       {
         "cols": 4,
-        "rows": 3,
-        "duration": 32,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "rows": 4,
+        "duration": 42,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
       }
     ]
   },
@@ -217,10 +217,10 @@
       },
       {
         "cols": 4,
-        "rows": 3,
-        "duration": 29,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "rows": 4,
+        "duration": 39,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
       }
     ]
   },
@@ -242,10 +242,10 @@
       },
       {
         "cols": 4,
-        "rows": 3,
-        "duration": 26,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "rows": 4,
+        "duration": 36,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
       }
     ]
   },
@@ -266,11 +266,11 @@
         "scoreMultiplier": 2
       },
       {
-        "cols": 4,
+        "cols": 5,
         "rows": 4,
-        "duration": 48,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "duration": 58,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
       }
     ]
   },
@@ -291,11 +291,11 @@
         "scoreMultiplier": 2
       },
       {
-        "cols": 4,
+        "cols": 5,
         "rows": 4,
-        "duration": 45,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "duration": 55,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
       }
     ]
   },
@@ -316,11 +316,11 @@
         "scoreMultiplier": 2
       },
       {
-        "cols": 4,
+        "cols": 5,
         "rows": 4,
-        "duration": 42,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "duration": 52,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
       }
     ]
   },
@@ -341,11 +341,11 @@
         "scoreMultiplier": 2
       },
       {
-        "cols": 4,
+        "cols": 5,
         "rows": 4,
-        "duration": 39,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "duration": 49,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
       }
     ]
   },
@@ -366,11 +366,11 @@
         "scoreMultiplier": 2
       },
       {
-        "cols": 4,
+        "cols": 5,
         "rows": 4,
-        "duration": 36,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "duration": 46,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
       }
     ]
   },
