@@ -143,6 +143,28 @@ let highestUnlockedCheckpoint = 1
 const collectedMonsters: boolean[] = new Array(TOTAL_CHECKPOINTS).fill(false)
 const CHECKPOINT_SELECT_COLS = FRONT_GRID
 const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
+
+// Rarity ranges by checkpoint-select slot index (row * CHECKPOINT_SELECT_COLS + col):
+// common A1-B3, rare C3-E4, exotic A5-D5, epic E5.
+const RARITIES = [
+  { label: 'Common', start: 0, end: 11 },
+  { label: 'Rare', start: 12, end: 19 },
+  { label: 'Exotic', start: 20, end: 23 },
+  { label: 'Epic', start: 24, end: 24 }
+]
+
+function getRarityProgress(rarity: { start: number; end: number }): { collected: number; total: number } {
+  let collected = 0
+  for (let slot = rarity.start; slot <= rarity.end; slot++) {
+    if (slot < TOTAL_CHECKPOINTS && collectedMonsters[slot]) collected++
+  }
+  return { collected, total: rarity.end - rarity.start + 1 }
+}
+
+function getRarityLabel(slot: number): string {
+  const rarity = RARITIES.find((r) => slot >= r.start && slot <= r.end)
+  return rarity ? rarity.label : ''
+}
 let checkpointSelectCellSize = 80 // fallback until the first canvas read
 
 let cells: CellState[] = []
@@ -844,6 +866,24 @@ const MemoryMatchUi = () => (
             <UiEntity
               uiTransform={{
                 width: CHECKPOINT_SELECT_COLS * checkpointSelectCellSize,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                margin: { bottom: 12 }
+              }}
+            >
+              {RARITIES.map((rarity) => {
+                const { collected, total } = getRarityProgress(rarity)
+                return (
+                  <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <Label value={rarity.label} fontSize={14} color={Color4.White()} textAlign="middle-left" />
+                    <Label value={`${collected}/${total}`} fontSize={20} color={Color4.White()} textAlign="middle-left" />
+                  </UiEntity>
+                )
+              })}
+            </UiEntity>
+            <UiEntity
+              uiTransform={{
+                width: CHECKPOINT_SELECT_COLS * checkpointSelectCellSize,
                 height: CHECKPOINT_SELECT_ROWS * checkpointSelectCellSize,
                 flexDirection: 'column'
               }}
@@ -1002,7 +1042,12 @@ const MemoryMatchUi = () => (
         {won ? (
           showingPrize ? (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label value="Monster collected!" fontSize={36} color={Color4.White()} />
+              <Label
+                value={`${getRarityLabel(wonMonsterQuadrant)} Monster\nCollected!`}
+                fontSize={36}
+                color={Color4.White()}
+                textAlign="middle-center"
+              />
               <UiEntity
                 uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
                 uiBackground={{
