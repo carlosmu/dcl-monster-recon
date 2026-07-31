@@ -5,6 +5,11 @@ import { room } from '../shared/messages'
 const LEADERBOARD_KEY = 'leaderboard'
 const LEADERBOARD_TOP_N = 10
 const SERVER_TICK_INTERVAL = 1 // seconds between heartbeat broadcasts
+const NO_BEST_TIME = -1
+
+function bestTimeKey(checkpoint: number, boardIndex: number): string {
+  return `bestTime-${checkpoint}-${boardIndex}`
+}
 
 interface LeaderboardEntry {
   playerName: string
@@ -28,6 +33,30 @@ export async function startServer() {
   })
 
   broadcastLeaderboard(leaderboard)
+
+  room.onMessage('requestBestTime', async (data, context) => {
+    if (!context) return
+    const key = bestTimeKey(data.checkpoint, data.boardIndex)
+    const best = await Storage.player.get<number>(context.from, key)
+    room.send(
+      'personalBestUpdate',
+      { checkpoint: data.checkpoint, boardIndex: data.boardIndex, bestTimeSeconds: best ?? NO_BEST_TIME },
+      { to: [context.from] }
+    )
+  })
+
+  room.onMessage('reportBoardTime', async (data, context) => {
+    if (!context) return
+    const key = bestTimeKey(data.checkpoint, data.boardIndex)
+    const current = await Storage.player.get<number>(context.from, key)
+    const best = current === null || data.timeSeconds < current ? data.timeSeconds : current
+    if (best !== current) await Storage.player.set(context.from, key, best)
+    room.send(
+      'personalBestUpdate',
+      { checkpoint: data.checkpoint, boardIndex: data.boardIndex, bestTimeSeconds: best },
+      { to: [context.from] }
+    )
+  })
 
   let tick = 0
   let sinceLastTick = 0

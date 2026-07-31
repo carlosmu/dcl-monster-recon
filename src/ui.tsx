@@ -219,6 +219,17 @@ let musicMuted = false
 
 let lastServerTick = 0
 let lastServerTickAt: number | null = null
+
+const NO_BEST_TIME = -1
+// Personal best times per board, keyed by bestTimeKey(checkpoint, boardIndex). -1 means no record yet.
+const personalBests: Record<string, number> = {}
+
+function bestTimeKey(checkpoint: number, boardIndex: number): string {
+  return `${checkpoint}-${boardIndex}`
+}
+
+let lastBoardTime = 0
+let isNewBestTime = false
 const SERVER_OFFLINE_THRESHOLD = 3 // seconds without a tick before we consider the server offline
 
 function shuffle<T>(arr: T[]): void {
@@ -272,6 +283,14 @@ function flipCell(cell: CellState) {
         score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
         totalScore += score
         reportScore(score)
+        lastBoardTime = GAME_DURATION - timeRemaining
+        const previousBest = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
+        isNewBestTime = previousBest === undefined || previousBest === NO_BEST_TIME || lastBoardTime < previousBest
+        room.send('reportBoardTime', {
+          checkpoint: currentCheckpoint,
+          boardIndex: currentBoardIndex,
+          timeSeconds: lastBoardTime
+        })
 
         const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
@@ -380,6 +399,10 @@ export function setupUi() {
     lastServerTickAt = elapsedTime
   })
 
+  room.onMessage('personalBestUpdate', (data) => {
+    personalBests[bestTimeKey(data.checkpoint, data.boardIndex)] = data.bestTimeSeconds
+  })
+
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
   engine.addSystem((dt: number) => {
     elapsedTime += dt
@@ -484,6 +507,7 @@ function startBoard(checkpoint: number, boardIndex: number) {
   endScreenShownAt = null
   countdownStart = elapsedTime
   playCountdownSound()
+  room.send('requestBestTime', { checkpoint, boardIndex })
 }
 
 function startCheckpoint(checkpoint: number) {
@@ -700,6 +724,15 @@ const MemoryMatchUi = () => (
             <Label
               value={`Checkpoint ${currentCheckpoint} · Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
               fontSize={28}
+              color={Color4.White()}
+              uiTransform={{ margin: { bottom: 4 } }}
+            />
+            <Label
+              value={(() => {
+                const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
+                return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
+              })()}
+              fontSize={16}
               color={Color4.White()}
               uiTransform={{ margin: { bottom: 12 } }}
             />
@@ -1117,6 +1150,14 @@ const MemoryMatchUi = () => (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
               <Label value="Board complete!" fontSize={36} color={Color4.White()} />
               <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+              {isNewBestTime && (
+                <Label
+                  value={`New Best Time! ${lastBoardTime.toFixed(1)}s`}
+                  fontSize={20}
+                  color={Color4.White()}
+                  uiTransform={{ margin: { top: 8 } }}
+                />
+              )}
             </UiEntity>
           )
         ) : (
