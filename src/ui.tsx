@@ -16,6 +16,7 @@ const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
 const MATCH_CLIP = 'assets/audio/match.mp3'
 const COUNTDOWN_CLIP = 'assets/audio/countdown.mp3'
+const FAIL_CLIP = 'assets/audio/fail.mp3'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
@@ -158,6 +159,7 @@ let notificationTimer = 0
 let currentNotification: string | null = null
 let matchAnimStart: number | null = null
 let countdownStart: number | null = null
+let musicMuted = false
 
 let lastServerTick = 0
 let lastServerTickAt: number | null = null
@@ -228,6 +230,7 @@ function flipCell(cell: CellState) {
       }
     } else {
       errors++
+      playFailSound()
     }
   }
 }
@@ -237,13 +240,24 @@ let boardEndEntity: Entity
 let prizeEntity: Entity
 let matchEntity: Entity
 let countdownEntity: Entity
+let failEntity: Entity
 
 function playBoardMusic() {
+  if (musicMuted) return
   AudioSource.getMutable(boardMusicEntity).playing = true
 }
 
 function stopBoardMusic() {
   AudioSource.getMutable(boardMusicEntity).playing = false
+}
+
+function toggleMusic() {
+  musicMuted = !musicMuted
+  if (musicMuted) {
+    stopBoardMusic()
+  } else if (screen === 'board' && !gameOver && !won && countdownStart === null) {
+    playBoardMusic()
+  }
 }
 
 function playBoardEndSound() {
@@ -262,6 +276,10 @@ function playMatchSound() {
 
 function playCountdownSound() {
   AudioSource.playSound(countdownEntity, COUNTDOWN_CLIP, true)
+}
+
+function playFailSound() {
+  AudioSource.playSound(failEntity, FAIL_CLIP, true)
 }
 
 function reportScore(points: number) {
@@ -292,6 +310,10 @@ export function setupUi() {
   countdownEntity = engine.addEntity()
   Transform.create(countdownEntity)
   AudioSource.create(countdownEntity, { audioClipUrl: COUNTDOWN_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
+  failEntity = engine.addEntity()
+  Transform.create(failEntity)
+  AudioSource.create(failEntity, { audioClipUrl: FAIL_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
@@ -581,6 +603,20 @@ const MemoryMatchUi = () => (
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
+            <UiEntity
+              uiTransform={{
+                width: CLOSE_BUTTON_SIZE,
+                height: CLOSE_BUTTON_SIZE,
+                positionType: 'absolute',
+                position: { top: 8, right: 8 + CLOSE_BUTTON_SIZE + 8 },
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              uiBackground={{ color: musicMuted ? Color4.create(0.3, 0.3, 0.3, 1) : Color4.create(0.2, 0.6, 0.9, 1) }}
+              onMouseDown={() => toggleMusic()}
+            >
+              <Label value="S" fontSize={18} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
             <UiEntity
               uiTransform={{
                 width: CLOSE_BUTTON_SIZE,
