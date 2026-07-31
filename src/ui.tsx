@@ -15,6 +15,7 @@ const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
 const MATCH_CLIP = 'assets/audio/match.mp3'
+const COUNTDOWN_CLIP = 'assets/audio/countdown.mp3'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
@@ -73,6 +74,12 @@ const MATCH_ANIM_DURATION = 0.7
 const MATCH_FADE_IN_END = 0.1
 const MATCH_FADE_OUT_START = 0.6
 const MATCH_ANIM_DISTANCE = 60
+
+// Pre-board countdown: "3, 2, 1", one second each, each number scaling up as it appears.
+const COUNTDOWN_STEP_DURATION = 1
+const COUNTDOWN_TOTAL_DURATION = 3
+const COUNTDOWN_BASE_FONT_SIZE = 60
+const COUNTDOWN_SCALE_MAX = 1.5
 
 // Placeholder notification copy — will be replaced with real event-driven messages later.
 const NOTIFICATION_MESSAGES = [
@@ -150,6 +157,7 @@ let endScreenShownAt: number | null = null
 let notificationTimer = 0
 let currentNotification: string | null = null
 let matchAnimStart: number | null = null
+let countdownStart: number | null = null
 
 let lastServerTick = 0
 let lastServerTickAt: number | null = null
@@ -177,7 +185,7 @@ function hideCell(cell: CellState) {
 }
 
 function flipCell(cell: CellState) {
-  if (gameOver || cell.matched || cell.revealed) return
+  if (gameOver || countdownStart !== null || cell.matched || cell.revealed) return
 
   // A 3rd flip while 2 are still face-up (mismatched, not yet timed out) forces both to hide first.
   if (revealedUnmatched.length === 2) {
@@ -228,6 +236,7 @@ let boardMusicEntity: Entity
 let boardEndEntity: Entity
 let prizeEntity: Entity
 let matchEntity: Entity
+let countdownEntity: Entity
 
 function playBoardMusic() {
   AudioSource.getMutable(boardMusicEntity).playing = true
@@ -249,6 +258,10 @@ function playPrizeSound() {
 
 function playMatchSound() {
   AudioSource.playSound(matchEntity, MATCH_CLIP, true)
+}
+
+function playCountdownSound() {
+  AudioSource.playSound(countdownEntity, COUNTDOWN_CLIP, true)
 }
 
 function reportScore(points: number) {
@@ -276,6 +289,10 @@ export function setupUi() {
   Transform.create(matchEntity)
   AudioSource.create(matchEntity, { audioClipUrl: MATCH_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
+  countdownEntity = engine.addEntity()
+  Transform.create(countdownEntity)
+  AudioSource.create(countdownEntity, { audioClipUrl: COUNTDOWN_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
   })
@@ -291,6 +308,10 @@ export function setupUi() {
     if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
       matchAnimStart = null
     }
+    if (countdownStart !== null && elapsedTime - countdownStart >= COUNTDOWN_TOTAL_DURATION) {
+      countdownStart = null
+      playBoardMusic()
+    }
     if (revealedUnmatched.length > 0) {
       revealedUnmatched = revealedUnmatched.filter((cell) => {
         if (cell.flippedAt !== null && elapsedTime - cell.flippedAt >= FLIP_TIMEOUT) {
@@ -301,7 +322,7 @@ export function setupUi() {
       })
     }
 
-    if (screen === 'board' && !gameOver && !won) {
+    if (screen === 'board' && !gameOver && !won && countdownStart === null) {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
@@ -383,7 +404,8 @@ function startBoard(checkpoint: number, boardIndex: number) {
   errors = 0
   score = 0
   endScreenShownAt = null
-  playBoardMusic()
+  countdownStart = elapsedTime
+  playCountdownSound()
 }
 
 function startCheckpoint(checkpoint: number) {
@@ -586,70 +608,95 @@ const MemoryMatchUi = () => (
                 flexDirection: 'column'
               }}
             >
-              {Array.from({ length: ROWS }, (_, rowIndex) => (
-                <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
-                  {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+              {countdownStart === null &&
+                Array.from({ length: ROWS }, (_, rowIndex) => (
+                  <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: cellSize, flexDirection: 'row' }}>
+                    {cells.slice(rowIndex * COLS, rowIndex * COLS + COLS).map((cell, colIndex) => (
+                      <UiEntity
+                        key={rowIndex * COLS + colIndex}
+                        uiTransform={{
+                          width: cellSize,
+                          height: cellSize
+                        }}
+                        uiBackground={
+                          cell.revealed
+                            ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                            : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
+                        }
+                        onMouseDown={() => flipCell(cell)}
+                      >
+                        {DEBUG_CELL_LABELS && (
+                          <Label
+                            value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
+                            fontSize={28}
+                            color={Color4.Yellow()}
+                            textAlign="middle-center"
+                            uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
+                          />
+                        )}
+                      </UiEntity>
+                    ))}
+                  </UiEntity>
+                ))}
+
+              {matchAnimStart !== null &&
+                (() => {
+                  const elapsed = elapsedTime - matchAnimStart
+                  const progress = Math.min(1, elapsed / MATCH_ANIM_DURATION)
+                  let opacity: number
+                  if (elapsed < MATCH_FADE_IN_END) {
+                    opacity = elapsed / MATCH_FADE_IN_END
+                  } else if (elapsed < MATCH_FADE_OUT_START) {
+                    opacity = 1
+                  } else {
+                    opacity = 1 - (elapsed - MATCH_FADE_OUT_START) / (MATCH_ANIM_DURATION - MATCH_FADE_OUT_START)
+                  }
+                  return (
                     <UiEntity
-                      key={rowIndex * COLS + colIndex}
                       uiTransform={{
-                        width: cellSize,
-                        height: cellSize
+                        width: '100%',
+                        height: '100%',
+                        positionType: 'absolute',
+                        position: { top: 0, left: 0 },
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
-                      uiBackground={
-                        cell.revealed
-                          ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
-                          : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
-                      }
-                      onMouseDown={() => flipCell(cell)}
                     >
-                      {DEBUG_CELL_LABELS && (
-                        <Label
-                          value={`${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`}
-                          fontSize={28}
-                          color={Color4.Yellow()}
-                          textAlign="middle-center"
-                          uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-                        />
-                      )}
+                      <Label
+                        value="MATCH!"
+                        fontSize={40}
+                        color={Color4.create(1, 0.9, 0.2, opacity)}
+                        textAlign="middle-center"
+                        uiTransform={{ margin: { bottom: progress * MATCH_ANIM_DISTANCE } }}
+                      />
                     </UiEntity>
-                  ))}
-                </UiEntity>
-              ))}
+                  )
+                })()}
+
+              {countdownStart !== null &&
+                (() => {
+                  const elapsed = elapsedTime - countdownStart
+                  const value = 3 - Math.floor(elapsed / COUNTDOWN_STEP_DURATION)
+                  const stepProgress = (elapsed % COUNTDOWN_STEP_DURATION) / COUNTDOWN_STEP_DURATION
+                  const fontSize = COUNTDOWN_BASE_FONT_SIZE * (1 + (COUNTDOWN_SCALE_MAX - 1) * stepProgress)
+                  return (
+                    <UiEntity
+                      uiTransform={{
+                        width: '100%',
+                        height: '100%',
+                        positionType: 'absolute',
+                        position: { top: 0, left: 0 },
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
+                    >
+                      <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
+                    </UiEntity>
+                  )
+                })()}
             </UiEntity>
 
-            {matchAnimStart !== null &&
-              (() => {
-                const elapsed = elapsedTime - matchAnimStart
-                const progress = Math.min(1, elapsed / MATCH_ANIM_DURATION)
-                let opacity: number
-                if (elapsed < MATCH_FADE_IN_END) {
-                  opacity = elapsed / MATCH_FADE_IN_END
-                } else if (elapsed < MATCH_FADE_OUT_START) {
-                  opacity = 1
-                } else {
-                  opacity = 1 - (elapsed - MATCH_FADE_OUT_START) / (MATCH_ANIM_DURATION - MATCH_FADE_OUT_START)
-                }
-                return (
-                  <UiEntity
-                    uiTransform={{
-                      width: COLS * cellSize,
-                      height: ROWS * cellSize,
-                      positionType: 'absolute',
-                      position: { top: 0, left: 0 },
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Label
-                      value="MATCH!"
-                      fontSize={40}
-                      color={Color4.create(1, 0.9, 0.2, opacity)}
-                      textAlign="middle-center"
-                      uiTransform={{ margin: { bottom: progress * MATCH_ANIM_DISTANCE } }}
-                    />
-                  </UiEntity>
-                )
-              })()}
           </UiEntity>
         )}
 
