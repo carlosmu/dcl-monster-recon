@@ -14,6 +14,7 @@ const PRIZE_IMAGE = 'assets/images/prizes_01.png'
 const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
+const MATCH_CLIP = 'assets/audio/match.mp3'
 // Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
 // texture (no custom uvs), so the frame art had to be exported as its own file.
 const FRAME_IMAGE = 'assets/images/frame_01.png'
@@ -66,6 +67,12 @@ const ERROR_PENALTY = 10
 
 // Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
+
+// "MATCH!" popup: seconds it takes to float up and fade out, and how far (in px) it travels.
+const MATCH_ANIM_DURATION = 0.7
+const MATCH_FADE_IN_END = 0.1
+const MATCH_FADE_OUT_START = 0.6
+const MATCH_ANIM_DISTANCE = 60
 
 // Placeholder notification copy — will be replaced with real event-driven messages later.
 const NOTIFICATION_MESSAGES = [
@@ -142,6 +149,7 @@ let endScreenShownAt: number | null = null
 
 let notificationTimer = 0
 let currentNotification: string | null = null
+let matchAnimStart: number | null = null
 
 let lastServerTick = 0
 let lastServerTickAt: number | null = null
@@ -187,6 +195,8 @@ function flipCell(cell: CellState) {
       a.matched = true
       b.matched = true
       revealedUnmatched = []
+      matchAnimStart = elapsedTime
+      playMatchSound()
       if (cells.every((c) => c.matched)) {
         won = true
         stopBoardMusic()
@@ -217,6 +227,7 @@ function flipCell(cell: CellState) {
 let boardMusicEntity: Entity
 let boardEndEntity: Entity
 let prizeEntity: Entity
+let matchEntity: Entity
 
 function playBoardMusic() {
   AudioSource.getMutable(boardMusicEntity).playing = true
@@ -234,6 +245,10 @@ function playBoardEndSound() {
 
 function playPrizeSound() {
   AudioSource.playSound(prizeEntity, PRIZE_CLIP, true)
+}
+
+function playMatchSound() {
+  AudioSource.playSound(matchEntity, MATCH_CLIP, true)
 }
 
 function reportScore(points: number) {
@@ -257,6 +272,10 @@ export function setupUi() {
   Transform.create(prizeEntity)
   AudioSource.create(prizeEntity, { audioClipUrl: PRIZE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
+  matchEntity = engine.addEntity()
+  Transform.create(matchEntity)
+  AudioSource.create(matchEntity, { audioClipUrl: MATCH_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
   })
@@ -269,6 +288,9 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
   engine.addSystem((dt: number) => {
     elapsedTime += dt
+    if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
+      matchAnimStart = null
+    }
     if (revealedUnmatched.length > 0) {
       revealedUnmatched = revealedUnmatched.filter((cell) => {
         if (cell.flippedAt !== null && elapsedTime - cell.flippedAt >= FLIP_TIMEOUT) {
@@ -594,6 +616,40 @@ const MemoryMatchUi = () => (
                 </UiEntity>
               ))}
             </UiEntity>
+
+            {matchAnimStart !== null &&
+              (() => {
+                const elapsed = elapsedTime - matchAnimStart
+                const progress = Math.min(1, elapsed / MATCH_ANIM_DURATION)
+                let opacity: number
+                if (elapsed < MATCH_FADE_IN_END) {
+                  opacity = elapsed / MATCH_FADE_IN_END
+                } else if (elapsed < MATCH_FADE_OUT_START) {
+                  opacity = 1
+                } else {
+                  opacity = 1 - (elapsed - MATCH_FADE_OUT_START) / (MATCH_ANIM_DURATION - MATCH_FADE_OUT_START)
+                }
+                return (
+                  <UiEntity
+                    uiTransform={{
+                      width: COLS * cellSize,
+                      height: ROWS * cellSize,
+                      positionType: 'absolute',
+                      position: { top: 0, left: 0 },
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Label
+                      value="MATCH!"
+                      fontSize={40}
+                      color={Color4.create(1, 0.9, 0.2, opacity)}
+                      textAlign="middle-center"
+                      uiTransform={{ margin: { bottom: progress * MATCH_ANIM_DISTANCE } }}
+                    />
+                  </UiEntity>
+                )
+              })()}
           </UiEntity>
         )}
 
