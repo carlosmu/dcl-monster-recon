@@ -7,6 +7,7 @@ import checkpointsData from './checkpoints.json'
 import { room } from './shared/messages'
 
 const DEBUG_CELL_LABELS = true
+const DEBUG_LAYOUT_BORDERS = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const FRONT_IMAGE = 'assets/images/cards_01.png'
@@ -485,7 +486,7 @@ const MemoryMatchUi = () => (
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: { top: '1vh', bottom: '1vh' },
-        borderWidth: 2,
+        borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
         borderColor: Color4.Green()
       }}
     >
@@ -497,12 +498,22 @@ const MemoryMatchUi = () => (
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderWidth: 2,
+          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
           borderColor: Color4.Red()
         }}
       >
         <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center' }}>
-          <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center', margin: { right: 12 } }}>
+          <UiEntity
+            uiTransform={{
+              width: HEADER_BUTTON_WIDTH,
+              flexDirection: 'column',
+              alignItems: 'center',
+              margin: { right: 12 },
+              padding: { top: 4, bottom: 4 },
+              borderRadius: 8
+            }}
+            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+          >
             <Label value="Score" fontSize={14} color={Color4.White()} />
             <Label value={`${totalScore}`} fontSize={20} color={Color4.White()} />
           </UiEntity>
@@ -587,10 +598,10 @@ const MemoryMatchUi = () => (
       <UiEntity
         uiTransform={{
           width: '100%',
-          height: 'auto',
+          height: '100%',
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 2,
+          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
           borderColor: Color4.Red()
         }}
       >
@@ -867,7 +878,7 @@ const MemoryMatchUi = () => (
 
         {screen === 'leaderboard' && (
           <UiEntity
-            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiTransform={{ minWidth: '80%', minHeight: '80%', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
               textureMode: 'nine-slices',
               texture: { src: FRAME_IMAGE },
@@ -916,7 +927,7 @@ const MemoryMatchUi = () => (
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
-          borderWidth: 2,
+          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
           borderColor: Color4.Red()
         }}
       >
@@ -935,16 +946,13 @@ const MemoryMatchUi = () => (
             <UiEntity
               uiTransform={{
                 positionType: 'absolute',
-                position: { bottom: 4, right: 4 },
-                padding: { top: 4, bottom: 4, left: 10, right: 10 },
-                borderRadius: 8
+                position: { bottom: 4, right: 4 }
               }}
-              uiBackground={{ color: serverOnline ? Color4.create(0.2, 0.7, 0.3, 0.8) : Color4.create(0.7, 0.2, 0.2, 0.8) }}
             >
               <Label
                 value={serverOnline ? `Server online (tick ${lastServerTick})` : 'Server offline'}
                 fontSize={12}
-                color={Color4.White()}
+                color={serverOnline ? Color4.create(0.2, 0.7, 0.3, 1) : Color4.create(0.9, 0.3, 0.3, 1)}
               />
             </UiEntity>
           )
