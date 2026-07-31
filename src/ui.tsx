@@ -6,7 +6,7 @@ import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
 import { room } from './shared/messages'
 
-const DEBUG_CELL_LABELS = true
+const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
