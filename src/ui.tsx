@@ -93,6 +93,9 @@ const NOTIFICATION_MESSAGES = [
 ]
 const NOTIFICATION_INTERVAL = 10 // seconds between notifications
 const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on screen
+// Notification slide-in: starts 10vh below its resting position and slides up over this long.
+const NOTIFICATION_SLIDE_DURATION = 0.5
+const NOTIFICATION_SLIDE_DISTANCE_VH = 10
 
 let cellSize = 200 // fallback until the first canvas read
 let framePadding = 32 // fallback until the first canvas read
@@ -963,14 +966,24 @@ const MemoryMatchUi = () => (
         alignItems: 'center'
       }}
     >
-      {currentNotification && (
-        <UiEntity
-          uiTransform={{ width: '100%', padding: { top: 10, bottom: 10, left: 20, right: 20 }, borderRadius: 16 }}
-          uiBackground={{ color: Color4.fromHexString('#600088') }}
-        >
-          <Label value={currentNotification} fontSize={24} color={Color4.White()} textAlign="middle-center" />
-        </UiEntity>
-      )}
+      {currentNotification &&
+        (() => {
+          const slideProgress = Math.min(1, notificationTimer / NOTIFICATION_SLIDE_DURATION)
+          const marginTopVh = (1 - slideProgress) * NOTIFICATION_SLIDE_DISTANCE_VH
+          return (
+            <UiEntity
+              uiTransform={{
+                width: '100%',
+                margin: { top: `${marginTopVh}vh` },
+                padding: { top: 10, bottom: 10, left: 20, right: 20 },
+                borderRadius: 16
+              }}
+              uiBackground={{ color: Color4.fromHexString('#600088') }}
+            >
+              <Label value={currentNotification} fontSize={24} color={Color4.White()} textAlign="middle-center" />
+            </UiEntity>
+          )
+        })()}
     </UiEntity>
 
     {(won || gameOver) && (
