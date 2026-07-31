@@ -85,11 +85,11 @@ const COUNTDOWN_SCALE_MAX = 1.5
 
 // Placeholder notification copy — will be replaced with real event-driven messages later.
 const NOTIFICATION_MESSAGES = [
-  'Cryptonauta ha capturado un pepino mutante',
-  '0xGorducho encontró un caracol con rayos láser',
-  'SatoshiWalker desenterró un sapo con casco espacial',
-  'PixelKilla atrapó una araña bioluminiscente',
-  'ByteHunter cazó un pulpo con gorra de piloto'
+  'Cryptonauta captured a mutant cucumber',
+  '0xGorducho found a laser-eyed snail',
+  'SatoshiWalker unearthed a toad with a space helmet',
+  'PixelKilla caught a bioluminescent spider',
+  'ByteHunter hunted down an octopus in a pilot cap'
 ]
 const NOTIFICATION_INTERVAL = 10 // seconds between notifications
 const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on screen
@@ -477,7 +477,7 @@ const MemoryMatchUi = () => (
   >
     {/* canvas_main: the safe-area column. Reserves 8% top/bottom for the system bar and stays
         within the 30%-75% horizontal safe zone (40% wide, centered). Reuse this for all scene UI;
-        a sibling "canvas_sidebar" can be added later for anything that belongs outside this column. */}
+        a sibling "canvas-sidebar" can be added later for anything that belongs outside this column. */}
     <UiEntity
       uiTransform={{
         width: `${CANVAS_MAIN_WIDTH_FRACTION * 100}%`,
@@ -919,7 +919,7 @@ const MemoryMatchUi = () => (
         )}
       </UiEntity>
 
-      {/* footer: notifications */}
+      {/* footer */}
       <UiEntity
         uiTransform={{
           width: '100%',
@@ -931,15 +931,6 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        {currentNotification && (
-          <UiEntity
-            uiTransform={{ padding: { top: 10, bottom: 10, left: 20, right: 20 }, borderRadius: 16 }}
-            uiBackground={{ color: Color4.create(0, 0, 0, 0.75) }}
-          >
-            <Label value={currentNotification} fontSize={16} color={Color4.White()} textAlign="middle-center" />
-          </UiEntity>
-        )}
-
         {(() => {
           const serverOnline = lastServerTickAt !== null && elapsedTime - lastServerTickAt < SERVER_OFFLINE_THRESHOLD
           return (
@@ -959,6 +950,27 @@ const MemoryMatchUi = () => (
         })()}
       </UiEntity>
 
+    </UiEntity>
+
+    {/* canvas-sidebar: sits to the right of canvas_main, outside its safe-area column. */}
+    <UiEntity
+      uiTransform={{
+        positionType: 'absolute',
+        position: { top: '30vh', right: 0 },
+        width: '30%',
+        minHeight: 100,
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}
+    >
+      {currentNotification && (
+        <UiEntity
+          uiTransform={{ width: '100%', padding: { top: 10, bottom: 10, left: 20, right: 20 }, borderRadius: 16 }}
+          uiBackground={{ color: Color4.fromHexString('#600088') }}
+        >
+          <Label value={currentNotification} fontSize={24} color={Color4.White()} textAlign="middle-center" />
+        </UiEntity>
+      )}
     </UiEntity>
 
     {(won || gameOver) && (
