@@ -26,6 +26,8 @@ const FRAME_IMAGE = 'assets/images/frame_01.png'
 const FRAME_SLICE = 0.22
 const FRONT_GRID = 5 // cards_01.png / prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
+const ALPHAS_IMAGE = 'assets/images/alphas.png'
+const ALPHAS_GRID = 8 // alphas.png grid
 
 interface BoardConfig {
   cols: number
@@ -77,6 +79,31 @@ const MATCH_FADE_IN_END = 0.1
 const MATCH_FADE_OUT_START = 0.6
 const MATCH_ANIM_DISTANCE = 60
 
+// "Monster collected!" backdrop: continuous linear pulse from 1x to 2x and back to 1x.
+const PRIZE_BACKDROP_SIZE = 180
+const PRIZE_PULSE_PERIOD = 2 // seconds for a full 1x -> 2x -> 1x cycle
+const PRIZE_PULSE_MAX_SCALE = 2
+
+function getPrizePulseSize(): number {
+  const phase = ((elapsedTime % PRIZE_PULSE_PERIOD) / PRIZE_PULSE_PERIOD) * 2 // 0..2
+  const triangle = phase <= 1 ? phase : 2 - phase // 0..1..0
+  const scale = 1 + triangle * (PRIZE_PULSE_MAX_SCALE - 1)
+  return PRIZE_BACKDROP_SIZE * scale
+}
+
+// UiTransform has no scale/transform prop, so a horizontal flip is done by mirroring the UVs.
+const PRIZE_FLIP_INTERVAL = 0.5 // seconds between horizontal flips
+
+function mirrorUvsHorizontal(uvs: number[]): number[] {
+  return [uvs[6], uvs[7], uvs[4], uvs[5], uvs[2], uvs[3], uvs[0], uvs[1]]
+}
+
+function getPrizeUvs(quadrant: number): number[] {
+  const uvs = getUvsForQuadrant(quadrant)
+  const flipped = Math.floor(elapsedTime / PRIZE_FLIP_INTERVAL) % 2 === 1
+  return flipped ? mirrorUvsHorizontal(uvs) : uvs
+}
+
 // Pre-board countdown: "3, 2, 1", one second each, each number scaling up as it appears.
 const COUNTDOWN_STEP_DURATION = 1
 const COUNTDOWN_TOTAL_DURATION = 3
@@ -116,6 +143,9 @@ function getUvsForQuadrant(index: number): number[] {
 
 // Card back art now spans a 2x2 block of atlas_01.png: A1, A2, B1, B2
 const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
+
+// "Monster collected!" backdrop spans a 4x4 block of alphas.png: A1 to D4
+const ALPHAS_COLLECTED_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
 
 interface CellState {
   frontQuadrant: number
@@ -1049,13 +1079,39 @@ const MemoryMatchUi = () => (
                 textAlign="middle-center"
               />
               <UiEntity
-                uiTransform={{ width: 180, height: 180, margin: { top: 20 } }}
-                uiBackground={{
-                  textureMode: 'stretch',
-                  texture: { src: PRIZE_IMAGE },
-                  uvs: getUvsForQuadrant(wonMonsterQuadrant)
+                uiTransform={{
+                  width: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
+                  height: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
+                  margin: { top: 20 },
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-              />
+              >
+                <UiEntity
+                  uiTransform={{ width: getPrizePulseSize(), height: getPrizePulseSize() }}
+                  uiBackground={{
+                    textureMode: 'stretch',
+                    texture: { src: ALPHAS_IMAGE },
+                    uvs: ALPHAS_COLLECTED_UVS
+                  }}
+                />
+                <UiEntity
+                  uiTransform={{
+                    width: PRIZE_BACKDROP_SIZE,
+                    height: PRIZE_BACKDROP_SIZE,
+                    positionType: 'absolute',
+                    position: {
+                      top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2,
+                      left: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2
+                    }
+                  }}
+                  uiBackground={{
+                    textureMode: 'stretch',
+                    texture: { src: PRIZE_IMAGE },
+                    uvs: getPrizeUvs(wonMonsterQuadrant)
+                  }}
+                />
+              </UiEntity>
             </UiEntity>
           ) : (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
