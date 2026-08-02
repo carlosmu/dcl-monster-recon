@@ -1,8 +1,9 @@
 import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
-import { Color4 } from '@dcl/sdk/math'
-import { engine, UiCanvasInformation, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
+import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { engine, UiCanvasInformation, AudioSource, Transform, MainCamera, VirtualCamera, type Entity } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
+import { triggerEmote } from '~system/RestrictedActions'
 import checkpointsData from './checkpoints.json'
 import { room } from './shared/messages'
 
@@ -77,6 +78,15 @@ const ERROR_PENALTY = 10
 
 // Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
+
+// Celebration cinematic camera: orbits halfway (180°) around the player over this many seconds.
+const CELEBRATION_CAM_DURATION = 3
+const CELEBRATION_CAM_SWEEP_DEG = 180
+// Waist-height camera tilted up at the player for a heroic, low-angle look.
+const CELEBRATION_CAM_OFFSET = Vector3.create(0, 0.2, 2.5)
+// The camera looks at this point (above head height) instead of the parent's feet-level origin,
+// so it tilts up dramatically rather than looking down at the player's feet.
+const CELEBRATION_LOOK_AT_OFFSET = Vector3.create(0, 1.5, 0)
 
 // "MATCH!" popup: seconds it takes to float up and fade out, and how far (in px) it travels.
 const MATCH_ANIM_DURATION = 0.7
@@ -238,6 +248,13 @@ let score = 0
 let totalScore = 0
 let endScreenShownAt: number | null = null
 
+let celebrationCamParent: Entity
+let celebrationCamEntity: Entity
+let celebrationLookAtEntity: Entity
+let celebrationActive = false
+let celebrationElapsed = 0
+let celebrationStartAngleDeg = 0
+
 let notificationTimer = 0
 let currentNotification: string | null = null
 let matchAnimStart: number | null = null
@@ -313,6 +330,7 @@ function flipCell(cell: CellState) {
         lastBoardTime = GAME_DURATION - timeRemaining
         const previousBest = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
         isNewBestTime = previousBest === undefined || previousBest === NO_BEST_TIME || lastBoardTime < previousBest
+        triggerCelebrationCamera(isNewBestTime ? 'disco' : 'handsair', 0)
         room.send('reportBoardTime', {
           checkpoint: currentCheckpoint,
           boardIndex: currentBoardIndex,
@@ -373,6 +391,20 @@ function playPrizeSound() {
   AudioSource.playSound(prizeEntity, PRIZE_CLIP, true)
 }
 
+// Plays a celebration emote while a cinematic camera, parented at the player's position, sweeps
+// 180° around them starting at startAngleDeg. Used both for the per-board score screen (hands air,
+// 0deg -> 180deg) and the monster-unlock screen (fist pump, 180deg -> 360deg).
+function triggerCelebrationCamera(predefinedEmote: string, startAngleDeg: number) {
+  const playerPos = Transform.get(engine.PlayerEntity).position
+  Transform.getMutable(celebrationCamParent).position = Vector3.clone(playerPos)
+  Transform.getMutable(celebrationCamParent).rotation = Quaternion.fromAngleAxis(startAngleDeg, Vector3.Up())
+  celebrationElapsed = 0
+  celebrationStartAngleDeg = startAngleDeg
+  celebrationActive = true
+  MainCamera.getMutable(engine.CameraEntity).virtualCameraEntity = celebrationCamEntity
+  void triggerEmote({ predefinedEmote })
+}
+
 function playMatchSound() {
   AudioSource.playSound(matchEntity, MATCH_CLIP, true)
 }
@@ -418,6 +450,21 @@ export function setupUi() {
   Transform.create(failEntity)
   AudioSource.create(failEntity, { audioClipUrl: FAIL_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
+  // Monster-unlock celebration camera: a parent entity placed at the player's position on trigger,
+  // and a child virtual camera orbiting it by rotating the parent.
+  celebrationCamParent = engine.addEntity()
+  Transform.create(celebrationCamParent)
+
+  celebrationLookAtEntity = engine.addEntity()
+  Transform.create(celebrationLookAtEntity, { parent: celebrationCamParent, position: CELEBRATION_LOOK_AT_OFFSET })
+
+  celebrationCamEntity = engine.addEntity()
+  Transform.create(celebrationCamEntity, { parent: celebrationCamParent, position: CELEBRATION_CAM_OFFSET })
+  VirtualCamera.create(celebrationCamEntity, {
+    lookAtEntity: celebrationLookAtEntity,
+    defaultTransition: { transitionMode: VirtualCamera.Transition.Time(0.5) }
+  })
+
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
   })
@@ -451,12 +498,23 @@ export function setupUi() {
       })
     }
 
+    if (celebrationActive) {
+      celebrationElapsed = Math.min(CELEBRATION_CAM_DURATION, celebrationElapsed + dt)
+      const angleDeg = celebrationStartAngleDeg + (celebrationElapsed / CELEBRATION_CAM_DURATION) * CELEBRATION_CAM_SWEEP_DEG
+      Transform.getMutable(celebrationCamParent).rotation = Quaternion.fromAngleAxis(angleDeg, Vector3.Up())
+      if (celebrationElapsed >= CELEBRATION_CAM_DURATION) {
+        celebrationActive = false
+        MainCamera.getMutable(engine.CameraEntity).virtualCameraEntity = undefined
+      }
+    }
+
     if (screen === 'board' && !gameOver && !won && countdownStart === null) {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
         stopBoardMusic()
         playBoardEndSound()
+        void triggerEmote({ predefinedEmote: 'cry' })
         endScreenShownAt = elapsedTime
       }
     }
@@ -467,6 +525,7 @@ export function setupUi() {
       } else if (won && checkpointComplete && !showingPrize) {
         showingPrize = true
         playPrizeSound()
+        triggerCelebrationCamera('fistpump', 180)
         endScreenShownAt = elapsedTime
       } else {
         screen = 'checkpointSelect'
@@ -721,7 +780,7 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        {screen === 'board' && (
+        {screen === 'board' && !won && !gameOver && (
           <UiEntity
             uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
@@ -1168,7 +1227,6 @@ const MemoryMatchUi = () => (
           justifyContent: 'center',
           flexDirection: 'column'
         }}
-        uiBackground={{ color: Color4.create(0, 0, 0, 0.95) }}
       >
         {won ? (
           showingPrize ? (
