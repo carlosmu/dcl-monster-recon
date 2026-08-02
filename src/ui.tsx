@@ -8,9 +8,10 @@ import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 
 const DEBUG_CELL_LABELS = false
-const DEBUG_LAYOUT_BORDERS = false
+const DEBUG_LAYOUT_BORDERS = true
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
+const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
 const FRONT_IMAGE = 'assets/images/cards_01.png'
 const PRIZE_IMAGE = 'assets/images/prizes_01.png'
 const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
@@ -19,11 +20,10 @@ const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
 const MATCH_CLIP = 'assets/audio/match.mp3'
 const COUNTDOWN_CLIP = 'assets/audio/countdown.mp3'
 const FAIL_CLIP = 'assets/audio/fail.mp3'
-// Cropped from atlas_01.png quadrants F1-H3. Nine-slicing in DCL only reads the full
-// texture (no custom uvs), so the frame art had to be exported as its own file.
-const FRAME_IMAGE = 'assets/images/frame_01.png'
-// Codex-only background, cropped from atlas_01.png quadrants F4-H6 (same reason as FRAME_IMAGE above).
-const CODEX_FRAME_IMAGE = 'assets/images/frame_codex_01.png'
+// Frame background shared by the memory-match board, checkpoint select, codex, and leaderboard
+// screens. Cropped from atlas_02.png quadrants A1-D4 into its own file because nine-slicing in
+// DCL only reads the full texture (no custom uvs).
+const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // Fraction of the frame texture occupied by each corner ornament, measured so the wood/metal
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
@@ -58,26 +58,29 @@ let SCORE_MULTIPLIER = CHECKPOINTS[0].boards[0].scoreMultiplier
 // Board height as a fraction of the real screen height, matched to the original 400px/1080px desktop look.
 // Kept as a fraction (not a raw pixel size) so mobile and desktop render the board at the same relative size.
 const BOARD_HEIGHT_FRACTION = 400 / 1080
-const TIMER_BAR_WIDTH = 300
-const TIMER_BAR_HEIGHT = 24
-const HEADER_BUTTON_WIDTH = 110
-const HEADER_BUTTON_HEIGHT = 40
 // Right-hand header icon buttons (leaderboard/codex/checkpoints): sized as large as the header
 // row allows while leaving a visible margin around each square icon.
 const HEADER_ICON_BUTTON_SIZE = 96
-const CLOSE_BUTTON_SIZE = 32
+const STAT_ICON_SIZE = 64
+let CLOSE_BUTTON_SIZE = 32 // fallback until the first canvas read; recomputed as 5vh each frame
+// Body text color for the memory board, checkpoint select, codex, and leaderboard screens.
+const SCREEN_TEXT_COLOR = Color4.fromHexString('#2c180b')
 // Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 96 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
 // layout and the cellSize calculation so the grid never grows wider than the column it sits in.
-const CANVAS_MAIN_WIDTH_FRACTION = 0.4
-// Fraction of canvas_main's height left for the body once the 15vh header and its 1vh top/bottom
+const CANVAS_MAIN_WIDTH_FRACTION = 0.45
+// Fraction of canvas_main's height left for the body once the 10vh header and its 1vh top/bottom
 // padding are subtracted. Used to size the Codex grid without overflowing past the header.
-const CANVAS_MAIN_BODY_HEIGHT_FRACTION = 1 - 0.15 - 0.02
+const CANVAS_MAIN_BODY_HEIGHT_FRACTION = 1 - 0.1 - 0.02
+// Header row's 3 columns as fractions of the header row's width: left (score/leaderboard),
+// middle (timer/play), right (codex/checkpoints) - must match the uiTransform widths below.
+const HEADER_SIDE_COLUMN_FRACTION = 0.375
+const HEADER_MIDDLE_COLUMN_FRACTION = 0.25
 
-const BASE_POINTS_PER_PAIR = 100
-const TIME_BONUS_MAX = 200
-const ERROR_PENALTY = 10
+const BASE_POINTS_PER_PAIR = 5
+const TIME_BONUS_MAX = 10
+const ERROR_PENALTY = 0.5
 
 // Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
@@ -118,6 +121,7 @@ const COUNTDOWN_STEP_DURATION = 1
 const COUNTDOWN_TOTAL_DURATION = 3
 const COUNTDOWN_BASE_FONT_SIZE = 60
 const COUNTDOWN_SCALE_MAX = 1.5
+const COUNTDOWN_CIRCLE_SIZE = 160
 
 // Placeholder notification copy — will be replaced with real event-driven messages later.
 const NOTIFICATION_MESSAGES = [
@@ -166,7 +170,11 @@ const EPIC_BADGE_UVS = getUvsForBlock(6, 6, 2, 2, BACK_ATLAS_GRID)
 const LEADERBOARD_BUTTON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // A5-B6
 const CODEX_BUTTON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // A3-B4
 const CHECKPOINTS_BUTTON_UVS = getUvsForBlock(2, 4, 2, 2, BACK_ATLAS_GRID) // C5-D6
-const SCORE_BACKGROUND_UVS = getUvsForBlock(2, 0, 6, 2, BACK_ATLAS_GRID) // C1-H2
+const SCORE_BACKGROUND_UVS = getUvsForBlock(2, 0, 4, 2, BACK_ATLAS_GRID) // C1-F2
+const PLAY_BUTTON_UVS = getUvsForBlock(2, 2, 4, 2, BACK_ATLAS_GRID) // C3-F4
+const SCORE_ICON_UVS = getUvsForBlock(6, 4, 2, 2, BACK_ATLAS_GRID) // G5-H6
+const TIMER_ICON_UVS = getUvsForBlock(4, 4, 2, 2, BACK_ATLAS_GRID) // E5-F6
+const CLOSE_BUTTON_UVS = getUvsForBlock(4, 1, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E2
 
 interface CellState {
   frontQuadrant: number
@@ -233,6 +241,10 @@ function getRarityBadgeUvs(slot: number): number[] {
 }
 let checkpointSelectCellSize = 80 // fallback until the first canvas read
 let codexCellSize = 80 // fallback until the first canvas read
+// PLAY_BUTTON_UVS crops a 4x2 block (2:1 width:height) out of a square atlas texture, so height
+// is derived from the button's actual pixel width each frame to keep that aspect ratio.
+const PLAY_BUTTON_ASPECT_RATIO = 2
+let playButtonHeight = 40 // fallback until the first canvas read
 
 let cells: CellState[] = []
 let elapsedTime = 0
@@ -317,7 +329,7 @@ function flipCell(cell: CellState) {
         playBoardEndSound()
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
-        score = Math.max(0, pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY)
+        score = Math.max(0, Math.round(pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY))
         totalScore += score
         reportScore(score)
         lastBoardTime = GAME_DURATION - timeRemaining
@@ -530,6 +542,13 @@ export function setupUi() {
       const codexHeightCellSize = Math.floor(codexAvailableHeight / CODEX_ROWS)
       const codexWidthCellSize = Math.floor(codexAvailableWidth / CODEX_COLS)
       codexCellSize = Math.min(codexHeightCellSize, codexWidthCellSize)
+
+      // Header's middle column (timer/play) is 25% of the header row, itself padded by 1vh on each side.
+      const headerVhPadding = canvas.height / 100
+      const playButtonWidth = HEADER_MIDDLE_COLUMN_FRACTION * availableWidth - 2 * headerVhPadding
+      playButtonHeight = Math.round(playButtonWidth / PLAY_BUTTON_ASPECT_RATIO)
+
+      CLOSE_BUTTON_SIZE = Math.round(5 * headerVhPadding)
     }
   })
 }
@@ -624,11 +643,11 @@ const MemoryMatchUi = () => (
         borderColor: Color4.Green()
       }}
     >
-      {/* header: 3 equal thirds - score | timer/play | buttons (leaderboard/codex/checkpoints) */}
+      {/* header: score+leaderboard (left) | timer/play (center) | codex+checkpoints (right) */}
       <UiEntity
         uiTransform={{
           width: '100%',
-          minHeight: '15vh',
+          minHeight: '10vh',
           flexDirection: 'row',
           alignItems: 'center',
           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -637,33 +656,36 @@ const MemoryMatchUi = () => (
       >
         <UiEntity
           uiTransform={{
-            width: '40%',
+            width: `${HEADER_SIDE_COLUMN_FRACTION * 100}%`,
             height: '100%',
             padding: '1vh',
             flexDirection: 'row',
             alignItems: 'center',
+            justifyContent: 'flex-start',
             borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
             borderColor: Color4.White()
           }}
         >
           <UiEntity
             uiTransform={{
-              width: HEADER_ICON_BUTTON_SIZE * 3,
+              width: HEADER_ICON_BUTTON_SIZE * 2,
               height: HEADER_ICON_BUTTON_SIZE,
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'flex-start',
+              padding: { left: '2%' },
               borderRadius: 8
             }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
           >
-            <Label value={`${totalScore}`} fontSize={20} color={Color4.White()} />
+            <UiEntity uiTransform={{ width: STAT_ICON_SIZE, height: STAT_ICON_SIZE, margin: { left: '1vh' } }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_ICON_UVS }} />
+            <Label value={`${totalScore}`} fontSize={26} color={Color4.White()} uiTransform={{ margin: { left: '2%' } }} />
           </UiEntity>
         </UiEntity>
 
         <UiEntity
           uiTransform={{
-            width: '20%',
+            width: `${HEADER_MIDDLE_COLUMN_FRACTION * 100}%`,
             height: '100%',
             padding: '1vh',
             alignItems: 'center',
@@ -674,45 +696,40 @@ const MemoryMatchUi = () => (
         >
           {screen === 'board' ? (
             <UiEntity
-              uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
-              uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+              uiTransform={{
+                width: HEADER_ICON_BUTTON_SIZE * 2,
+                height: HEADER_ICON_BUTTON_SIZE,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                padding: { left: '2%' },
+                borderRadius: 8
+              }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
             >
-              <UiEntity
-                uiTransform={{ width: `${(timeRemaining / GAME_DURATION) * 100}%`, height: '100%' }}
-                uiBackground={{ color: Color4.create(0.2, 0.6, 0.9, 1) }}
-              />
-              <Label
-                value={`${Math.ceil(timeRemaining)}s`}
-                fontSize={18}
-                color={Color4.White()}
-                textAlign="middle-center"
-                uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}
-              />
+              <UiEntity uiTransform={{ width: STAT_ICON_SIZE, height: STAT_ICON_SIZE, margin: { left: '1vh' } }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
+              <Label value={`${Math.ceil(timeRemaining)}s`} fontSize={40} color={Color4.White()} uiTransform={{ margin: { left: '-1vh' } }} />
             </UiEntity>
           ) : (
             <UiEntity
               uiTransform={{
-                width: HEADER_BUTTON_WIDTH,
-                height: HEADER_BUTTON_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center'
+                width: '100%',
+                height: playButtonHeight
               }}
-              uiBackground={{ color: Color4.create(0.2, 0.7, 0.3, 1) }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
               onMouseDown={() => showCheckpointSelect()}
-            >
-              <Label value="PLAY" fontSize={20} color={Color4.White()} textAlign="middle-center" />
-            </UiEntity>
+            />
           )}
         </UiEntity>
 
         <UiEntity
           uiTransform={{
-            width: '40%',
+            width: `${HEADER_SIDE_COLUMN_FRACTION * 100}%`,
             height: '100%',
             padding: '1vh',
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
             borderColor: Color4.White()
           }}
@@ -723,12 +740,12 @@ const MemoryMatchUi = () => (
             onMouseDown={() => showLeaderboard()}
           />
           <UiEntity
-            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center', margin: { left: 16 } }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CODEX_BUTTON_UVS }}
             onMouseDown={() => showInventory()}
           />
           <UiEntity
-            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center', margin: { left: 16 } }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CHECKPOINTS_BUTTON_UVS }}
             onMouseDown={() => showCheckpointSelect()}
           />
@@ -740,6 +757,7 @@ const MemoryMatchUi = () => (
         uiTransform={{
           width: '100%',
           height: '100%',
+          padding: '2vh',
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -748,10 +766,10 @@ const MemoryMatchUi = () => (
       >
         {screen === 'board' && !won && !gameOver && (
           <UiEntity
-            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiTransform={{ width: '100%', height: 'auto', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
               textureMode: 'nine-slices',
-              texture: { src: FRAME_IMAGE },
+              texture: { src: BOARD_FRAME_IMAGE },
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
@@ -778,15 +796,13 @@ const MemoryMatchUi = () => (
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              uiBackground={{ color: Color4.Red() }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeBoard()}
-            >
-              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
-            </UiEntity>
+            />
             <Label
               value={`Checkpoint ${currentCheckpoint} · Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
               fontSize={28}
-              color={Color4.White()}
+              color={SCREEN_TEXT_COLOR}
               uiTransform={{ margin: { bottom: 4 } }}
             />
             <Label
@@ -795,7 +811,7 @@ const MemoryMatchUi = () => (
                 return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
               })()}
               fontSize={16}
-              color={Color4.White()}
+              color={SCREEN_TEXT_COLOR}
               uiTransform={{ margin: { bottom: 12 } }}
             />
             <UiEntity
@@ -886,9 +902,19 @@ const MemoryMatchUi = () => (
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}
-                      uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
                     >
-                      <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
+                      <UiEntity
+                        uiTransform={{
+                          width: COUNTDOWN_CIRCLE_SIZE,
+                          height: COUNTDOWN_CIRCLE_SIZE,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 999
+                        }}
+                        uiBackground={{ color: Color4.Red() }}
+                      >
+                        <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
+                      </UiEntity>
                     </UiEntity>
                   )
                 })()}
@@ -899,10 +925,10 @@ const MemoryMatchUi = () => (
 
         {screen === 'checkpointSelect' && (
           <UiEntity
-            uiTransform={{ flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiTransform={{ width: '100%', height: 'auto', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
               textureMode: 'nine-slices',
-              texture: { src: FRAME_IMAGE },
+              texture: { src: BOARD_FRAME_IMAGE },
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
@@ -915,12 +941,10 @@ const MemoryMatchUi = () => (
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              uiBackground={{ color: Color4.Red() }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeCheckpointSelect()}
-            >
-              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
-            </UiEntity>
-            <Label value="Select checkpoint" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            />
+            <Label value="Select checkpoint" fontSize={28} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity
               uiTransform={{
                 width: CHECKPOINT_SELECT_COLS * checkpointSelectCellSize,
@@ -952,7 +976,7 @@ const MemoryMatchUi = () => (
                         <Label
                           value={unlocked ? `Checkpoint ${String(checkpoint).padStart(2, '0')}` : 'Locked'}
                           fontSize={14}
-                          color={Color4.White()}
+                          color={SCREEN_TEXT_COLOR}
                           textAlign="middle-center"
                         />
                       </UiEntity>
@@ -966,10 +990,10 @@ const MemoryMatchUi = () => (
 
         {screen === 'inventory' && (
           <UiEntity
-            uiTransform={{ width: '100%', height: '100%', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiTransform={{ width: '100%', height: 'auto', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
               textureMode: 'nine-slices',
-              texture: { src: CODEX_FRAME_IMAGE },
+              texture: { src: BOARD_FRAME_IMAGE },
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
@@ -982,12 +1006,10 @@ const MemoryMatchUi = () => (
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              uiBackground={{ color: Color4.Red() }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeInventory()}
-            >
-              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
-            </UiEntity>
-            <Label value="Monster Codex" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            />
+            <Label value="Monster Codex" fontSize={28} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity uiTransform={{ flexDirection: 'row' }}>
               <UiEntity
                 uiTransform={{ flexDirection: 'column', alignItems: 'flex-end', margin: { right: 24 } }}
@@ -1006,8 +1028,8 @@ const MemoryMatchUi = () => (
                         margin: { bottom: rarityIndex < RARITIES.length - 1 ? 16 : 0 }
                       }}
                     >
-                      <Label value={`${collected}/${total}`} fontSize={30} color={Color4.White()} textAlign="middle-right" />
-                      <Label value={rarity.label} fontSize={14} color={Color4.White()} textAlign="middle-right" uiTransform={{ margin: { top: -4 } }} />
+                      <Label value={`${collected}/${total}`} fontSize={30} color={SCREEN_TEXT_COLOR} textAlign="middle-right" />
+                      <Label value={rarity.label} fontSize={14} color={SCREEN_TEXT_COLOR} textAlign="middle-right" uiTransform={{ margin: { top: -4 } }} />
                     </UiEntity>
                   )
                 })}
@@ -1077,10 +1099,10 @@ const MemoryMatchUi = () => (
 
         {screen === 'leaderboard' && (
           <UiEntity
-            uiTransform={{ minWidth: '80%', minHeight: '80%', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
+            uiTransform={{ width: '100%', height: 'auto', flexDirection: 'column', alignItems: 'center', padding: framePadding }}
             uiBackground={{
               textureMode: 'nine-slices',
-              texture: { src: FRAME_IMAGE },
+              texture: { src: BOARD_FRAME_IMAGE },
               textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
             }}
           >
@@ -1093,23 +1115,21 @@ const MemoryMatchUi = () => (
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              uiBackground={{ color: Color4.Red() }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeLeaderboard()}
-            >
-              <Label value="X" fontSize={18} color={Color4.White()} textAlign="middle-center" />
-            </UiEntity>
-            <Label value="Leaderboard" fontSize={28} color={Color4.White()} uiTransform={{ margin: { bottom: 12 } }} />
+            />
+            <Label value="Leaderboard" fontSize={28} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 12 } }} />
             <UiEntity uiTransform={{ width: 300, flexDirection: 'column' }}>
               {leaderboard.length === 0 ? (
-                <Label value="No scores yet" fontSize={16} color={Color4.White()} textAlign="middle-center" />
+                <Label value="No scores yet" fontSize={16} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
                     key={index}
                     uiTransform={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', padding: { top: 4, bottom: 4 } }}
                   >
-                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={16} color={Color4.White()} />
-                    <Label value={`${entry.score}`} fontSize={16} color={Color4.White()} />
+                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={16} color={SCREEN_TEXT_COLOR} />
+                    <Label value={`${entry.score}`} fontSize={16} color={SCREEN_TEXT_COLOR} />
                   </UiEntity>
                 ))
               )}
@@ -1200,7 +1220,7 @@ const MemoryMatchUi = () => (
               <Label
                 value={`${getRarityLabel(wonMonsterQuadrant)} Monster\nCollected!`}
                 fontSize={36}
-                color={Color4.White()}
+                color={SCREEN_TEXT_COLOR}
                 textAlign="middle-center"
               />
               <UiEntity
@@ -1240,20 +1260,20 @@ const MemoryMatchUi = () => (
             </UiEntity>
           ) : (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label value="Board complete!" fontSize={36} color={Color4.White()} />
-              <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+              <Label value="Board complete!" fontSize={36} color={SCREEN_TEXT_COLOR} />
+              <Label value={`+${score} pts`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 8 } }} />
               {isNewBestTime && (
                 <Label
                   value={`New Best Time! ${lastBoardTime.toFixed(1)}s`}
                   fontSize={20}
-                  color={Color4.White()}
+                  color={SCREEN_TEXT_COLOR}
                   uiTransform={{ margin: { top: 8 } }}
                 />
               )}
             </UiEntity>
           )
         ) : (
-          <Label value="Time's up" fontSize={36} color={Color4.White()} />
+          <Label value="Time's up" fontSize={36} color={SCREEN_TEXT_COLOR} />
         )}
       </UiEntity>
     )}
