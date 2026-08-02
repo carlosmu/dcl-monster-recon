@@ -62,6 +62,9 @@ const TIMER_BAR_WIDTH = 300
 const TIMER_BAR_HEIGHT = 24
 const HEADER_BUTTON_WIDTH = 110
 const HEADER_BUTTON_HEIGHT = 40
+// Right-hand header icon buttons (leaderboard/codex/checkpoints): sized as large as the header
+// row allows while leaving a visible margin around each square icon.
+const HEADER_ICON_BUTTON_SIZE = 96
 const CLOSE_BUTTON_SIZE = 32
 // Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 96 / 1080
@@ -158,6 +161,12 @@ const COMMON_BADGE_UVS = getUvsForBlock(0, 6, 2, 2, BACK_ATLAS_GRID)
 const RARE_BADGE_UVS = getUvsForBlock(2, 6, 2, 2, BACK_ATLAS_GRID)
 const EXOTIC_BADGE_UVS = getUvsForBlock(4, 6, 2, 2, BACK_ATLAS_GRID)
 const EPIC_BADGE_UVS = getUvsForBlock(6, 6, 2, 2, BACK_ATLAS_GRID)
+
+// Header button icons are 2x2 blocks of atlas_01.png.
+const LEADERBOARD_BUTTON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // A5-B6
+const CODEX_BUTTON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // A3-B4
+const CHECKPOINTS_BUTTON_UVS = getUvsForBlock(2, 4, 2, 2, BACK_ATLAS_GRID) // C5-D6
+const SCORE_BACKGROUND_UVS = getUvsForBlock(2, 0, 6, 2, BACK_ATLAS_GRID) // C1-H2
 
 interface CellState {
   frontQuadrant: number
@@ -614,48 +623,54 @@ const MemoryMatchUi = () => (
         borderColor: Color4.Green()
       }}
     >
-      {/* header: left (score + tbd), middle (timer / play), right (inventory / checkpoints) */}
+      {/* header: 3 equal thirds - score | timer/play | buttons (leaderboard/codex/checkpoints) */}
       <UiEntity
         uiTransform={{
           width: '100%',
           minHeight: '15vh',
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'center',
           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
           borderColor: Color4.Red()
         }}
       >
-        <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center' }}>
+        <UiEntity
+          uiTransform={{
+            width: '40%',
+            height: '100%',
+            padding: '1vh',
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+            borderColor: Color4.White()
+          }}
+        >
           <UiEntity
             uiTransform={{
-              width: HEADER_BUTTON_WIDTH,
+              width: HEADER_ICON_BUTTON_SIZE * 3,
+              height: HEADER_ICON_BUTTON_SIZE,
               flexDirection: 'column',
               alignItems: 'center',
-              margin: { right: 12 },
-              padding: { top: 4, bottom: 4 },
+              justifyContent: 'center',
               borderRadius: 8
             }}
-            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
           >
-            <Label value="Score" fontSize={14} color={Color4.White()} />
             <Label value={`${totalScore}`} fontSize={20} color={Color4.White()} />
-          </UiEntity>
-          <UiEntity
-            uiTransform={{
-              width: HEADER_BUTTON_WIDTH,
-              height: HEADER_BUTTON_HEIGHT,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
-            onMouseDown={() => showLeaderboard()}
-          >
-            <Label value="Leaderboard" fontSize={14} color={Color4.White()} textAlign="middle-center" />
           </UiEntity>
         </UiEntity>
 
-        <UiEntity uiTransform={{ alignItems: 'center', justifyContent: 'center' }}>
+        <UiEntity
+          uiTransform={{
+            width: '20%',
+            height: '100%',
+            padding: '1vh',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+            borderColor: Color4.White()
+          }}
+        >
           {screen === 'board' ? (
             <UiEntity
               uiTransform={{ width: TIMER_BAR_WIDTH, height: TIMER_BAR_HEIGHT }}
@@ -689,32 +704,33 @@ const MemoryMatchUi = () => (
           )}
         </UiEntity>
 
-        <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center' }}>
+        <UiEntity
+          uiTransform={{
+            width: '40%',
+            height: '100%',
+            padding: '1vh',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+            borderColor: Color4.White()
+          }}
+        >
           <UiEntity
-            uiTransform={{
-              width: HEADER_BUTTON_WIDTH,
-              height: HEADER_BUTTON_HEIGHT,
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: { right: 8 }
-            }}
-            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: LEADERBOARD_BUTTON_UVS }}
+            onMouseDown={() => showLeaderboard()}
+          />
+          <UiEntity
+            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CODEX_BUTTON_UVS }}
             onMouseDown={() => showInventory()}
-          >
-            <Label value="Monster Codex" fontSize={14} color={Color4.White()} textAlign="middle-center" />
-          </UiEntity>
+          />
           <UiEntity
-            uiTransform={{
-              width: HEADER_BUTTON_WIDTH,
-              height: HEADER_BUTTON_HEIGHT,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            uiBackground={{ color: Color4.create(0.3, 0.3, 0.3, 1) }}
+            uiTransform={{ width: HEADER_ICON_BUTTON_SIZE, height: HEADER_ICON_BUTTON_SIZE, alignItems: 'center', justifyContent: 'center' }}
+            uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CHECKPOINTS_BUTTON_UVS }}
             onMouseDown={() => showCheckpointSelect()}
-          >
-            <Label value="Checkpoints" fontSize={14} color={Color4.White()} textAlign="middle-center" />
-          </UiEntity>
+          />
         </UiEntity>
       </UiEntity>
 
