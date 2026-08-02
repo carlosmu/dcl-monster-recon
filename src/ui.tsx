@@ -576,6 +576,7 @@ function closeBoard() {
   checkpointComplete = false
   showingPrize = false
   endScreenShownAt = null
+  countdownStart = null
 }
 
 function closeCheckpointSelect() {
