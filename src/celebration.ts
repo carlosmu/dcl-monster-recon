@@ -1,6 +1,6 @@
 import { engine, Transform, MainCamera, VirtualCamera, type Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
-import { triggerEmote } from '~system/RestrictedActions'
+import { triggerEmote, stopEmote } from '~system/RestrictedActions'
 
 // Celebration cinematic camera: orbits halfway (180°) around the player over this many seconds.
 const CAM_DURATION = 3
@@ -11,12 +11,19 @@ const CAM_OFFSET = Vector3.create(0, 0.2, 2.5)
 // so it tilts up dramatically rather than looking down at the player's feet.
 const LOOK_AT_OFFSET = Vector3.create(0, 1.5, 0)
 
+// Predefined avatar emotes (disco, handsair, fistpump, cry) loop forever until explicitly
+// stopped, so every trigger below is paired with a stopEmote() once it has played through once.
+const EMOTE_DURATION = 3
+
 let camParent: Entity
 let camEntity: Entity
 let lookAtEntity: Entity
 let active = false
 let elapsed = 0
 let orbitStartAngleDeg = 0
+
+let emoteActive = false
+let emoteElapsed = 0
 
 // Creates the celebration camera rig. Call once from setupUi().
 export function setupCelebrationCamera() {
@@ -45,11 +52,13 @@ export function triggerCelebrationCamera(predefinedEmote: string, startAngleDeg:
   active = true
   orbitStartAngleDeg = startAngleDeg
   MainCamera.getMutable(engine.CameraEntity).virtualCameraEntity = camEntity
-  void triggerEmote({ predefinedEmote })
+  startEmote(predefinedEmote)
 }
 
 // Advances the camera orbit; call every frame from the main system loop.
 export function updateCelebrationCamera(dt: number) {
+  updateEmote(dt)
+
   if (!active) return
   elapsed = Math.min(CAM_DURATION, elapsed + dt)
   const angleDeg = orbitStartAngleDeg + (elapsed / CAM_DURATION) * CAM_SWEEP_DEG
@@ -62,5 +71,21 @@ export function updateCelebrationCamera(dt: number) {
 
 // Plays when the player runs out of time and loses the board. No camera involved.
 export function triggerDefeatEmote() {
-  void triggerEmote({ predefinedEmote: 'cry' })
+  startEmote('cry')
+}
+
+function startEmote(predefinedEmote: string) {
+  emoteElapsed = 0
+  emoteActive = true
+  void triggerEmote({ predefinedEmote })
+}
+
+// Stops the emote after one cycle, since predefined avatar emotes loop until told to stop.
+function updateEmote(dt: number) {
+  if (!emoteActive) return
+  emoteElapsed += dt
+  if (emoteElapsed >= EMOTE_DURATION) {
+    emoteActive = false
+    void stopEmote({})
+  }
 }

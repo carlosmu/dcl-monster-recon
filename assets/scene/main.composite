@@ -86,16 +86,16 @@
               "y": 0,
               "z": 32
             },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
             "rotation": {
               "x": 0,
               "y": 0,
               "z": 0,
               "w": 1
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
             },
             "parent": 0
           }
@@ -1124,6 +1124,7 @@
         "0": {
           "json": {
             "name": "Monster Recont - Testing",
+            "description": "Music I use: Bensound.com\nLicense code: HS2MLQCYO5E1P2XY\nArtist: : Benjamin Tissot",
             "thumbnail": "assets/scene/Images/thumbnail.png",
             "ageRating": "A",
             "categories": [],

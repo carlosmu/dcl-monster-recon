@@ -14,7 +14,7 @@ const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
 const FRONT_IMAGE = 'assets/images/cards_01.png'
 const PRIZE_IMAGE = 'assets/images/prizes_01.png'
-const BOARD_MUSIC_CLIP = 'assets/audio/tuntun.mp3'
+const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
 const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
@@ -784,7 +784,29 @@ const MemoryMatchUi = () => (
           borderColor: Color4.Red()
         }}
       >
-        {screen === 'board' && !won && !gameOver && (
+        {screen === 'board' && !won && !gameOver && countdownStart !== null && (
+          (() => {
+            const elapsed = elapsedTime - countdownStart
+            const value = 3 - Math.floor(elapsed / COUNTDOWN_STEP_DURATION)
+            const stepProgress = (elapsed % COUNTDOWN_STEP_DURATION) / COUNTDOWN_STEP_DURATION
+            const fontSize = COUNTDOWN_BASE_FONT_SIZE * (1 + (COUNTDOWN_SCALE_MAX - 1) * stepProgress)
+            return (
+              <UiEntity
+                uiTransform={{
+                  width: COUNTDOWN_CIRCLE_SIZE,
+                  height: COUNTDOWN_CIRCLE_SIZE,
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: COUNTDOWN_BACKGROUND_UVS }}
+              >
+                <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
+              </UiEntity>
+            )
+          })()
+        )}
+
+        {screen === 'board' && !won && !gameOver && countdownStart === null && (
           <UiEntity
             uiTransform={{
               width: '100%',
@@ -859,8 +881,7 @@ const MemoryMatchUi = () => (
                 borderColor: Color4.White()
               }}
             >
-              {countdownStart === null &&
-                Array.from({ length: ROWS }, (_, rowIndex) => (
+              {Array.from({ length: ROWS }, (_, rowIndex) => (
                   <UiEntity
                     key={rowIndex}
                     uiTransform={{
@@ -933,37 +954,6 @@ const MemoryMatchUi = () => (
                   )
                 })()}
 
-              {countdownStart !== null &&
-                (() => {
-                  const elapsed = elapsedTime - countdownStart
-                  const value = 3 - Math.floor(elapsed / COUNTDOWN_STEP_DURATION)
-                  const stepProgress = (elapsed % COUNTDOWN_STEP_DURATION) / COUNTDOWN_STEP_DURATION
-                  const fontSize = COUNTDOWN_BASE_FONT_SIZE * (1 + (COUNTDOWN_SCALE_MAX - 1) * stepProgress)
-                  return (
-                    <UiEntity
-                      uiTransform={{
-                        width: '100%',
-                        height: '100%',
-                        positionType: 'absolute',
-                        position: { top: 0, left: 0 },
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <UiEntity
-                        uiTransform={{
-                          width: COUNTDOWN_CIRCLE_SIZE,
-                          height: COUNTDOWN_CIRCLE_SIZE,
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: COUNTDOWN_BACKGROUND_UVS }}
-                      >
-                        <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
-                      </UiEntity>
-                    </UiEntity>
-                  )
-                })()}
             </UiEntity>
 
           </UiEntity>
@@ -1273,7 +1263,7 @@ const MemoryMatchUi = () => (
                       borderColor: Color4.Green()
                     }}
                   >
-                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={16} color={SCREEN_TEXT_COLOR} />
+                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={24} color={SCREEN_TEXT_COLOR} />
                     <Label value={`${entry.score}`} fontSize={16} color={SCREEN_TEXT_COLOR} />
                   </UiEntity>
                 ))

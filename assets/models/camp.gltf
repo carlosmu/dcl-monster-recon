@@ -2205,12 +2205,25 @@
 		},
 		{
 			"doubleSided":true,
+			"name":"Tronco",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.09564574062824249,
+					0.01885032467544079,
+					0.011154204607009888,
+					1
+				],
+				"metallicFactor":0
+			}
+		},
+		{
+			"doubleSided":true,
 			"name":"Arbol",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.032062578946352005,
-					0.17012354731559753,
-					0.011409033089876175,
+					0.021650854498147964,
+					0.06892513483762741,
+					0.007539641112089157,
 					1
 				],
 				"metallicFactor":0
@@ -2409,7 +2422,7 @@
 						"TEXCOORD_0":47
 					},
 					"indices":48,
-					"material":0
+					"material":2
 				},
 				{
 					"attributes":{
@@ -2418,7 +2431,7 @@
 						"TEXCOORD_0":51
 					},
 					"indices":52,
-					"material":2
+					"material":3
 				}
 			]
 		},
@@ -2935,14 +2948,14 @@
 		{
 			"bufferView":53,
 			"componentType":5126,
-			"count":132,
+			"count":300,
 			"max":[
 				4.998027801513672,
 				7.228969097137451,
 				0.5398440957069397
 			],
 			"min":[
-				-4.998027801513672,
+				-5.00933837890625,
 				0,
 				-0.3528722822666168
 			],
@@ -2951,19 +2964,19 @@
 		{
 			"bufferView":54,
 			"componentType":5126,
-			"count":132,
+			"count":300,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":55,
 			"componentType":5126,
-			"count":132,
+			"count":300,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":56,
 			"componentType":5123,
-			"count":228,
+			"count":540,
 			"type":"SCALAR"
 		},
 		{
@@ -3322,50 +3335,50 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":1584,
+			"byteLength":3600,
 			"byteOffset":130156,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1584,
-			"byteOffset":131740,
+			"byteLength":3600,
+			"byteOffset":133756,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1056,
-			"byteOffset":133324,
+			"byteLength":2400,
+			"byteOffset":137356,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":456,
-			"byteOffset":134380,
+			"byteLength":1080,
+			"byteOffset":139756,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":86616,
-			"byteOffset":134836,
+			"byteOffset":140836,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":86616,
-			"byteOffset":221452,
+			"byteOffset":227452,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":57744,
-			"byteOffset":308068,
+			"byteOffset":314068,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":28464,
-			"byteOffset":365812,
+			"byteOffset":371812,
 			"target":34963
 		}
 	],
@@ -3377,7 +3390,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":394276,
+			"byteLength":400276,
 			"uri":"camp.bin"
 		}
 	]
