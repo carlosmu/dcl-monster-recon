@@ -14,6 +14,7 @@ const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
 const FRONT_IMAGE = 'assets/images/cards_01.png'
 const PRIZE_IMAGE = 'assets/images/prizes_01.png'
+const AMBIENT_MUSIC_CLIP = 'assets/audio/Medieval_Astrology.mp3'
 const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
@@ -368,6 +369,7 @@ function flipCell(cell: CellState) {
   }
 }
 
+let ambientMusicEntity: Entity
 let boardMusicEntity: Entity
 let boardEndEntity: Entity
 let prizeEntity: Entity
@@ -376,7 +378,17 @@ let countdownEntity: Entity
 let failEntity: Entity
 let timeoutEntity: Entity
 
+function playAmbientMusic() {
+  if (musicMuted) return
+  AudioSource.getMutable(ambientMusicEntity).playing = true
+}
+
+function stopAmbientMusic() {
+  AudioSource.getMutable(ambientMusicEntity).playing = false
+}
+
 function playBoardMusic() {
+  stopAmbientMusic()
   if (musicMuted) return
   AudioSource.getMutable(boardMusicEntity).playing = true
 }
@@ -389,8 +401,11 @@ function toggleMusic() {
   musicMuted = !musicMuted
   if (musicMuted) {
     stopBoardMusic()
+    stopAmbientMusic()
   } else if (screen === 'board' && !gameOver && !won && countdownStart === null) {
     playBoardMusic()
+  } else {
+    playAmbientMusic()
   }
 }
 
@@ -428,6 +443,10 @@ function reportScore(points: number) {
 
 export function setupUi() {
   cells = buildCells()
+
+  ambientMusicEntity = engine.addEntity()
+  Transform.create(ambientMusicEntity)
+  AudioSource.create(ambientMusicEntity, { audioClipUrl: AMBIENT_MUSIC_CLIP, playing: true, loop: true, volume: 0.1, global: true })
 
   boardMusicEntity = engine.addEntity()
   Transform.create(boardMusicEntity)
@@ -516,6 +535,7 @@ export function setupUi() {
         endScreenShownAt = elapsedTime
       } else {
         screen = 'checkpointSelect'
+        playAmbientMusic()
         won = false
         gameOver = false
         checkpointComplete = false
@@ -605,6 +625,7 @@ function startCheckpoint(checkpoint: number) {
 
 function closeBoard() {
   stopBoardMusic()
+  playAmbientMusic()
   screen = 'checkpointSelect'
   gameOver = false
   won = false
