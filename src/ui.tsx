@@ -333,7 +333,6 @@ function flipCell(cell: CellState) {
       playMatchSound()
       if (cells.every((c) => c.matched)) {
         won = true
-        stopBoardMusic()
         playBoardEndSound()
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
@@ -511,6 +510,7 @@ export function setupUi() {
         startBoard(currentCheckpoint, currentBoardIndex + 1)
       } else if (won && checkpointComplete && !showingPrize) {
         showingPrize = true
+        stopBoardMusic()
         playPrizeSound()
         triggerCelebrationCamera('fistpump', 180)
         endScreenShownAt = elapsedTime
