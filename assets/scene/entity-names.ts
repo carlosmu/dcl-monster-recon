@@ -6,5 +6,5 @@
  */
 export enum EntityNames {
   Admin_Tools = "Admin Tools",
-  button = "button",
+  camp_gltf = "camp.gltf",
 } 

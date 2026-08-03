@@ -58,27 +58,6 @@
         "serializationType": "transform"
       },
       "data": {
-        "512": {
-          "json": {
-            "position": {
-              "x": 27.5,
-              "y": 0,
-              "z": 29
-            },
-            "scale": {
-              "x": 10,
-              "y": 10,
-              "z": 10
-            },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0,
-              "w": 1
-            },
-            "parent": 0
-          }
-        },
         "513": {
           "json": {
             "position": {
@@ -96,6 +75,27 @@
               "y": 0,
               "z": 0,
               "w": 1
+            },
+            "parent": 0
+          }
+        },
+        "514": {
+          "json": {
+            "position": {
+              "x": 32,
+              "y": 0,
+              "z": 32
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
             },
             "parent": 0
           }
@@ -119,41 +119,10 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
-          "json": {
-            "networkId": 0,
-            "entityId": 8002
-          }
-        },
         "513": {
           "json": {
             "networkId": 0,
             "entityId": 8003
-          }
-        }
-      }
-    },
-    {
-      "name": "core::Animator",
-      "jsonSchema": {
-        "type": "object",
-        "properties": {},
-        "serializationType": "protocol-buffer",
-        "protocolBuffer": "PBAnimator"
-      },
-      "data": {
-        "512": {
-          "json": {
-            "states": [
-              {
-                "clip": "trigger",
-                "playing": false,
-                "weight": 1,
-                "speed": 1,
-                "loop": false,
-                "shouldReset": false
-              }
-            ]
           }
         }
       }
@@ -167,9 +136,9 @@
         "protocolBuffer": "PBGltfContainer"
       },
       "data": {
-        "512": {
+        "514": {
           "json": {
-            "src": "assets/asset-packs/red_button/red_button.glb",
+            "src": "assets/models/camp.gltf",
             "visibleMeshesCollisionMask": 0,
             "invisibleMeshesCollisionMask": 3
           }
@@ -189,40 +158,14 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
-          "json": {
-            "value": "button"
-          }
-        },
         "513": {
           "json": {
             "value": "Admin Tools"
           }
-        }
-      }
-    },
-    {
-      "name": "core::PointerEvents",
-      "jsonSchema": {
-        "type": "object",
-        "properties": {},
-        "serializationType": "protocol-buffer",
-        "protocolBuffer": "PBPointerEvents"
-      },
-      "data": {
-        "512": {
+        },
+        "514": {
           "json": {
-            "pointerEvents": [
-              {
-                "eventType": 1,
-                "eventInfo": {
-                  "button": 1,
-                  "hoverText": "Press",
-                  "maxDistance": 10,
-                  "showFeedback": true
-                }
-              }
-            ]
+            "value": "camp.gltf"
           }
         }
       }
@@ -244,14 +187,6 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
-          "json": {
-            "componentIds": [
-              1042,
-              1020
-            ]
-          }
-        },
         "513": {
           "json": {
             "componentIds": [
@@ -356,8 +291,8 @@
                 "entity": 0,
                 "open": true,
                 "children": [
-                  512,
-                  513
+                  513,
+                  514
                 ]
               },
               {
@@ -369,11 +304,11 @@
                 "children": []
               },
               {
-                "entity": 512,
+                "entity": 513,
                 "children": []
               },
               {
-                "entity": 513,
+                "entity": 514,
                 "children": []
               }
             ]
@@ -398,10 +333,10 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
+        "513": {
           "json": {}
         },
-        "513": {
+        "514": {
           "json": {}
         }
       }
@@ -835,28 +770,6 @@
         "serializationType": "map"
       },
       "data": {
-        "512": {
-          "json": {
-            "isBasicViewEnabled": true,
-            "componentName": "Button",
-            "fields": [
-              {
-                "name": "Hover Text",
-                "type": "core::PointerEvents"
-              },
-              {
-                "name": "When Clicked",
-                "type": "asset-packs::Triggers",
-                "basicViewId": "trigger-when-clicked"
-              }
-            ],
-            "assetId": "89d3e0e7-b9cd-406e-bd95-8abba3b37cc6",
-            "helpTooltip": {
-              "text": "Configure the button's hover text and actions. Set what happens when the button is clicked by configuring triggers and actions."
-            },
-            "version": 1
-          }
-        },
         "513": {
           "json": {
             "isBasicViewEnabled": true,
@@ -1210,14 +1123,19 @@
       "data": {
         "0": {
           "json": {
-            "name": "monster-recon",
-            "description": "Empty Scene Template",
-            "thumbnail": "assets/images/autogenerated-thumbnail.png",
+            "name": "Monster Recont - Testing",
+            "thumbnail": "assets/scene/Images/thumbnail.png",
+            "ageRating": "A",
             "categories": [],
             "author": "SDK",
-            "email": "",
-            "tags": [],
+            "tags": [
+              ""
+            ],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -1283,14 +1201,8 @@
                   "x": 3,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
-            "silenceVoiceChat": false,
-            "disablePortableExperiences": false,
             "spawnPoints": [
               {
                 "name": "SpawnArea1",
@@ -1299,22 +1211,19 @@
                   "x": {
                     "$case": "range",
                     "value": [
-                      28.5,
-                      31.5
+                      48.2400016784668,
+                      51.2400016784668
                     ]
                   },
                   "y": {
-                    "$case": "range",
-                    "value": [
-                      0,
-                      0
-                    ]
+                    "$case": "single",
+                    "value": 0
                   },
                   "z": {
                     "$case": "range",
                     "value": [
-                      28.5,
-                      31.5
+                      48.709999084472656,
+                      51.709999084472656
                     ]
                   }
                 },
@@ -1325,9 +1234,7 @@
                 }
               }
             ],
-            "skyboxConfig": {},
-            "creator": "",
-            "disableNearbyVoiceChat": false
+            "skyboxConfig": {}
           }
         }
       }
@@ -1620,84 +1527,6 @@
       }
     },
     {
-      "name": "asset-packs::Actions",
-      "jsonSchema": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "serializationType": "int32"
-          },
-          "value": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "serializationType": "utf8-string"
-                },
-                "type": {
-                  "type": "string",
-                  "serializationType": "utf8-string"
-                },
-                "jsonPayload": {
-                  "type": "string",
-                  "serializationType": "utf8-string"
-                },
-                "allowedInBasicView": {
-                  "type": "boolean",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "boolean",
-                    "serializationType": "boolean"
-                  }
-                },
-                "basicViewId": {
-                  "type": "string",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "string",
-                    "serializationType": "utf8-string"
-                  }
-                },
-                "default": {
-                  "type": "boolean",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "boolean",
-                    "serializationType": "boolean"
-                  }
-                }
-              },
-              "serializationType": "map"
-            },
-            "serializationType": "array"
-          }
-        },
-        "serializationType": "map"
-      },
-      "data": {
-        "512": {
-          "json": {
-            "id": 1,
-            "value": [
-              {
-                "name": "Play Activate Animation",
-                "type": "play_animation",
-                "jsonPayload": "{ \"animation\": \"trigger\" }"
-              },
-              {
-                "name": "Play Sound",
-                "type": "play_sound",
-                "jsonPayload": "{\"src\":\"assets/asset-packs/red_button/sound.mp3\"}"
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
       "name": "asset-packs::Counter",
       "jsonSchema": {
         "type": "object",
@@ -1718,198 +1547,6 @@
           "json": {
             "id": 0,
             "value": 1
-          }
-        }
-      }
-    },
-    {
-      "name": "asset-packs::Triggers",
-      "jsonSchema": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "on_click",
-                    "on_input_action",
-                    "on_state_change",
-                    "on_spawn",
-                    "on_tween_end",
-                    "on_counter_change",
-                    "on_player_enters_area",
-                    "on_player_leaves_area",
-                    "on_delay",
-                    "on_loop",
-                    "on_clone",
-                    "on_click_image",
-                    "on_damage",
-                    "on_global_click",
-                    "on_global_primary",
-                    "on_global_secondary",
-                    "on_tick",
-                    "on_heal_player",
-                    "on_player_spawn"
-                  ],
-                  "default": "on_input_action",
-                  "serializationType": "enum-string",
-                  "enumObject": {
-                    "ON_CLICK": "on_click",
-                    "ON_INPUT_ACTION": "on_input_action",
-                    "ON_STATE_CHANGE": "on_state_change",
-                    "ON_SPAWN": "on_spawn",
-                    "ON_TWEEN_END": "on_tween_end",
-                    "ON_COUNTER_CHANGE": "on_counter_change",
-                    "ON_PLAYER_ENTERS_AREA": "on_player_enters_area",
-                    "ON_PLAYER_LEAVES_AREA": "on_player_leaves_area",
-                    "ON_DELAY": "on_delay",
-                    "ON_LOOP": "on_loop",
-                    "ON_CLONE": "on_clone",
-                    "ON_CLICK_IMAGE": "on_click_image",
-                    "ON_DAMAGE": "on_damage",
-                    "ON_GLOBAL_CLICK": "on_global_click",
-                    "ON_GLOBAL_PRIMARY": "on_global_primary",
-                    "ON_GLOBAL_SECONDARY": "on_global_secondary",
-                    "ON_TICK": "on_tick",
-                    "ON_HEAL_PLAYER": "on_heal_player",
-                    "ON_PLAYER_SPAWN": "on_player_spawn"
-                  }
-                },
-                "conditions": {
-                  "type": "array",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer",
-                          "serializationType": "optional",
-                          "optionalJsonSchema": {
-                            "type": "integer",
-                            "serializationType": "int32"
-                          }
-                        },
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "when_state_is",
-                            "when_state_is_not",
-                            "when_counter_equals",
-                            "when_counter_is_greater_than",
-                            "when_counter_is_less_than",
-                            "when_distance_to_player_less_than",
-                            "when_distance_to_player_greater_than",
-                            "when_previous_state_is",
-                            "when_previous_state_is_not"
-                          ],
-                          "default": "when_state_is",
-                          "serializationType": "enum-string",
-                          "enumObject": {
-                            "WHEN_STATE_IS": "when_state_is",
-                            "WHEN_STATE_IS_NOT": "when_state_is_not",
-                            "WHEN_COUNTER_EQUALS": "when_counter_equals",
-                            "WHEN_COUNTER_IS_GREATER_THAN": "when_counter_is_greater_than",
-                            "WHEN_COUNTER_IS_LESS_THAN": "when_counter_is_less_than",
-                            "WHEN_DISTANCE_TO_PLAYER_LESS_THAN": "when_distance_to_player_less_than",
-                            "WHEN_DISTANCE_TO_PLAYER_GREATER_THAN": "when_distance_to_player_greater_than",
-                            "WHEN_PREVIOUS_STATE_IS": "when_previous_state_is",
-                            "WHEN_PREVIOUS_STATE_IS_NOT": "when_previous_state_is_not"
-                          }
-                        },
-                        "value": {
-                          "type": "string",
-                          "serializationType": "utf8-string"
-                        }
-                      },
-                      "serializationType": "map"
-                    },
-                    "serializationType": "array"
-                  }
-                },
-                "operation": {
-                  "type": "string",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "string",
-                    "enum": [
-                      "and",
-                      "or"
-                    ],
-                    "default": "and",
-                    "serializationType": "enum-string",
-                    "enumObject": {
-                      "AND": "and",
-                      "OR": "or"
-                    }
-                  }
-                },
-                "actions": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "integer",
-                        "serializationType": "optional",
-                        "optionalJsonSchema": {
-                          "type": "integer",
-                          "serializationType": "int32"
-                        }
-                      },
-                      "name": {
-                        "type": "string",
-                        "serializationType": "optional",
-                        "optionalJsonSchema": {
-                          "type": "string",
-                          "serializationType": "utf8-string"
-                        }
-                      }
-                    },
-                    "serializationType": "map"
-                  },
-                  "serializationType": "array"
-                },
-                "basicViewId": {
-                  "type": "string",
-                  "serializationType": "optional",
-                  "optionalJsonSchema": {
-                    "type": "string",
-                    "serializationType": "utf8-string"
-                  }
-                }
-              },
-              "serializationType": "map"
-            },
-            "serializationType": "array"
-          }
-        },
-        "serializationType": "map"
-      },
-      "data": {
-        "512": {
-          "json": {
-            "value": [
-              {
-                "type": "on_input_action",
-                "actions": [
-                  {
-                    "id": 1,
-                    "name": "Play Activate Animation"
-                  },
-                  {
-                    "id": 1,
-                    "name": "Play Sound"
-                  }
-                ],
-                "basicViewId": "trigger-when-clicked"
-              }
-            ]
           }
         }
       }
