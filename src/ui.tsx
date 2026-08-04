@@ -184,12 +184,6 @@ const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
 // "Monster collected!" backdrop spans a 4x4 block of alphas.png: A1 to D4
 const ALPHAS_COLLECTED_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
 
-// Rarity badges are 2x2 blocks of atlas_01.png: common A7-B8, rare C7-D8, exotic E7-F8, epic G7-H8
-const COMMON_BADGE_UVS = getUvsForBlock(0, 6, 2, 2, BACK_ATLAS_GRID)
-const RARE_BADGE_UVS = getUvsForBlock(2, 6, 2, 2, BACK_ATLAS_GRID)
-const EXOTIC_BADGE_UVS = getUvsForBlock(4, 6, 2, 2, BACK_ATLAS_GRID)
-const EPIC_BADGE_UVS = getUvsForBlock(6, 6, 2, 2, BACK_ATLAS_GRID)
-
 // Header button icons are 2x2 blocks of atlas_01.png.
 const LEADERBOARD_BUTTON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // A5-B6
 const CODEX_BUTTON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // A3-B4
@@ -240,10 +234,10 @@ const CODEX_RARITY_LABEL_HEIGHT = 24
 // Rarity ranges by checkpoint slot index. Each rarity is laid out as a single row in the Codex
 // (rowSize equals its slot count), with Exotic and Epic sharing one row (see CODEX_GROUPS below).
 const RARITIES = [
-  { label: 'Common', start: 0, end: 7, badgeUvs: COMMON_BADGE_UVS, rowSize: 8 },
-  { label: 'Rare', start: 8, end: 13, badgeUvs: RARE_BADGE_UVS, rowSize: 6 },
-  { label: 'Exotic', start: 14, end: 17, badgeUvs: EXOTIC_BADGE_UVS, rowSize: 4 },
-  { label: 'Epic', start: 18, end: 19, badgeUvs: EPIC_BADGE_UVS, rowSize: 2 }
+  { label: 'Common', start: 0, end: 7, rowSize: 8 },
+  { label: 'Rare', start: 8, end: 13, rowSize: 6 },
+  { label: 'Exotic', start: 14, end: 17, rowSize: 4 },
+  { label: 'Epic', start: 18, end: 19, rowSize: 2 }
 ]
 
 type RarityConfig = (typeof RARITIES)[number]
@@ -276,6 +270,12 @@ const CODEX_ROWS = CODEX_GROUPS.reduce((sum, g) => sum + Math.ceil(getGroupDispl
 // square box would squash the art, so icon height is derived from width using that ratio.
 const PRIZE_CELL_ASPECT = PRIZE_GRID_COLS / PRIZE_GRID_ROWS
 
+// Locked-monster silhouette: same prize sprite, tinted black. PBUiBackground multiplies
+// color * texture, so black (0,0,0) flattens every pixel's RGB to 0 regardless of the sprite's
+// own shading, while its alpha (the silhouette shape) is preserved. Any non-zero tint would still
+// show the sprite's original shading through, since multiply only scales existing brightness.
+const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
+
 // Renders one rarity's label ("Common 3/8") and its badge row(s).
 // iconSize is capped so rowSize icons never exceed the width available to this rarity's row
 // (its own row for a standalone rarity, or its share of a combined row like Exotic+Epic).
@@ -283,7 +283,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
   const { collected, total } = getRarityProgress(rarity)
   const rowSize = rarity.rowSize
   const rows = Math.ceil(total / rowSize)
-  const slots = Array.from({ length: total }, (_, i) => ({ slot: rarity.start + i, badgeUvs: rarity.badgeUvs }))
+  const slots = Array.from({ length: total }, (_, i) => rarity.start + i)
   const iconHeight = Math.round(iconSize * PRIZE_CELL_ASPECT)
   return (
     <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -293,7 +293,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
           {Array.from({ length: rowSize }, (_, colIndex) => {
             const indexInRarity = rowIndex * rowSize + colIndex
             if (indexInRarity >= slots.length) return null
-            const { slot, badgeUvs } = slots[indexInRarity]
+            const slot = slots[indexInRarity]
             const collectedSlot = slot < TOTAL_CHECKPOINTS && (DEBUG_CODEX_SHOW_ALL_MONSTERS || collectedMonsters[slot])
             return (
               <UiEntity
@@ -306,11 +306,14 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
                   margin: 0
                 }}
                 uiBackground={
-                  collectedSlot
-                    ? { textureMode: 'stretch', texture: { src: PRIZE_IMAGE }, uvs: getUvsForPrizeQuadrant(slot) }
-                    : slot < TOTAL_CHECKPOINTS
-                      ? { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: badgeUvs }
-                      : { color: Color4.create(0, 0, 0, 0.5) }
+                  slot < TOTAL_CHECKPOINTS
+                    ? {
+                        textureMode: 'stretch',
+                        texture: { src: PRIZE_IMAGE },
+                        uvs: getUvsForPrizeQuadrant(slot),
+                        color: collectedSlot ? undefined : LOCKED_MONSTER_TINT
+                      }
+                    : { color: Color4.create(0, 0, 0, 0.5) }
                 }
               >
                 {collectedSlot && collectionCounts[slot] > 0 && (
