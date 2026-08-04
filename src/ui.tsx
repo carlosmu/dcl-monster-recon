@@ -9,6 +9,9 @@ import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCame
 
 const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = false
+// Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
+// Does not touch real collection progress. Flip to false to see actual player progress.
+const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -72,8 +75,8 @@ let CLOSE_BUTTON_SIZE = 48 // fallback until the first canvas read
 let MUSIC_BUTTON_SIZE = 48 // fallback until the first canvas read
 // Body text color for the memory board, checkpoint select, codex, and leaderboard screens.
 const SCREEN_TEXT_COLOR = Color4.fromHexString('#2c180b')
-// Frame padding as a fraction of the real screen height, matched to a 96px/1080px desktop look.
-const FRAME_PADDING_FRACTION = 96 / 1080
+// Frame padding as a fraction of the real screen height, matched to a 48px/1080px desktop look.
+const FRAME_PADDING_FRACTION = 48 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width. Shared between the
 // layout and the cellSize calculation so the grid never grows wider than the column it sits in.
 const CANVAS_MAIN_WIDTH_FRACTION = 0.45
@@ -103,7 +106,7 @@ const MATCH_FADE_OUT_START = 0.6
 const MATCH_ANIM_DISTANCE = 60
 
 // "Monster collected!" backdrop: continuous linear pulse from 1x to 2x and back to 1x.
-const PRIZE_BACKDROP_SIZE = 180
+const PRIZE_BACKDROP_SIZE = 270
 const PRIZE_PULSE_PERIOD = 2 // seconds for a full 1x -> 2x -> 1x cycle
 const PRIZE_PULSE_MAX_SCALE = 2
 
@@ -159,7 +162,7 @@ const NOTIFICATION_SLIDE_DURATION = 0.5
 const NOTIFICATION_SLIDE_DISTANCE_VH = 10
 
 let cellSize = 200 // fallback until the first canvas read
-let framePadding = 32 // fallback until the first canvas read
+let framePadding = 16 // fallback until the first canvas read
 
 function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
   const u1 = col / grid
@@ -268,6 +271,11 @@ function getGroupRowSize(group: RarityConfig[]): number {
 const CODEX_COLS = Math.max(...CODEX_GROUPS.map((g) => getGroupRowSize(g)))
 const CODEX_ROWS = CODEX_GROUPS.reduce((sum, g) => sum + Math.ceil(getGroupDisplayTotal(g) / getGroupRowSize(g)), 0)
 
+// prizes_01.png is a 5-col x 4-row grid, so each sprite cell isn't square: on a square texture,
+// a cell is taller than it is wide by cols/rows (e.g. 100 wide -> 125 tall). Stretching it into a
+// square box would squash the art, so icon height is derived from width using that ratio.
+const PRIZE_CELL_ASPECT = PRIZE_GRID_COLS / PRIZE_GRID_ROWS
+
 // Renders one rarity's label ("Common 3/8") and its badge row(s).
 // iconSize is capped so rowSize icons never exceed the width available to this rarity's row
 // (its own row for a standalone rarity, or its share of a combined row like Exotic+Epic).
@@ -276,22 +284,23 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
   const rowSize = rarity.rowSize
   const rows = Math.ceil(total / rowSize)
   const slots = Array.from({ length: total }, (_, i) => ({ slot: rarity.start + i, badgeUvs: rarity.badgeUvs }))
+  const iconHeight = Math.round(iconSize * PRIZE_CELL_ASPECT)
   return (
     <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={16} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 4 } }} />
+      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 4 } }} />
       {Array.from({ length: rows }, (_, rowIndex) => (
-        <UiEntity key={rowIndex} uiTransform={{ height: iconSize, flexDirection: 'row', justifyContent: 'flex-start' }}>
+        <UiEntity key={rowIndex} uiTransform={{ height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
           {Array.from({ length: rowSize }, (_, colIndex) => {
             const indexInRarity = rowIndex * rowSize + colIndex
             if (indexInRarity >= slots.length) return null
             const { slot, badgeUvs } = slots[indexInRarity]
-            const collectedSlot = slot < TOTAL_CHECKPOINTS && collectedMonsters[slot]
+            const collectedSlot = slot < TOTAL_CHECKPOINTS && (DEBUG_CODEX_SHOW_ALL_MONSTERS || collectedMonsters[slot])
             return (
               <UiEntity
                 key={slot}
                 uiTransform={{
                   width: iconSize,
-                  height: iconSize,
+                  height: iconHeight,
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: 0
@@ -304,7 +313,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
                       : { color: Color4.create(0, 0, 0, 0.5) }
                 }
               >
-                {collectedSlot && (
+                {collectedSlot && collectionCounts[slot] > 0 && (
                   <Label
                     value={`x${collectionCounts[slot]}`}
                     fontSize={18}
@@ -1064,11 +1073,11 @@ const MemoryMatchUi = () => (
             uiTransform={{
               width: '100%',
               height: 'auto',
-              minHeight: '60%',
+              minHeight: '80%',
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: { top: '3vh', bottom: framePadding, left: framePadding, right: framePadding },
+              padding: framePadding,
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: Color4.Red()
             }}
@@ -1094,7 +1103,7 @@ const MemoryMatchUi = () => (
             <UiEntity
               uiTransform={{
                 width: '90%',
-                height: CHECKPOINT_SELECT_ROWS * checkpointSelectCellSize,
+                height: 'auto',
                 flexDirection: 'column',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: Color4.White()
@@ -1107,6 +1116,7 @@ const MemoryMatchUi = () => (
                     width: '100%',
                     height: checkpointSelectCellSize,
                     flexDirection: 'row',
+                    margin: { bottom: 4 },
                     borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                     borderColor: Color4.Green()
                   }}
@@ -1202,7 +1212,7 @@ const MemoryMatchUi = () => (
                 borderColor: Color4.White()
               }}
             >
-              {CODEX_GROUPS.map((group, groupIndex) => {
+              {CODEX_GROUPS.map((group) => {
                 const groupRowSize = getGroupRowSize(group)
                 // No margin between icons, so each row's icons grow to fill the full available width.
                 const iconSize = Math.floor((CODEX_COLS * codexCellSize) / groupRowSize)
@@ -1214,7 +1224,7 @@ const MemoryMatchUi = () => (
                       flexDirection: 'row',
                       justifyContent: group.length > 1 ? 'space-between' : 'flex-start',
                       alignItems: 'flex-start',
-                      margin: { bottom: groupIndex < CODEX_GROUPS.length - 1 ? 16 : 0 }
+                      margin: { bottom: '5vh' }
                     }}
                   >
                     {group.map((rarity) => renderRarityBlock(rarity, iconSize))}
@@ -1230,7 +1240,7 @@ const MemoryMatchUi = () => (
             uiTransform={{
               width: '100%',
               height: 'auto',
-              minHeight: '60%',
+              minHeight: '80%',
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
@@ -1303,7 +1313,7 @@ const MemoryMatchUi = () => (
       <UiEntity
         uiTransform={{
           width: '100%',
-          minHeight: '15vh',
+          minHeight: isMobile() ? '7.5vh' : '15vh',
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
@@ -1404,10 +1414,10 @@ const MemoryMatchUi = () => (
                 <UiEntity
                   uiTransform={{
                     width: PRIZE_BACKDROP_SIZE,
-                    height: PRIZE_BACKDROP_SIZE,
+                    height: PRIZE_BACKDROP_SIZE * PRIZE_CELL_ASPECT,
                     positionType: 'absolute',
                     position: {
-                      top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2,
+                      top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE * PRIZE_CELL_ASPECT) / 2,
                       left: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2
                     }
                   }}
