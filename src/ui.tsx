@@ -29,7 +29,9 @@ const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // Fraction of the frame texture occupied by each corner ornament, measured so the wood/metal
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
-const FRONT_GRID = 5 // cards_01.png / prizes_01.png grid
+const FRONT_GRID = 5 // cards_01.png grid
+const PRIZE_GRID_COLS = 5 // prizes_01.png grid
+const PRIZE_GRID_ROWS = 4 // prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 const ALPHAS_IMAGE = 'assets/images/alphas.png'
 const ALPHAS_GRID = 8 // alphas.png grid
@@ -119,8 +121,18 @@ function mirrorUvsHorizontal(uvs: number[]): number[] {
   return [uvs[6], uvs[7], uvs[4], uvs[5], uvs[2], uvs[3], uvs[0], uvs[1]]
 }
 
+function getUvsForPrizeQuadrant(index: number): number[] {
+  const col = index % PRIZE_GRID_COLS
+  const row = Math.floor(index / PRIZE_GRID_COLS)
+  const u1 = col / PRIZE_GRID_COLS
+  const u2 = (col + 1) / PRIZE_GRID_COLS
+  const v1 = (PRIZE_GRID_ROWS - row - 1) / PRIZE_GRID_ROWS
+  const v2 = (PRIZE_GRID_ROWS - row) / PRIZE_GRID_ROWS
+  return [u1, v1, u1, v2, u2, v2, u2, v1]
+}
+
 function getPrizeUvs(quadrant: number): number[] {
-  const uvs = getUvsForQuadrant(quadrant)
+  const uvs = getUvsForPrizeQuadrant(quadrant)
   const flipped = Math.floor(elapsedTime / PRIZE_FLIP_INTERVAL) % 2 === 1
   return flipped ? mirrorUvsHorizontal(uvs) : uvs
 }
@@ -219,21 +231,19 @@ const CHECKPOINT_SELECT_COLS = FRONT_GRID
 const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
 // Approximate height of the "Monster Codex" title above the grid.
 const CODEX_HEADER_RESERVED = 60
-// Approximate width of the left rarity/progress sidebar (label + margin) next to the grid.
-const CODEX_SIDEBAR_WIDTH = 110
+// Approximate height of the rarity label ("Common 3/8") shown above each row.
+const CODEX_RARITY_LABEL_HEIGHT = 24
 
-// Rarity ranges by checkpoint-select slot index (row * FRONT_GRID + col):
-// common A1-B3, rare C3-E4, exotic A5-D5, epic E5.
-// rowSize: how many cells per row when laying out this rarity's slots in the Codex grid.
+// Rarity ranges by checkpoint slot index. Each rarity is laid out as a single row in the Codex
+// (rowSize equals its slot count), with Exotic and Epic sharing one row (see CODEX_GROUPS below).
 const RARITIES = [
-  { label: 'Common', start: 0, end: 11, badgeUvs: COMMON_BADGE_UVS, rowSize: 6 },
-  { label: 'Rare', start: 12, end: 19, badgeUvs: RARE_BADGE_UVS, rowSize: 4 },
-  { label: 'Exotic', start: 20, end: 23, badgeUvs: EXOTIC_BADGE_UVS, rowSize: 4 },
-  { label: 'Epic', start: 24, end: 24, badgeUvs: EPIC_BADGE_UVS, rowSize: 1 }
+  { label: 'Common', start: 0, end: 7, badgeUvs: COMMON_BADGE_UVS, rowSize: 8 },
+  { label: 'Rare', start: 8, end: 13, badgeUvs: RARE_BADGE_UVS, rowSize: 6 },
+  { label: 'Exotic', start: 14, end: 17, badgeUvs: EXOTIC_BADGE_UVS, rowSize: 4 },
+  { label: 'Epic', start: 18, end: 19, badgeUvs: EPIC_BADGE_UVS, rowSize: 2 }
 ]
 
-const CODEX_COLS = Math.max(...RARITIES.map((r) => r.rowSize))
-const CODEX_ROWS = RARITIES.reduce((sum, r) => sum + Math.ceil((r.end - r.start + 1) / r.rowSize), 0)
+type RarityConfig = (typeof RARITIES)[number]
 
 function getRarityProgress(rarity: { start: number; end: number }): { collected: number; total: number } {
   let collected = 0
@@ -243,15 +253,83 @@ function getRarityProgress(rarity: { start: number; end: number }): { collected:
   return { collected, total: rarity.end - rarity.start + 1 }
 }
 
+// Groups of rarities laid out together in the Codex, one row per group. Exotic and Epic share a
+// row (see the two-column layout with justify space-between in the render loop below).
+const CODEX_GROUPS: RarityConfig[][] = [[RARITIES[0]], [RARITIES[1]], [RARITIES[2], RARITIES[3]]]
+
+function getGroupDisplayTotal(group: RarityConfig[]): number {
+  return group.reduce((sum, r) => sum + (r.end - r.start + 1), 0)
+}
+
+function getGroupRowSize(group: RarityConfig[]): number {
+  return group.reduce((sum, r) => sum + r.rowSize, 0)
+}
+
+const CODEX_COLS = Math.max(...CODEX_GROUPS.map((g) => getGroupRowSize(g)))
+const CODEX_ROWS = CODEX_GROUPS.reduce((sum, g) => sum + Math.ceil(getGroupDisplayTotal(g) / getGroupRowSize(g)), 0)
+
+// Renders one rarity's label ("Common 3/8") and its badge row(s).
+// iconSize is capped so rowSize icons never exceed the width available to this rarity's row
+// (its own row for a standalone rarity, or its share of a combined row like Exotic+Epic).
+function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
+  const { collected, total } = getRarityProgress(rarity)
+  const rowSize = rarity.rowSize
+  const rows = Math.ceil(total / rowSize)
+  const slots = Array.from({ length: total }, (_, i) => ({ slot: rarity.start + i, badgeUvs: rarity.badgeUvs }))
+  return (
+    <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={16} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 4 } }} />
+      {Array.from({ length: rows }, (_, rowIndex) => (
+        <UiEntity key={rowIndex} uiTransform={{ height: iconSize, flexDirection: 'row', justifyContent: 'flex-start' }}>
+          {Array.from({ length: rowSize }, (_, colIndex) => {
+            const indexInRarity = rowIndex * rowSize + colIndex
+            if (indexInRarity >= slots.length) return null
+            const { slot, badgeUvs } = slots[indexInRarity]
+            const collectedSlot = slot < TOTAL_CHECKPOINTS && collectedMonsters[slot]
+            return (
+              <UiEntity
+                key={slot}
+                uiTransform={{
+                  width: iconSize,
+                  height: iconSize,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: 0
+                }}
+                uiBackground={
+                  collectedSlot
+                    ? { textureMode: 'stretch', texture: { src: PRIZE_IMAGE }, uvs: getUvsForPrizeQuadrant(slot) }
+                    : slot < TOTAL_CHECKPOINTS
+                      ? { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: badgeUvs }
+                      : { color: Color4.create(0, 0, 0, 0.5) }
+                }
+              >
+                {collectedSlot && (
+                  <Label
+                    value={`x${collectionCounts[slot]}`}
+                    fontSize={18}
+                    color={Color4.Yellow()}
+                    textAlign="middle-right"
+                    uiTransform={{
+                      positionType: 'absolute',
+                      position: { top: 2, right: 2 }
+                    }}
+                  />
+                )}
+              </UiEntity>
+            )
+          })}
+        </UiEntity>
+      ))}
+    </UiEntity>
+  )
+}
+
 function getRarityLabel(slot: number): string {
   const rarity = RARITIES.find((r) => slot >= r.start && slot <= r.end)
   return rarity ? rarity.label : ''
 }
 
-function getRarityBadgeUvs(slot: number): number[] {
-  const rarity = RARITIES.find((r) => slot >= r.start && slot <= r.end)
-  return rarity ? rarity.badgeUvs : COMMON_BADGE_UVS
-}
 let checkpointSelectCellSize = 80 // fallback until the first canvas read
 let codexCellSize = 80 // fallback until the first canvas read
 
@@ -572,10 +650,11 @@ export function setupUi() {
       checkpointSelectCellSize = Math.min(selectHeightCellSize, selectWidthCellSize)
 
       // Codex fills its whole container, so size its cells off the canvas_main column's actual
-      // body area (width and height), minus room for the frame padding, the title, and the left
-      // rarity/progress sidebar next to the grid.
-      const codexAvailableWidth = availableWidth - CODEX_SIDEBAR_WIDTH
-      const codexAvailableHeight = CANVAS_MAIN_BODY_HEIGHT_FRACTION * canvas.height - 2 * framePadding - CODEX_HEADER_RESERVED
+      // body area (width and height), minus room for the frame padding, the title, and the
+      // rarity label above each row.
+      const codexAvailableWidth = availableWidth
+      const codexAvailableHeight =
+        CANVAS_MAIN_BODY_HEIGHT_FRACTION * canvas.height - 2 * framePadding - CODEX_HEADER_RESERVED - CODEX_GROUPS.length * CODEX_RARITY_LABEL_HEIGHT
       const codexHeightCellSize = Math.floor(codexAvailableHeight / CODEX_ROWS)
       const codexWidthCellSize = Math.floor(codexAvailableWidth / CODEX_COLS)
       codexCellSize = Math.min(codexHeightCellSize, codexWidthCellSize)
@@ -1116,106 +1195,32 @@ const MemoryMatchUi = () => (
             />
             <UiEntity
               uiTransform={{
-                flexDirection: 'row',
+                width: CODEX_COLS * codexCellSize,
+                flexDirection: 'column',
+                alignItems: 'flex-start',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: Color4.White()
               }}
             >
-              <UiEntity
-                uiTransform={{
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  margin: { right: 24 },
-                  borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
-                  borderColor: Color4.Green()
-                }}
-              >
-                {RARITIES.map((rarity, rarityIndex) => {
-                  const { collected, total } = getRarityProgress(rarity)
-                  const rows = Math.ceil((rarity.end - rarity.start + 1) / rarity.rowSize)
-                  return (
-                    <UiEntity
-                      key={rarity.label}
-                      uiTransform={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-end',
-                        height: rows * codexCellSize,
-                        justifyContent: 'center',
-                        margin: { bottom: rarityIndex < RARITIES.length - 1 ? 16 : 0 }
-                      }}
-                    >
-                      <Label value={`${collected}/${total}`} fontSize={30} color={SCREEN_TEXT_COLOR} textAlign="middle-right" />
-                      <Label value={rarity.label} fontSize={14} color={SCREEN_TEXT_COLOR} textAlign="middle-right" uiTransform={{ margin: { top: -4 } }} />
-                    </UiEntity>
-                  )
-                })}
-              </UiEntity>
-              <UiEntity
-                uiTransform={{
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
-                  borderColor: Color4.Green()
-                }}
-              >
-                {RARITIES.map((rarity, rarityIndex) => {
-                  const rarityTotal = rarity.end - rarity.start + 1
-                  const rows = Math.ceil(rarityTotal / rarity.rowSize)
-                  return (
-                    <UiEntity
-                      key={rarity.label}
-                      uiTransform={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        margin: { bottom: rarityIndex < RARITIES.length - 1 ? 16 : 0 }
-                      }}
-                    >
-                      {Array.from({ length: rows }, (_, rowIndex) => (
-                        <UiEntity key={rowIndex} uiTransform={{ height: codexCellSize, flexDirection: 'row', justifyContent: 'flex-start' }}>
-                          {Array.from({ length: rarity.rowSize }, (_, colIndex) => {
-                            const indexInRarity = rowIndex * rarity.rowSize + colIndex
-                            if (indexInRarity >= rarityTotal) return null
-                            const slot = rarity.start + indexInRarity
-                            const collected = slot < TOTAL_CHECKPOINTS && collectedMonsters[slot]
-                            return (
-                              <UiEntity
-                                key={slot}
-                                uiTransform={{
-                                  width: codexCellSize,
-                                  height: codexCellSize,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  margin: 2
-                                }}
-                                uiBackground={
-                                  collected
-                                    ? { textureMode: 'stretch', texture: { src: PRIZE_IMAGE }, uvs: getUvsForQuadrant(slot) }
-                                    : slot < TOTAL_CHECKPOINTS
-                                      ? { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: getRarityBadgeUvs(slot) }
-                                      : { color: Color4.create(0, 0, 0, 0.5) }
-                                }
-                              >
-                                {collected && (
-                                  <Label
-                                    value={`x${collectionCounts[slot]}`}
-                                    fontSize={18}
-                                    color={Color4.Yellow()}
-                                    textAlign="middle-right"
-                                    uiTransform={{
-                                      positionType: 'absolute',
-                                      position: { top: 2, right: 2 }
-                                    }}
-                                  />
-                                )}
-                              </UiEntity>
-                            )
-                          })}
-                        </UiEntity>
-                      ))}
-                    </UiEntity>
-                  )
-                })}
-              </UiEntity>
+              {CODEX_GROUPS.map((group, groupIndex) => {
+                const groupRowSize = getGroupRowSize(group)
+                // No margin between icons, so each row's icons grow to fill the full available width.
+                const iconSize = Math.floor((CODEX_COLS * codexCellSize) / groupRowSize)
+                return (
+                  <UiEntity
+                    key={group.map((r) => r.label).join('+')}
+                    uiTransform={{
+                      width: group.length > 1 ? '100%' : 'auto',
+                      flexDirection: 'row',
+                      justifyContent: group.length > 1 ? 'space-between' : 'flex-start',
+                      alignItems: 'flex-start',
+                      margin: { bottom: groupIndex < CODEX_GROUPS.length - 1 ? 16 : 0 }
+                    }}
+                  >
+                    {group.map((rarity) => renderRarityBlock(rarity, iconSize))}
+                  </UiEntity>
+                )
+              })}
             </UiEntity>
           </UiEntity>
         )}
