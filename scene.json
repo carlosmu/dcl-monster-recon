@@ -2,7 +2,7 @@
   "ecs7": true,
   "runtimeVersion": "7",
   "display": {
-    "title": "Monster Recont - Testing",
+    "title": "MR2",
     "description": "Music I use: Bensound.com\nLicense code: HS2MLQCYO5E1P2XY\nArtist: : Benjamin Tissot",
     "favicon": "favicon_asset",
     "navmapThumbnail": "assets/scene/Images/thumbnail.png"
@@ -15,6 +15,7 @@
   "main": "bin/index.js",
   "tags": [],
   "scene": {
+    "base": "0,0",
     "parcels": [
       "0,3",
       "1,3",
@@ -32,8 +33,7 @@
       "1,0",
       "2,0",
       "3,0"
-    ],
-    "base": "0,0"
+    ]
   },
   "spawnPoints": [
     {
@@ -73,7 +73,7 @@
   "skyboxConfig": {},
   "authoritativeMultiplayer": true,
   "worldConfiguration": {
-    "name": "carlosmu.dcl.eth"
+    "name": "fighters.dcl.eth"
   },
   "logsPermissions": [
     "0x4B538E1E044922aec2F428EC7E17A99f44205fF9"

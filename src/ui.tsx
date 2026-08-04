@@ -15,8 +15,6 @@ const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
-const FRONT_IMAGE = 'assets/images/cards_01.png'
-const PRIZE_IMAGE = 'assets/images/prizes_01.png'
 const AMBIENT_MUSIC_CLIP = 'assets/audio/Medieval_Astrology.mp3'
 const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
 const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
@@ -32,12 +30,85 @@ const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // Fraction of the frame texture occupied by each corner ornament, measured so the wood/metal
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
-const FRONT_GRID = 5 // cards_01.png grid
-const PRIZE_GRID_COLS = 5 // prizes_01.png grid
-const PRIZE_GRID_ROWS = 4 // prizes_01.png grid
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 const ALPHAS_IMAGE = 'assets/images/alphas.png'
 const ALPHAS_GRID = 8 // alphas.png grid
+
+// A "collection" is one full monster set: its own memory-match card art, its own prize sprite
+// sheet, and its own rarity breakdown. To add a future collection, append a new entry here (with
+// its own images and rarity counts) and append its checkpoints to checkpoints.json — existing
+// collections' slot ranges, images, and any persisted player progress keyed off them are untouched.
+interface RarityDef {
+  label: string
+  count: number
+}
+
+interface CollectionConfig {
+  id: string
+  cardImage: string // memory-match card faces (square grid)
+  cardGrid: number
+  prizeImage: string // monster prize sprites
+  prizeGridCols: number
+  prizeGridRows: number
+  rarities: RarityDef[] // Common, Rare, Exotic, Epic, in that order
+}
+
+const COLLECTIONS: CollectionConfig[] = [
+  {
+    id: 'prizes_01',
+    cardImage: 'assets/images/cards_01.png',
+    cardGrid: 5,
+    prizeImage: 'assets/images/prizes_01.png',
+    prizeGridCols: 5,
+    prizeGridRows: 4,
+    rarities: [
+      { label: 'Common', count: 8 },
+      { label: 'Rare', count: 6 },
+      { label: 'Exotic', count: 4 },
+      { label: 'Epic', count: 2 }
+    ]
+  }
+]
+
+interface ResolvedRarity extends RarityDef {
+  collection: ResolvedCollection
+  start: number // global 0-based checkpoint/slot index, inclusive
+  end: number
+  rowSize: number
+}
+
+interface ResolvedCollection extends CollectionConfig {
+  rarities: ResolvedRarity[]
+  start: number // global 0-based checkpoint/slot index this collection starts at, inclusive
+  end: number
+}
+
+// Assigns each collection (and each rarity within it) a contiguous slice of the global 0-based
+// checkpoint/slot range, in COLLECTIONS order. A new collection appended at the end just continues
+// the numbering — it never renumbers or collides with an earlier collection's slots.
+const RESOLVED_COLLECTIONS: ResolvedCollection[] = (() => {
+  let offset = 0
+  return COLLECTIONS.map((collection) => {
+    const start = offset
+    // rarities is filled in below, once `resolved` itself exists, so each rarity can reference it.
+    const resolved: ResolvedCollection = { ...collection, rarities: [], start, end: start }
+    resolved.rarities = collection.rarities.map((r) => {
+      const rarityStart = offset
+      offset += r.count
+      return { ...r, collection: resolved, start: rarityStart, end: offset - 1, rowSize: r.count }
+    })
+    resolved.end = offset - 1
+    return resolved
+  })
+})()
+
+function getCollectionForSlot(slot: number): ResolvedCollection {
+  return RESOLVED_COLLECTIONS.find((c) => slot >= c.start && slot <= c.end) ?? RESOLVED_COLLECTIONS[0]
+}
+
+function getCollectionForCheckpoint(checkpoint: number): ResolvedCollection {
+  return getCollectionForSlot(checkpoint - 1)
+}
 
 interface BoardConfig {
   cols: number
@@ -51,8 +122,10 @@ interface CheckpointConfig {
   boards: BoardConfig[]
 }
 
-// One entry per checkpoint; checkpoint N's prize quadrant is CHECKPOINTS[N - 1] / (N - 1),
-// so the checkpoint order and the A1..E5 prize order stay in lockstep automatically.
+// One entry per checkpoint; checkpoint N's monster is global slot N - 1, resolved to a collection
+// and local sprite index via getCollectionForCheckpoint()/getCollectionForSlot(). This length must
+// equal the sum of every COLLECTIONS[].rarities[].count — when appending a new collection, also
+// append that many checkpoints here (new collections are added at the end, never inserted).
 const CHECKPOINTS: CheckpointConfig[] = checkpointsData
 const TOTAL_CHECKPOINTS = CHECKPOINTS.length
 
@@ -124,18 +197,19 @@ function mirrorUvsHorizontal(uvs: number[]): number[] {
   return [uvs[6], uvs[7], uvs[4], uvs[5], uvs[2], uvs[3], uvs[0], uvs[1]]
 }
 
-function getUvsForPrizeQuadrant(index: number): number[] {
-  const col = index % PRIZE_GRID_COLS
-  const row = Math.floor(index / PRIZE_GRID_COLS)
-  const u1 = col / PRIZE_GRID_COLS
-  const u2 = (col + 1) / PRIZE_GRID_COLS
-  const v1 = (PRIZE_GRID_ROWS - row - 1) / PRIZE_GRID_ROWS
-  const v2 = (PRIZE_GRID_ROWS - row) / PRIZE_GRID_ROWS
+// index is LOCAL to the collection's own prize grid (i.e. global slot minus the collection's start).
+function getUvsForPrizeQuadrant(index: number, gridCols: number, gridRows: number): number[] {
+  const col = index % gridCols
+  const row = Math.floor(index / gridCols)
+  const u1 = col / gridCols
+  const u2 = (col + 1) / gridCols
+  const v1 = (gridRows - row - 1) / gridRows
+  const v2 = (gridRows - row) / gridRows
   return [u1, v1, u1, v2, u2, v2, u2, v1]
 }
 
-function getPrizeUvs(quadrant: number): number[] {
-  const uvs = getUvsForPrizeQuadrant(quadrant)
+function getPrizeUvs(localIndex: number, gridCols: number, gridRows: number): number[] {
+  const uvs = getUvsForPrizeQuadrant(localIndex, gridCols, gridRows)
   const flipped = Math.floor(elapsedTime / PRIZE_FLIP_INTERVAL) % 2 === 1
   return flipped ? mirrorUvsHorizontal(uvs) : uvs
 }
@@ -174,8 +248,8 @@ function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: numb
   return [u1, v1, u1, v2, u2, v2, u2, v1]
 }
 
-function getUvsForQuadrant(index: number): number[] {
-  return getUvsForBlock(index % FRONT_GRID, Math.floor(index / FRONT_GRID), 1, 1, FRONT_GRID)
+function getUvsForQuadrant(index: number, grid: number): number[] {
+  return getUvsForBlock(index % grid, Math.floor(index / grid), 1, 1, grid)
 }
 
 // Card back art now spans a 2x2 block of atlas_01.png: A1, A2, B1, B2
@@ -224,23 +298,20 @@ let highestUnlockedCheckpoint = 1
 const collectedMonsters: boolean[] = new Array(TOTAL_CHECKPOINTS).fill(false)
 // One slot per checkpoint; how many times that checkpoint's monster prize has been collected.
 const collectionCounts: number[] = new Array(TOTAL_CHECKPOINTS).fill(0)
-const CHECKPOINT_SELECT_COLS = FRONT_GRID
+// Checkpoint-select grid is just a UI layout choice, independent of any collection's texture grids.
+const CHECKPOINT_SELECT_COLS = 5
 const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
 // Approximate height of the "Monster Codex" title above the grid.
 const CODEX_HEADER_RESERVED = 60
 // Approximate height of the rarity label ("Common 3/8") shown above each row.
 const CODEX_RARITY_LABEL_HEIGHT = 24
 
-// Rarity ranges by checkpoint slot index. Each rarity is laid out as a single row in the Codex
-// (rowSize equals its slot count), with Exotic and Epic sharing one row (see CODEX_GROUPS below).
-const RARITIES = [
-  { label: 'Common', start: 0, end: 7, rowSize: 8 },
-  { label: 'Rare', start: 8, end: 13, rowSize: 6 },
-  { label: 'Exotic', start: 14, end: 17, rowSize: 4 },
-  { label: 'Epic', start: 18, end: 19, rowSize: 2 }
-]
+// Rarity ranges by checkpoint slot index, flattened across all collections. Each rarity is laid
+// out as a single row in the Codex (rowSize equals its slot count), with Exotic and Epic sharing
+// one row per collection (see CODEX_GROUPS below).
+const RARITIES: ResolvedRarity[] = RESOLVED_COLLECTIONS.flatMap((c) => c.rarities)
 
-type RarityConfig = (typeof RARITIES)[number]
+type RarityConfig = ResolvedRarity
 
 function getRarityProgress(rarity: { start: number; end: number }): { collected: number; total: number } {
   let collected = 0
@@ -250,9 +321,10 @@ function getRarityProgress(rarity: { start: number; end: number }): { collected:
   return { collected, total: rarity.end - rarity.start + 1 }
 }
 
-// Groups of rarities laid out together in the Codex, one row per group. Exotic and Epic share a
-// row (see the two-column layout with justify space-between in the render loop below).
-const CODEX_GROUPS: RarityConfig[][] = [[RARITIES[0]], [RARITIES[1]], [RARITIES[2], RARITIES[3]]]
+// Groups of rarities laid out together in the Codex, one row per group. Within each collection,
+// Exotic and Epic share a row (see the two-column layout with justify space-between in the render
+// loop below). Assumes every collection declares exactly [Common, Rare, Exotic, Epic] in order.
+const CODEX_GROUPS: RarityConfig[][] = RESOLVED_COLLECTIONS.flatMap((c) => [[c.rarities[0]], [c.rarities[1]], [c.rarities[2], c.rarities[3]]])
 
 function getGroupDisplayTotal(group: RarityConfig[]): number {
   return group.reduce((sum, r) => sum + (r.end - r.start + 1), 0)
@@ -265,10 +337,13 @@ function getGroupRowSize(group: RarityConfig[]): number {
 const CODEX_COLS = Math.max(...CODEX_GROUPS.map((g) => getGroupRowSize(g)))
 const CODEX_ROWS = CODEX_GROUPS.reduce((sum, g) => sum + Math.ceil(getGroupDisplayTotal(g) / getGroupRowSize(g)), 0)
 
-// prizes_01.png is a 5-col x 4-row grid, so each sprite cell isn't square: on a square texture,
-// a cell is taller than it is wide by cols/rows (e.g. 100 wide -> 125 tall). Stretching it into a
-// square box would squash the art, so icon height is derived from width using that ratio.
-const PRIZE_CELL_ASPECT = PRIZE_GRID_COLS / PRIZE_GRID_ROWS
+// Each collection's prize sprite sheet may use a different grid, so its cells aren't necessarily
+// square: on a square texture, a cell is taller than it is wide by cols/rows (e.g. a 5x4 grid on a
+// square texture makes each cell 100 wide -> 125 tall). Stretching it into a square box would
+// squash the art, so icon height is derived from width using that collection's own ratio.
+function getPrizeCellAspect(collection: CollectionConfig): number {
+  return collection.prizeGridCols / collection.prizeGridRows
+}
 
 // Locked-monster silhouette: same prize sprite, tinted black. PBUiBackground multiplies
 // color * texture, so black (0,0,0) flattens every pixel's RGB to 0 regardless of the sprite's
@@ -284,7 +359,8 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
   const rowSize = rarity.rowSize
   const rows = Math.ceil(total / rowSize)
   const slots = Array.from({ length: total }, (_, i) => rarity.start + i)
-  const iconHeight = Math.round(iconSize * PRIZE_CELL_ASPECT)
+  const collection = rarity.collection
+  const iconHeight = Math.round(iconSize * getPrizeCellAspect(collection))
   return (
     <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
       <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 4 } }} />
@@ -309,8 +385,8 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
                   slot < TOTAL_CHECKPOINTS
                     ? {
                         textureMode: 'stretch',
-                        texture: { src: PRIZE_IMAGE },
-                        uvs: getUvsForPrizeQuadrant(slot),
+                        texture: { src: collection.prizeImage },
+                        uvs: getUvsForPrizeQuadrant(slot - collection.start, collection.prizeGridCols, collection.prizeGridRows),
                         color: collectedSlot ? undefined : LOCKED_MONSTER_TINT
                       }
                     : { color: Color4.create(0, 0, 0, 0.5) }
@@ -346,6 +422,10 @@ let checkpointSelectCellSize = 80 // fallback until the first canvas read
 let codexCellSize = 80 // fallback until the first canvas read
 
 let cells: CellState[] = []
+// The memory-match card art for the checkpoint currently being played; set by startBoard() from
+// that checkpoint's collection.
+let currentCardImage = COLLECTIONS[0].cardImage
+let currentCardGrid = COLLECTIONS[0].cardGrid
 let elapsedTime = 0
 let revealedUnmatched: CellState[] = []
 let timeRemaining = GAME_DURATION
@@ -389,7 +469,7 @@ function shuffle<T>(arr: T[]): void {
 
 function buildCells(): CellState[] {
   const pairCount = (COLS * ROWS) / 2
-  const pool = Array.from({ length: FRONT_GRID * FRONT_GRID }, (_, i) => i)
+  const pool = Array.from({ length: currentCardGrid * currentCardGrid }, (_, i) => i)
   shuffle(pool)
   const values = [...pool.slice(0, pairCount), ...pool.slice(0, pairCount)]
   shuffle(values)
@@ -693,6 +773,10 @@ function startBoard(checkpoint: number, boardIndex: number) {
   GAME_DURATION = config.duration
   FLIP_TIMEOUT = config.flipTimeout
   SCORE_MULTIPLIER = config.scoreMultiplier
+
+  const collection = getCollectionForCheckpoint(checkpoint)
+  currentCardImage = collection.cardImage
+  currentCardGrid = collection.cardGrid
 
   cells = buildCells()
   revealedUnmatched = []
@@ -1013,7 +1097,7 @@ const MemoryMatchUi = () => (
                         }}
                         uiBackground={
                           cell.revealed
-                            ? { textureMode: 'stretch', texture: { src: FRONT_IMAGE }, uvs: getUvsForQuadrant(cell.frontQuadrant) }
+                            ? { textureMode: 'stretch', texture: { src: currentCardImage }, uvs: getUvsForQuadrant(cell.frontQuadrant, currentCardGrid) }
                             : { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BACK_UVS }
                         }
                         onMouseDown={() => flipCell(cell)}
@@ -1390,48 +1474,54 @@ const MemoryMatchUi = () => (
       >
         {won ? (
           showingPrize ? (
-            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label
-                value={`${getRarityLabel(wonMonsterQuadrant)} Monster\nCollected!`}
-                fontSize={36}
-                color={Color4.White()}
-                textAlign="middle-center"
-              />
-              <UiEntity
-                uiTransform={{
-                  width: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
-                  height: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
-                  margin: { top: 20 },
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <UiEntity
-                  uiTransform={{ width: getPrizePulseSize(), height: getPrizePulseSize() }}
-                  uiBackground={{
-                    textureMode: 'stretch',
-                    texture: { src: ALPHAS_IMAGE },
-                    uvs: ALPHAS_COLLECTED_UVS
-                  }}
-                />
-                <UiEntity
-                  uiTransform={{
-                    width: PRIZE_BACKDROP_SIZE,
-                    height: PRIZE_BACKDROP_SIZE * PRIZE_CELL_ASPECT,
-                    positionType: 'absolute',
-                    position: {
-                      top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE * PRIZE_CELL_ASPECT) / 2,
-                      left: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2
-                    }
-                  }}
-                  uiBackground={{
-                    textureMode: 'stretch',
-                    texture: { src: PRIZE_IMAGE },
-                    uvs: getPrizeUvs(wonMonsterQuadrant)
-                  }}
-                />
-              </UiEntity>
-            </UiEntity>
+            (() => {
+              const wonCollection = getCollectionForSlot(wonMonsterQuadrant)
+              const wonPrizeCellHeight = PRIZE_BACKDROP_SIZE * getPrizeCellAspect(wonCollection)
+              return (
+                <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+                  <Label
+                    value={`${getRarityLabel(wonMonsterQuadrant)} Monster\nCollected!`}
+                    fontSize={36}
+                    color={Color4.White()}
+                    textAlign="middle-center"
+                  />
+                  <UiEntity
+                    uiTransform={{
+                      width: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
+                      height: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
+                      margin: { top: 20 },
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <UiEntity
+                      uiTransform={{ width: getPrizePulseSize(), height: getPrizePulseSize() }}
+                      uiBackground={{
+                        textureMode: 'stretch',
+                        texture: { src: ALPHAS_IMAGE },
+                        uvs: ALPHAS_COLLECTED_UVS
+                      }}
+                    />
+                    <UiEntity
+                      uiTransform={{
+                        width: PRIZE_BACKDROP_SIZE,
+                        height: wonPrizeCellHeight,
+                        positionType: 'absolute',
+                        position: {
+                          top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - wonPrizeCellHeight) / 2,
+                          left: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2
+                        }
+                      }}
+                      uiBackground={{
+                        textureMode: 'stretch',
+                        texture: { src: wonCollection.prizeImage },
+                        uvs: getPrizeUvs(wonMonsterQuadrant - wonCollection.start, wonCollection.prizeGridCols, wonCollection.prizeGridRows)
+                      }}
+                    />
+                  </UiEntity>
+                </UiEntity>
+              )
+            })()
           ) : (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
               <Label value="Board complete!" fontSize={36} color={Color4.White()} />
