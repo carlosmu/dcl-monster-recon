@@ -8,7 +8,7 @@ import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 
 const DEBUG_CELL_LABELS = false
-const DEBUG_LAYOUT_BORDERS = false
+const DEBUG_LAYOUT_BORDERS = true
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
@@ -301,10 +301,18 @@ const collectionCounts: number[] = new Array(TOTAL_CHECKPOINTS).fill(0)
 // Checkpoint-select grid is just a UI layout choice, independent of any collection's texture grids.
 const CHECKPOINT_SELECT_COLS = 5
 const CHECKPOINT_SELECT_ROWS = Math.ceil(TOTAL_CHECKPOINTS / CHECKPOINT_SELECT_COLS)
-// Approximate height of the "Monster Codex" title above the grid.
-const CODEX_HEADER_RESERVED = 60
-// Approximate height of the rarity label ("Common 3/8") shown above each row.
-const CODEX_RARITY_LABEL_HEIGHT = 24
+// Each button's aspect ratio (width:height). Expressed in 'vw' - not px - since the grid's width
+// is always CANVAS_MAIN_WIDTH_FRACTION of the screen (90% of that, divided into COLS buttons),
+// so a button's on-screen width is a fixed fraction of viewport width regardless of canvas.height.
+// Deriving the row height as that same fraction * 4/5 keeps the buttons 5:4 without ever reading
+// canvas dimensions at runtime.
+const CHECKPOINT_SELECT_BUTTON_ASPECT = 4 / 5
+const CHECKPOINT_SELECT_CELL_WIDTH_VW = (CANVAS_MAIN_WIDTH_FRACTION * 100 * 0.9) / CHECKPOINT_SELECT_COLS
+const CHECKPOINT_SELECT_ROW_HEIGHT_VW = `${CHECKPOINT_SELECT_CELL_WIDTH_VW * CHECKPOINT_SELECT_BUTTON_ASPECT}vw`
+// Buttons are 5:4 (wider than tall), but the lock artwork is square - sizing it off the button's
+// width AND height (e.g. '60%'/'60%' of the cell) would stretch it to match the button's own 5:4
+// shape. Deriving both dimensions from the same width-based vw value keeps it square instead.
+const CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW = `${CHECKPOINT_SELECT_CELL_WIDTH_VW * 0.6}vw`
 
 // Rarity ranges by checkpoint slot index, flattened across all collections. Each rarity is laid
 // out as a single row in the Codex (rowSize equals its slot count), with Exotic and Epic sharing
@@ -334,8 +342,18 @@ function getGroupRowSize(group: RarityConfig[]): number {
   return group.reduce((sum, r) => sum + r.rowSize, 0)
 }
 
-const CODEX_COLS = Math.max(...CODEX_GROUPS.map((g) => getGroupRowSize(g)))
-const CODEX_ROWS = CODEX_GROUPS.reduce((sum, g) => sum + Math.ceil(getGroupDisplayTotal(g) / getGroupRowSize(g)), 0)
+// Codex grid container is width: '95%' of canvas_main (see the JSX further down), so a group's
+// row - and each icon within it - is always that same fixed fraction of the screen's width, in
+// 'vw'. A rarity block is (rarity.rowSize / groupRowSize) of the row, and each icon within it is
+// (1 / rarity.rowSize) of the block, so rarity.rowSize cancels out: every icon in a group ends up
+// the same on-screen width, (CANVAS_MAIN_WIDTH_FRACTION * 95) / groupRowSize vw. Height is just
+// that width * the aspect ratio - both in 'vw' so the icon can never deform, unlike the old
+// px-from-canvas.height approach (see renderRarityBlock's comment).
+const CODEX_ICON_HEIGHT_TO_WIDTH_RATIO = 1.25
+function getCodexIconHeightVw(groupRowSize: number): `${number}vw` {
+  const iconWidthVw = (CANVAS_MAIN_WIDTH_FRACTION * 100 * 0.95) / groupRowSize
+  return `${iconWidthVw * CODEX_ICON_HEIGHT_TO_WIDTH_RATIO}vw`
+}
 
 // Each collection's prize sprite sheet may use a different grid, so its cells aren't necessarily
 // square: on a square texture, a cell is taller than it is wide by cols/rows (e.g. a 5x4 grid on a
@@ -352,20 +370,31 @@ function getPrizeCellAspect(collection: CollectionConfig): number {
 const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
 
 // Renders one rarity's label ("Common 3/8") and its badge row(s).
-// iconSize is capped so rowSize icons never exceed the width available to this rarity's row
-// (its own row for a standalone rarity, or its share of a combined row like Exotic+Epic).
-function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
+// widthPercent is this block's share of the grid's width (100% for a standalone rarity, or its
+// proportional share of a combined row like Exotic+Epic) - every width below it (row, icon) is a
+// % of an ancestor, so this is the anchor that keeps them from resolving against nothing.
+// iconHeight is a 'vw' string (not px, not %): height can't be expressed as a fraction of one's
+// own width, and computing it from canvas.width/height at runtime (like we used to) breaks
+// whenever the player changes the client's render Resolution setting - that setting skews
+// UiCanvasInformation's reported canvas size without actually changing the real on-screen %
+// layout, so px math derived from it drifts out of sync with the % width and the icon deforms.
+// 'vw' sidesteps that: it's resolved by the UI layer against the true screen size, unaffected by
+// that setting - see CHECKPOINT_SELECT_ROW_HEIGHT_VW above for the same fix applied earlier.
+function renderRarityBlock(rarity: RarityConfig, widthPercent: number, iconHeightVw: `${number}vw`, marginRight: `${number}vh` | number = 0) {
   const { collected, total } = getRarityProgress(rarity)
   const rowSize = rarity.rowSize
   const rows = Math.ceil(total / rowSize)
   const slots = Array.from({ length: total }, (_, i) => rarity.start + i)
   const collection = rarity.collection
-  const iconHeight = Math.round(iconSize * getPrizeCellAspect(collection))
+  const iconHeight = iconHeightVw
   return (
-    <UiEntity key={rarity.label} uiTransform={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { bottom: 4 } }} />
+    <UiEntity
+      key={rarity.label}
+      uiTransform={{ width: `${widthPercent}%`, flexDirection: 'column', alignItems: 'flex-start', margin: { right: marginRight } }}
+    >
+      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: '2vh', bottom: 0 } }} />
       {Array.from({ length: rows }, (_, rowIndex) => (
-        <UiEntity key={rowIndex} uiTransform={{ height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
+        <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
           {Array.from({ length: rowSize }, (_, colIndex) => {
             const indexInRarity = rowIndex * rowSize + colIndex
             if (indexInRarity >= slots.length) return null
@@ -375,7 +404,8 @@ function renderRarityBlock(rarity: RarityConfig, iconSize: number) {
               <UiEntity
                 key={slot}
                 uiTransform={{
-                  width: iconSize,
+                  width: `${100 / rowSize}%`,
+                  minWidth: `${100 / rowSize}%`,
                   height: iconHeight,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -418,8 +448,6 @@ function getRarityLabel(slot: number): string {
   return rarity ? rarity.label : ''
 }
 
-let checkpointSelectCellSize = 80 // fallback until the first canvas read
-let codexCellSize = 80 // fallback until the first canvas read
 
 let cells: CellState[] = []
 // The memory-match card art for the checkpoint currently being played; set by startBoard() from
@@ -735,21 +763,6 @@ export function setupUi() {
       // Re-clamp to widthCellSize: the mobile touch-size boost must never push the grid past
       // the available width again, or the nine-slice frame overflows canvas_main in X.
       cellSize = Math.min(boostedCellSize, widthCellSize)
-
-      // Checkpoint select is always a fixed grid, independent of the current board's size.
-      const selectHeightCellSize = Math.floor((BOARD_HEIGHT_FRACTION * canvas.height) / CHECKPOINT_SELECT_ROWS)
-      const selectWidthCellSize = Math.floor(availableWidth / CHECKPOINT_SELECT_COLS)
-      checkpointSelectCellSize = Math.min(selectHeightCellSize, selectWidthCellSize)
-
-      // Codex fills its whole container, so size its cells off the canvas_main column's actual
-      // body area (width and height), minus room for the frame padding, the title, and the
-      // rarity label above each row.
-      const codexAvailableWidth = availableWidth
-      const codexAvailableHeight =
-        CANVAS_MAIN_BODY_HEIGHT_FRACTION * canvas.height - 2 * framePadding - CODEX_HEADER_RESERVED - CODEX_GROUPS.length * CODEX_RARITY_LABEL_HEIGHT
-      const codexHeightCellSize = Math.floor(codexAvailableHeight / CODEX_ROWS)
-      const codexWidthCellSize = Math.floor(codexAvailableWidth / CODEX_COLS)
-      codexCellSize = Math.min(codexHeightCellSize, codexWidthCellSize)
 
       const headerVhPadding = canvas.height / 100
       const closeButtonBaseSize = 5 * headerVhPadding
@@ -1201,9 +1214,8 @@ const MemoryMatchUi = () => (
                   key={rowIndex}
                   uiTransform={{
                     width: '100%',
-                    height: checkpointSelectCellSize,
+                    height: CHECKPOINT_SELECT_ROW_HEIGHT_VW,
                     flexDirection: 'row',
-                    margin: { bottom: 4 },
                     borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                     borderColor: Color4.Green()
                   }}
@@ -1211,7 +1223,18 @@ const MemoryMatchUi = () => (
                   {Array.from({ length: CHECKPOINT_SELECT_COLS }, (_, colIndex) => {
                     const checkpoint = rowIndex * CHECKPOINT_SELECT_COLS + colIndex + 1
                     if (checkpoint > TOTAL_CHECKPOINTS) {
-                      return <UiEntity key={checkpoint} uiTransform={{ width: `${100 / CHECKPOINT_SELECT_COLS}%`, height: checkpointSelectCellSize, margin: 2 }} />
+                      return (
+                        <UiEntity
+                          key={checkpoint}
+                          uiTransform={{
+                            width: `${100 / CHECKPOINT_SELECT_COLS}%`,
+                            minWidth: `${100 / CHECKPOINT_SELECT_COLS}%`,
+                            height: '100%',
+                            borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                            borderColor: Color4.Blue()
+                          }}
+                        />
+                      )
                     }
                     const unlocked = checkpoint <= highestUnlockedCheckpoint
                     return (
@@ -1219,10 +1242,12 @@ const MemoryMatchUi = () => (
                         key={checkpoint}
                         uiTransform={{
                           width: `${100 / CHECKPOINT_SELECT_COLS}%`,
-                          height: checkpointSelectCellSize,
+                          minWidth: `${100 / CHECKPOINT_SELECT_COLS}%`,
+                          height: '100%',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          margin: 2
+                          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                          borderColor: Color4.Blue()
                         }}
                         uiBackground={{ color: unlocked ? Color4.create(0.2, 0.6, 0.9, 0.6) : Color4.create(0, 0, 0, 0.5) }}
                         onMouseDown={unlocked ? () => startCheckpoint(checkpoint) : undefined}
@@ -1236,7 +1261,7 @@ const MemoryMatchUi = () => (
                           />
                         ) : (
                           <UiEntity
-                            uiTransform={{ width: STAT_ICON_SIZE, height: STAT_ICON_SIZE }}
+                            uiTransform={{ width: CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW, height: CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW }}
                             uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: LOCK_ICON_UVS }}
                           />
                         )}
@@ -1254,7 +1279,7 @@ const MemoryMatchUi = () => (
             uiTransform={{
               width: '100%',
               height: 'auto',
-              minHeight: '60%',
+              minHeight: '80%',
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
@@ -1292,7 +1317,7 @@ const MemoryMatchUi = () => (
             />
             <UiEntity
               uiTransform={{
-                width: CODEX_COLS * codexCellSize,
+                width: '95%',
                 flexDirection: 'column',
                 alignItems: 'flex-start',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1301,20 +1326,21 @@ const MemoryMatchUi = () => (
             >
               {CODEX_GROUPS.map((group) => {
                 const groupRowSize = getGroupRowSize(group)
-                // No margin between icons, so each row's icons grow to fill the full available width.
-                const iconSize = Math.floor((CODEX_COLS * codexCellSize) / groupRowSize)
+                const iconHeightVw = getCodexIconHeightVw(groupRowSize)
                 return (
                   <UiEntity
                     key={group.map((r) => r.label).join('+')}
                     uiTransform={{
-                      width: group.length > 1 ? '100%' : 'auto',
+                      width: '100%',
                       flexDirection: 'row',
                       justifyContent: group.length > 1 ? 'space-between' : 'flex-start',
                       alignItems: 'flex-start',
                       margin: { bottom: '5vh' }
                     }}
                   >
-                    {group.map((rarity) => renderRarityBlock(rarity, iconSize))}
+                    {group.map((rarity, rarityIndex) =>
+                      renderRarityBlock(rarity, (rarity.rowSize / groupRowSize) * 100, iconHeightVw, group.length > 1 && rarityIndex === 0 ? '2vh' : 0)
+                    )}
                   </UiEntity>
                 )
               })}
