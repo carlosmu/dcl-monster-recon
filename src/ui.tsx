@@ -444,7 +444,8 @@ let screen: Screen = 'hidden'
 let previousScreen: Screen | null = null
 let currentCheckpoint = 1
 let currentBoardIndex = 0 // 0-based index into the current checkpoint's boards array
-// In-memory only for now — will be replaced by progress read from the authoritative server.
+// Synced from the server on connect via 'requestProgress'/'progressUpdate', and updated locally
+// (then re-synced) whenever a checkpoint is completed - see reportBoardTime below.
 let highestUnlockedCheckpoint = 1
 // One slot per checkpoint; true once that checkpoint's monster prize has been collected.
 const collectedMonsters: boolean[] = new Array(TOTAL_CHECKPOINTS).fill(false)
@@ -712,14 +713,15 @@ function flipCell(cell: CellState) {
         const previousBest = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
         isNewBestTime = previousBest === undefined || previousBest === NO_BEST_TIME || lastBoardTime < previousBest
         triggerCelebrationCamera(isNewBestTime ? 'disco' : 'handsair', 0)
+        const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
+        checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
         room.send('reportBoardTime', {
           checkpoint: currentCheckpoint,
           boardIndex: currentBoardIndex,
-          timeSeconds: lastBoardTime
+          timeSeconds: lastBoardTime,
+          checkpointComplete
         })
 
-        const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
-        checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
         if (checkpointComplete) {
           wonMonsterQuadrant = currentCheckpoint - 1
           collectedMonsters[currentCheckpoint - 1] = true
@@ -858,6 +860,15 @@ export function setupUi() {
   room.onMessage('personalBestUpdate', (data) => {
     personalBests[bestTimeKey(data.checkpoint, data.boardIndex)] = data.bestTimeSeconds
   })
+
+  room.onMessage('progressUpdate', (data) => {
+    highestUnlockedCheckpoint = data.highestUnlockedCheckpoint
+    for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
+      collectedMonsters[i] = data.collectedMonsters[i] ?? false
+      collectionCounts[i] = data.collectionCounts[i] ?? 0
+    }
+  })
+  room.send('requestProgress', {})
 
   // TEST: virtualWidth/virtualHeight lets the renderer scale raw-px sizes to fit any real screen,
   // per the build-ui skill. Trying it out on the R header icons first (see HEADER_RIGHT_ICON_SIZE_PX)

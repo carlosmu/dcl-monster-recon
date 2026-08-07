@@ -1,11 +1,14 @@
 import { engine } from '@dcl/sdk/ecs'
 import { Storage } from '@dcl/sdk/server'
 import { room } from '../shared/messages'
+import checkpointsData from '../checkpoints.json'
 
 const LEADERBOARD_KEY = 'leaderboard'
 const LEADERBOARD_TOP_N = 10
 const SERVER_TICK_INTERVAL = 1 // seconds between heartbeat broadcasts
 const NO_BEST_TIME = -1
+const TOTAL_CHECKPOINTS = checkpointsData.length
+const PROGRESS_KEY = 'progress'
 
 function bestTimeKey(checkpoint: number, boardIndex: number): string {
   return `bestTime-${checkpoint}-${boardIndex}`
@@ -17,6 +20,20 @@ interface LeaderboardEntry {
 }
 
 type LeaderboardMap = Record<string, LeaderboardEntry> // keyed by wallet address
+
+interface PlayerProgress {
+  highestUnlockedCheckpoint: number
+  collectedMonsters: boolean[]
+  collectionCounts: number[]
+}
+
+function defaultProgress(): PlayerProgress {
+  return {
+    highestUnlockedCheckpoint: 1,
+    collectedMonsters: new Array(TOTAL_CHECKPOINTS).fill(false),
+    collectionCounts: new Array(TOTAL_CHECKPOINTS).fill(0)
+  }
+}
 
 export async function startServer() {
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY)) ?? {}
@@ -56,6 +73,23 @@ export async function startServer() {
       { checkpoint: data.checkpoint, boardIndex: data.boardIndex, bestTimeSeconds: best },
       { to: [context.from] }
     )
+
+    if (data.checkpointComplete) {
+      const progress = (await Storage.player.get<PlayerProgress>(context.from, PROGRESS_KEY)) ?? defaultProgress()
+      progress.collectedMonsters[data.checkpoint - 1] = true
+      progress.collectionCounts[data.checkpoint - 1] = (progress.collectionCounts[data.checkpoint - 1] ?? 0) + 1
+      if (data.checkpoint === progress.highestUnlockedCheckpoint && progress.highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
+        progress.highestUnlockedCheckpoint++
+      }
+      await Storage.player.set(context.from, PROGRESS_KEY, progress)
+      room.send('progressUpdate', progress, { to: [context.from] })
+    }
+  })
+
+  room.onMessage('requestProgress', async (_data, context) => {
+    if (!context) return
+    const progress = (await Storage.player.get<PlayerProgress>(context.from, PROGRESS_KEY)) ?? defaultProgress()
+    room.send('progressUpdate', progress, { to: [context.from] })
   })
 
   let tick = 0
