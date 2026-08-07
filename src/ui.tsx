@@ -17,6 +17,9 @@ const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 0.25)
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
+// Visual-only: forces the header score display to a 5-digit value, to check it fits without
+// overflowing the box. Does not touch the real score. Flip to false to see the actual score.
+const DEBUG_SCORE_OVERRIDE = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -232,6 +235,28 @@ function getPrizePulseSize(): number {
   return PRIZE_BACKDROP_SIZE * scale
 }
 
+// Timer text: below this many seconds remaining, it blinks white <-> red (ping-pong) instead of
+// staying solid white.
+const TIMER_LOW_TIME_THRESHOLD = 10
+const TIMER_BLINK_PERIOD = 0.5 // seconds for a full white -> red -> white cycle
+
+function getTimerColor(): Color4 {
+  if (timeRemaining > TIMER_LOW_TIME_THRESHOLD) return Color4.White()
+  const phase = ((elapsedTime % TIMER_BLINK_PERIOD) / TIMER_BLINK_PERIOD) * 2 // 0..2
+  const triangle = phase <= 1 ? phase : 2 - phase // 0..1..0 - white (0) to red (1) and back
+  return Color4.create(1, 1 - triangle, 1 - triangle, 1)
+}
+
+// "Paused" text (shown instead of the timer while a board is left open behind checkpoint
+// select/codex/leaderboard): fades in and out via alpha, same ping-pong technique as the timer.
+const PAUSED_BLINK_PERIOD = 0.8 // seconds for a full opaque -> faded -> opaque cycle
+
+function getPausedBlinkColor(): Color4 {
+  const phase = ((elapsedTime % PAUSED_BLINK_PERIOD) / PAUSED_BLINK_PERIOD) * 2 // 0..2
+  const triangle = phase <= 1 ? phase : 2 - phase // 0..1..0
+  return Color4.create(1, 1, 1, 0.3 + triangle * 0.7) // alpha 0.3..1..0.3
+}
+
 // UiTransform has no scale/transform prop, so a horizontal flip is done by mirroring the UVs.
 const PRIZE_FLIP_INTERVAL = 0.5 // seconds between horizontal flips
 
@@ -331,6 +356,10 @@ interface LeaderboardEntry {
 let leaderboard: LeaderboardEntry[] = []
 
 let screen: Screen = 'hidden'
+// Set to 'board' when checkpointSelect/inventory/leaderboard is opened while a board is in
+// progress, so closing it resumes that board instead of stranding it on 'hidden' (the timer
+// already pauses on its own since it only ticks while screen === 'board').
+let previousScreen: Screen | null = null
 let currentCheckpoint = 1
 let currentBoardIndex = 0 // 0-based index into the current checkpoint's boards array
 // In-memory only for now — will be replaced by progress read from the authoritative server.
@@ -801,6 +830,7 @@ export function setupUi() {
 }
 
 export function showCheckpointSelect() {
+  if (screen === 'board') previousScreen = 'board'
   screen = 'checkpointSelect'
 }
 
@@ -851,23 +881,28 @@ function closeBoard() {
 }
 
 function closeCheckpointSelect() {
-  screen = 'hidden'
+  screen = previousScreen === 'board' ? 'board' : 'hidden'
+  previousScreen = null
 }
 
 function showInventory() {
+  if (screen === 'board') previousScreen = 'board'
   screen = 'inventory'
 }
 
 function closeInventory() {
-  screen = 'hidden'
+  screen = previousScreen === 'board' ? 'board' : 'hidden'
+  previousScreen = null
 }
 
 function showLeaderboard() {
+  if (screen === 'board') previousScreen = 'board'
   screen = 'leaderboard'
 }
 
 function closeLeaderboard() {
-  screen = 'hidden'
+  screen = previousScreen === 'board' ? 'board' : 'hidden'
+  previousScreen = null
 }
 
 const MemoryMatchUi = () => (
@@ -936,7 +971,7 @@ const MemoryMatchUi = () => (
             />
             <UiEntity uiTransform={{ width: STAT_ICON_SIZE_VW, height: STAT_ICON_SIZE_VW, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_ICON_UVS }} />
             <Label
-              value="99.999" // DEBUG: temp, checking score fit - revert to `${totalScore}`
+              value={DEBUG_SCORE_OVERRIDE ? '99.999' : `${totalScore}`}
               fontSize={SCORE_FONT_SIZE_VW}
               textWrap="nowrap"
               textAlign="middle-right"
@@ -944,7 +979,7 @@ const MemoryMatchUi = () => (
             />
           </UiEntity>
 
-          {screen === 'board' && (
+          {(screen === 'board' || previousScreen === 'board') && (
             <UiEntity
               uiTransform={{
                 width: HEADER_LEFT_ICON_WIDTH,
@@ -964,13 +999,11 @@ const MemoryMatchUi = () => (
                 uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
               />
               <UiEntity uiTransform={{ width: STAT_ICON_SIZE_VW, height: STAT_ICON_SIZE_VW, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
-              <Label
-                value={`${Math.ceil(timeRemaining)}s`}
-                fontSize={TIMER_FONT_SIZE_VW}
-                textWrap="nowrap"
-                textAlign="middle-center"
-                color={Color4.White()}
-              />
+              {screen === 'board' ? (
+                <Label value={`${Math.ceil(timeRemaining)}s`} fontSize={TIMER_FONT_SIZE_VW} textWrap="nowrap" textAlign="middle-center" color={getTimerColor()} />
+              ) : (
+                <Label value="Paused" fontSize={SCORE_FONT_SIZE_VW} textWrap="nowrap" textAlign="middle-center" color={getPausedBlinkColor()} />
+              )}
             </UiEntity>
           )}
         </UiEntity>
@@ -1012,7 +1045,7 @@ const MemoryMatchUi = () => (
         uiTransform={{
           width: '100%',
           height: '100%',
-          padding: '2vh',
+          padding: { top: '2vh', bottom: '2vh' },
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
