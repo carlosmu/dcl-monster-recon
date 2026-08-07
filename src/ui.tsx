@@ -1,6 +1,6 @@
 import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { engine, UiCanvasInformation, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
+import { engine, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
@@ -9,11 +9,11 @@ import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCame
 
 const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = true
-// Debug layout border colors at 25% opacity, so they outline containers without obscuring the UI.
-const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 0.25)
-const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 0.25)
-const DEBUG_BORDER_BLUE = Color4.create(0, 0, 1, 0.25)
-const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 0.25)
+// Debug layout border colors at 10% opacity, so they outline containers without obscuring the UI.
+const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 0.1)
+const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 0.1)
+const DEBUG_BORDER_BLUE = Color4.create(0, 0, 1, 0.1)
+const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 0.1)
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
@@ -159,10 +159,36 @@ function getScreenTitleFontSizeVh(): `${number}vh` {
 function getScreenSubtitleFontSizeVh(): `${number}vh` {
   return `${SCREEN_TITLE_FONT_SIZE_VH_NUM * (isMobile() ? 1.5 : 1) * 0.6}vh`
 }
-// Frame padding as a fraction of the real screen height, matched to a 48px/1080px desktop look.
-const FRAME_PADDING_FRACTION = 48 / 1080
+// Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
+// the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
+// virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
+// would now double-scale (it already read the true screen height, then virtualHeight would scale
+// it again).
+const FRAME_PADDING_PX = 48
+const FRAME_PADDING_MOBILE_PX = 72
+
+function getFramePaddingPx(): number {
+  return isMobile() ? FRAME_PADDING_MOBILE_PX : FRAME_PADDING_PX
+}
 // Width of canvas_main (the safe-area column) as a fraction of screen width.
 const CANVAS_MAIN_WIDTH_FRACTION = 0.4
+// TEST: canvas_main's own width, as raw px (virtualWidth * fraction) instead of '%' of the real
+// screen. This is the anchor fix for the header/L/R/body overflow bug on mobile: '%' NEVER goes
+// through the virtualWidth/virtualHeight scale factor (only raw numbers do - confirmed by reading
+// @dcl/react-ecs's uiTransform/utils.js), so a '%' chain all the way to the true screen (the old
+// canvas_main) disagreed with the raw-px score/timer boxes inside it whenever height (not width)
+// was the constraining axis for the scale factor (e.g. a landscape phone wider than 16:9). Anchoring
+// canvas_main itself in raw px makes every '%' below it resolve against an already-correctly-scaled
+// parent, so header/L/R/body stay consistent with the raw-px leaves without needing their own
+// conversion. canvas_main's height stays '100%' on purpose - see comment at its uiTransform below.
+const CANVAS_MAIN_WIDTH_PX = CANVAS_MAIN_WIDTH_FRACTION * 1920
+// TEST: canvas_main's top/bottom padding, body's top/bottom padding, and the footer's min height -
+// same visual sizes as their old 'vh' values (1vh/2vh/7.5-15vh at a 1080 reference), as raw px
+// relying on virtualWidth/virtualHeight, same approach as everything else converted so far.
+const CANVAS_MAIN_PADDING_PX = 11
+const BODY_PADDING_PX = 22
+const FOOTER_MIN_HEIGHT_MOBILE_PX = 81
+const FOOTER_MIN_HEIGHT_DESKTOP_PX = 162
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
 // down). Cell height is derived from that same real width fraction, in 'vw' - not from px computed
 // from canvas.height, which drifts out of sync with the real % width whenever the player changes
@@ -179,6 +205,13 @@ const CLOSE_MUSIC_BUTTON_WIDTH_PERCENT = 10
 const CLOSE_BUTTON_SIZE = `${CLOSE_MUSIC_BUTTON_WIDTH_PERCENT}%`
 const CLOSE_BUTTON_HEIGHT_VW = `${(CLOSE_MUSIC_BUTTON_WIDTH_PERCENT / 100) * CANVAS_MAIN_WIDTH_FRACTION * 100}vw`
 const MUSIC_BUTTON_SIZE = CLOSE_BUTTON_SIZE
+// TEST: close (X) / music toggle buttons, square, as raw px at the 1920x1080 reference (10% of
+// canvas_main's 768px-reference width), plus their position insets in the same raw-px system -
+// mixing '%'/'vh' insets with a raw-px button size is exactly the bug fixed for score/timer.
+const CLOSE_BUTTON_SIZE_PX = 76.8
+const CLOSE_BUTTON_INSET_PX = 7.68 // 1% of the 768px-reference frame width
+const CLOSE_BUTTON_TOP_INSET_PX = 10.8 // 1% of the 1080px virtual height
+const MUSIC_BUTTON_RIGHT_INSET_PX = CLOSE_BUTTON_INSET_PX + CLOSE_BUTTON_SIZE_PX + CLOSE_BUTTON_INSET_PX
 // Fraction of canvas_main's height left for the body once the 10vh header and its 1vh top/bottom
 // padding are subtracted. Used to size the Codex grid without overflowing past the header.
 const CANVAS_MAIN_BODY_HEIGHT_FRACTION = 1 - 0.1 - 0.02
@@ -203,7 +236,7 @@ const HEADER_RIGHT_ICON_HEIGHT_VW = `${(HEADER_RIGHT_ICON_WIDTH_PERCENT / 100) *
 // TEST: same visual size as above (25% of a 20vw column ~ 96px at a 1920 reference), but as a
 // raw px value relying on setUiRenderer's virtualWidth/virtualHeight to scale it, instead of the
 // manual vw math above. If this reads correctly (including on mobile), migrate the rest to it.
-const HEADER_RIGHT_ICON_SIZE_PX = 96
+const HEADER_RIGHT_ICON_SIZE_PX = 90
 // Left-hand header boxes (score, timer): 40%-of-column width; height is derived from that same
 // 'vw' width (not '%' or 'auto' - no aspect-ratio prop exists) to keep the 2:1 art undeformed.
 const HEADER_LEFT_ICON_WIDTH_PERCENT = 50
@@ -224,17 +257,23 @@ const TIMER_FONT_SIZE_VW = `${HEADER_LEFT_ICON_HEIGHT_VW_NUM * 0.37}vw`
 // TEST: same visual sizes as the vw-derived values above (at a 1920 reference: box ~192x96,
 // icon ~58, score font ~29, timer font ~36), but as raw px relying on virtualWidth/virtualHeight -
 // same approach already confirmed working on the R header icons.
-const HEADER_LEFT_BOX_WIDTH_PX = 192
-const HEADER_LEFT_BOX_HEIGHT_PX = 96
-const STAT_ICON_SIZE_PX = 58
-const SCORE_FONT_SIZE_PX = 29
-const TIMER_FONT_SIZE_PX = 36
+const HEADER_LEFT_BOX_WIDTH_PX = 180
+const HEADER_LEFT_BOX_HEIGHT_PX = 90
+const STAT_ICON_SIZE_PX = 60
+const SCORE_FONT_SIZE_PX = 30
+const TIMER_FONT_SIZE_PX = 45
+const HEADER_LEFT_BOX_PADDING_PX = 22
 // Play button lives in the body ("main") container while screen === 'hidden'. Width is 40% of
 // that container (real, dynamic - width: '100%' of canvas_main); height is derived from the same
 // 'vw' width so the 2:1 art (PLAY_BUTTON_UVS is a 4x2 atlas block) never deforms.
 const PLAY_BUTTON_WIDTH_PERCENT = 25
 const PLAY_BUTTON_WIDTH = `${PLAY_BUTTON_WIDTH_PERCENT}%`
 const PLAY_BUTTON_HEIGHT_VW = `${((PLAY_BUTTON_WIDTH_PERCENT / 100) * CANVAS_MAIN_WIDTH_FRACTION * 100) / 2}vw`
+// TEST: same visual size as above (25% of body's 40vw ~ 192x96 at a 1920 reference), as raw px
+// relying on virtualWidth/virtualHeight. `left`/`top` stay '%' - percentages are already
+// resolution-safe on their own, only the raw-px width/height needed the virtual-canvas fix.
+const PLAY_BUTTON_WIDTH_PX = 192
+const PLAY_BUTTON_HEIGHT_PX = 96
 
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
@@ -328,7 +367,6 @@ const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on sc
 const NOTIFICATION_SLIDE_DURATION = 0.5
 const NOTIFICATION_SLIDE_DISTANCE_VH = 10
 
-let framePadding = 16 // fallback until the first canvas read
 
 function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
   const u1 = col / grid
@@ -409,6 +447,24 @@ const CHECKPOINT_SELECT_ROW_HEIGHT_VW = `${CHECKPOINT_SELECT_CELL_WIDTH_VW * CHE
 // width AND height (e.g. '60%'/'60%' of the cell) would stretch it to match the button's own 5:4
 // shape. Deriving both dimensions from the same width-based vw value keeps it square instead.
 const CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW = `${CHECKPOINT_SELECT_CELL_WIDTH_VW * 0.6}vw`
+// TEST: same idea as the vw-derived values above (cell width also converted, not just row
+// height/lock icon - a '%' cell width next to a raw-px row height would reintroduce the same
+// square-vs-container mismatch fixed for score/timer), but computed as a function instead of a
+// static constant: the frame's own padding (getFramePaddingPx(), mobile vs desktop) eats into
+// canvas_main's width before the grid ever sees it, so the available width has to subtract that
+// first - the old 'vw' formula never did, which is what caused the grid to overflow the frame.
+function getCheckpointSelectCellWidthPx(): number {
+  const availableWidth = CANVAS_MAIN_WIDTH_PX - 2 * getFramePaddingPx()
+  return (availableWidth * 0.9) / CHECKPOINT_SELECT_COLS
+}
+
+function getCheckpointSelectRowHeightPx(): number {
+  return getCheckpointSelectCellWidthPx() * CHECKPOINT_SELECT_BUTTON_ASPECT
+}
+
+function getCheckpointSelectLockIconSizePx(): number {
+  return getCheckpointSelectCellWidthPx() * 0.6
+}
 
 // Rarity ranges by checkpoint slot index, flattened across all collections. Each rarity is laid
 // out as a single row in the Codex (rowSize equals its slot count), with Exotic and Epic sharing
@@ -848,13 +904,6 @@ export function setupUi() {
     } else if (currentNotification !== null && notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
       currentNotification = null
     }
-
-    const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
-    if (canvas) {
-      const basePadding = Math.round(FRAME_PADDING_FRACTION * canvas.height)
-      framePadding = isMobile() ? Math.round(basePadding * 1.5) : basePadding
-
-    }
   })
 }
 
@@ -949,12 +998,16 @@ const MemoryMatchUi = () => (
         a sibling "canvas-sidebar" can be added later for anything that belongs outside this column. */}
     <UiEntity
       uiTransform={{
-        width: `${CANVAS_MAIN_WIDTH_FRACTION * 100}%`,
+        width: CANVAS_MAIN_WIDTH_PX,
+        // Stays '100%' (real, unscaled) rather than a raw-px 1080 - height isn't part of the
+        // reported bug, and a raw px height would letterbox (stop filling the real screen height)
+        // whenever width - not height - ends up being the scale factor's constraining axis
+        // (the common case: any portrait/narrower-than-16:9 screen).
         height: '100%',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: { top: '1vh', bottom: '1vh' },
+        padding: { top: CANVAS_MAIN_PADDING_PX, bottom: CANVAS_MAIN_PADDING_PX },
         borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
         borderColor: DEBUG_BORDER_GREEN
       }}
@@ -989,7 +1042,7 @@ const MemoryMatchUi = () => (
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: { left: '2vh', right: '2vh' },
+              padding: { left: HEADER_LEFT_BOX_PADDING_PX, right: HEADER_LEFT_BOX_PADDING_PX },
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_WHITE
             }}
@@ -1018,7 +1071,7 @@ const MemoryMatchUi = () => (
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 margin: { left: 8 },
-                padding: { left: '2vh', right: '2vh' },
+                padding: { left: HEADER_LEFT_BOX_PADDING_PX, right: HEADER_LEFT_BOX_PADDING_PX },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
@@ -1074,7 +1127,7 @@ const MemoryMatchUi = () => (
         uiTransform={{
           width: '100%',
           height: '100%',
-          padding: { top: '2vh', bottom: '2vh' },
+          padding: { top: BODY_PADDING_PX, bottom: BODY_PADDING_PX },
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1084,8 +1137,8 @@ const MemoryMatchUi = () => (
         {screen === 'hidden' && (
           <UiEntity
             uiTransform={{
-              width: PLAY_BUTTON_WIDTH,
-              height: PLAY_BUTTON_HEIGHT_VW,
+              width: PLAY_BUTTON_WIDTH_PX,
+              height: PLAY_BUTTON_HEIGHT_PX,
               flexShrink: 0,
               positionType: 'absolute',
               // Centered in the body's top third: left keeps it horizontally centered ((100% -
@@ -1128,7 +1181,7 @@ const MemoryMatchUi = () => (
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: framePadding,
+              padding: getFramePaddingPx(),
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_RED
             }}
@@ -1140,13 +1193,12 @@ const MemoryMatchUi = () => (
           >
             <UiEntity
               uiTransform={{
-                width: MUSIC_BUTTON_SIZE,
-                height: CLOSE_BUTTON_HEIGHT_VW,
+                width: CLOSE_BUTTON_SIZE_PX,
+                height: CLOSE_BUTTON_SIZE_PX,
                 positionType: 'absolute',
-                // 1% inset + CLOSE_BUTTON_SIZE (10%) + 1% gap, in the same % unit as the button
-                // widths themselves, so this never drifts out of sync with them like a vh offset
-                // paired with a % width would (that mismatch caused the earlier overlap).
-                position: { top: '1vh', right: `${1 + CLOSE_MUSIC_BUTTON_WIDTH_PERCENT + 1}%` },
+                // Raw px, same reference as the button's own size - a '%'/'vh' inset paired with
+                // a raw-px button size is exactly the mismatch fixed for score/timer.
+                position: { top: CLOSE_BUTTON_TOP_INSET_PX, right: MUSIC_BUTTON_RIGHT_INSET_PX },
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
@@ -1155,10 +1207,10 @@ const MemoryMatchUi = () => (
             />
             <UiEntity
               uiTransform={{
-                width: CLOSE_BUTTON_SIZE,
-                height: CLOSE_BUTTON_HEIGHT_VW,
+                width: CLOSE_BUTTON_SIZE_PX,
+                height: CLOSE_BUTTON_SIZE_PX,
                 positionType: 'absolute',
-                position: { top: '1vh', right: '1%' },
+                position: { top: CLOSE_BUTTON_TOP_INSET_PX, right: CLOSE_BUTTON_INSET_PX },
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
@@ -1284,7 +1336,7 @@ const MemoryMatchUi = () => (
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: framePadding,
+              padding: getFramePaddingPx(),
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_RED
             }}
@@ -1296,8 +1348,8 @@ const MemoryMatchUi = () => (
           >
             <UiEntity
               uiTransform={{
-                width: CLOSE_BUTTON_SIZE,
-                height: CLOSE_BUTTON_HEIGHT_VW,
+                width: CLOSE_BUTTON_SIZE_PX,
+                height: CLOSE_BUTTON_SIZE_PX,
                 positionType: 'absolute',
                 position: { top: 8, right: 8 },
                 alignItems: 'center',
@@ -1321,7 +1373,7 @@ const MemoryMatchUi = () => (
                   key={rowIndex}
                   uiTransform={{
                     width: '100%',
-                    height: CHECKPOINT_SELECT_ROW_HEIGHT_VW,
+                    height: getCheckpointSelectRowHeightPx(),
                     flexDirection: 'row',
                     borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                     borderColor: DEBUG_BORDER_GREEN
@@ -1368,7 +1420,7 @@ const MemoryMatchUi = () => (
                           />
                         ) : (
                           <UiEntity
-                            uiTransform={{ width: CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW, height: CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW }}
+                            uiTransform={{ width: getCheckpointSelectLockIconSizePx(), height: getCheckpointSelectLockIconSizePx() }}
                             uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: LOCK_ICON_UVS }}
                           />
                         )}
@@ -1390,7 +1442,7 @@ const MemoryMatchUi = () => (
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: framePadding,
+              padding: getFramePaddingPx(),
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_RED
             }}
@@ -1402,8 +1454,8 @@ const MemoryMatchUi = () => (
           >
             <UiEntity
               uiTransform={{
-                width: CLOSE_BUTTON_SIZE,
-                height: CLOSE_BUTTON_HEIGHT_VW,
+                width: CLOSE_BUTTON_SIZE_PX,
+                height: CLOSE_BUTTON_SIZE_PX,
                 positionType: 'absolute',
                 position: { top: 8, right: 8 },
                 alignItems: 'center',
@@ -1464,7 +1516,7 @@ const MemoryMatchUi = () => (
               maxHeight: '100%',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: framePadding,
+              padding: getFramePaddingPx(),
               borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_RED
             }}
@@ -1476,8 +1528,8 @@ const MemoryMatchUi = () => (
           >
             <UiEntity
               uiTransform={{
-                width: CLOSE_BUTTON_SIZE,
-                height: CLOSE_BUTTON_HEIGHT_VW,
+                width: CLOSE_BUTTON_SIZE_PX,
+                height: CLOSE_BUTTON_SIZE_PX,
                 positionType: 'absolute',
                 position: { top: 8, right: 8 },
                 alignItems: 'center',
@@ -1533,7 +1585,7 @@ const MemoryMatchUi = () => (
       <UiEntity
         uiTransform={{
           width: '100%',
-          minHeight: isMobile() ? '7.5vh' : '15vh',
+          minHeight: isMobile() ? FOOTER_MIN_HEIGHT_MOBILE_PX : FOOTER_MIN_HEIGHT_DESKTOP_PX,
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
