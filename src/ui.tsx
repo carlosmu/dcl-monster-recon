@@ -145,6 +145,20 @@ let SCORE_MULTIPLIER = CHECKPOINTS[0].boards[0].scoreMultiplier
 
 // Body text color for the memory board, checkpoint select, codex, and leaderboard screens.
 const SCREEN_TEXT_COLOR = Color4.fromHexString('#2c180b')
+// Screen title ("Select checkpoint", "Monster Codex", "Leaderboard"): matched to a 28px/1080px
+// desktop look (x1.2), expressed in 'vh' so it scales with real screen size instead of a fixed px
+// value. 'vh' alone still reads tiny on a small mobile screen (same reasoning as framePadding's
+// isMobile() boost above), so it gets an extra x1.5 there.
+const SCREEN_TITLE_FONT_SIZE_VH_NUM = (28 / 1080) * 100 * 1.2
+
+function getScreenTitleFontSizeVh(): `${number}vh` {
+  return `${SCREEN_TITLE_FONT_SIZE_VH_NUM * (isMobile() ? 1.5 : 1)}vh`
+}
+
+// Screen subtitle ("Best Time", "No scores yet"): 60% of the screen title size.
+function getScreenSubtitleFontSizeVh(): `${number}vh` {
+  return `${SCREEN_TITLE_FONT_SIZE_VH_NUM * (isMobile() ? 1.5 : 1) * 0.6}vh`
+}
 // Frame padding as a fraction of the real screen height, matched to a 48px/1080px desktop look.
 const FRAME_PADDING_FRACTION = 48 / 1080
 // Width of canvas_main (the safe-area column) as a fraction of screen width.
@@ -186,6 +200,10 @@ const HEADER_RIGHT_COLUMN_WIDTH_VW = (1 - HEADER_LEFT_COLUMN_FRACTION) * HEADER_
 const HEADER_RIGHT_ICON_WIDTH_PERCENT = 25
 const HEADER_RIGHT_ICON_SIZE = `${HEADER_RIGHT_ICON_WIDTH_PERCENT}%`
 const HEADER_RIGHT_ICON_HEIGHT_VW = `${(HEADER_RIGHT_ICON_WIDTH_PERCENT / 100) * HEADER_RIGHT_COLUMN_WIDTH_VW}vw`
+// TEST: same visual size as above (25% of a 20vw column ~ 96px at a 1920 reference), but as a
+// raw px value relying on setUiRenderer's virtualWidth/virtualHeight to scale it, instead of the
+// manual vw math above. If this reads correctly (including on mobile), migrate the rest to it.
+const HEADER_RIGHT_ICON_SIZE_PX = 96
 // Left-hand header boxes (score, timer): 40%-of-column width; height is derived from that same
 // 'vw' width (not '%' or 'auto' - no aspect-ratio prop exists) to keep the 2:1 art undeformed.
 const HEADER_LEFT_ICON_WIDTH_PERCENT = 50
@@ -203,6 +221,14 @@ const STAT_ICON_SIZE_VW = `${HEADER_LEFT_ICON_HEIGHT_VW_NUM * 0.6}vw`
 // the width left over after the icon, since box width scales in lockstep with box height (2:1).
 const SCORE_FONT_SIZE_VW = `${HEADER_LEFT_ICON_HEIGHT_VW_NUM * 0.3}vw`
 const TIMER_FONT_SIZE_VW = `${HEADER_LEFT_ICON_HEIGHT_VW_NUM * 0.37}vw`
+// TEST: same visual sizes as the vw-derived values above (at a 1920 reference: box ~192x96,
+// icon ~58, score font ~29, timer font ~36), but as raw px relying on virtualWidth/virtualHeight -
+// same approach already confirmed working on the R header icons.
+const HEADER_LEFT_BOX_WIDTH_PX = 192
+const HEADER_LEFT_BOX_HEIGHT_PX = 96
+const STAT_ICON_SIZE_PX = 58
+const SCORE_FONT_SIZE_PX = 29
+const TIMER_FONT_SIZE_PX = 36
 // Play button lives in the body ("main") container while screen === 'hidden'. Width is 40% of
 // that container (real, dynamic - width: '100%' of canvas_main); height is derived from the same
 // 'vw' width so the 2:1 art (PLAY_BUTTON_UVS is a 4x2 atlas block) never deforms.
@@ -759,7 +785,10 @@ export function setupUi() {
     personalBests[bestTimeKey(data.checkpoint, data.boardIndex)] = data.bestTimeSeconds
   })
 
-  ReactEcsRenderer.setUiRenderer(MemoryMatchUi)
+  // TEST: virtualWidth/virtualHeight lets the renderer scale raw-px sizes to fit any real screen,
+  // per the build-ui skill. Trying it out on the R header icons first (see HEADER_RIGHT_ICON_SIZE_PX)
+  // before migrating the rest of the manual vw/vh sizing done elsewhere in this file.
+  ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
   engine.addSystem((dt: number) => {
     elapsedTime += dt
     if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
@@ -954,8 +983,8 @@ const MemoryMatchUi = () => (
         >
           <UiEntity
             uiTransform={{
-              width: HEADER_LEFT_ICON_WIDTH,
-              height: HEADER_LEFT_ICON_HEIGHT_VW,
+              width: HEADER_LEFT_BOX_WIDTH_PX,
+              height: HEADER_LEFT_BOX_HEIGHT_PX,
               flexShrink: 0,
               flexDirection: 'row',
               alignItems: 'center',
@@ -969,10 +998,10 @@ const MemoryMatchUi = () => (
               uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
             />
-            <UiEntity uiTransform={{ width: STAT_ICON_SIZE_VW, height: STAT_ICON_SIZE_VW, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_ICON_UVS }} />
+            <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_ICON_UVS }} />
             <Label
               value={DEBUG_SCORE_OVERRIDE ? '99.999' : `${totalScore}`}
-              fontSize={SCORE_FONT_SIZE_VW}
+              fontSize={SCORE_FONT_SIZE_PX}
               textWrap="nowrap"
               textAlign="middle-right"
               color={Color4.White()}
@@ -982,8 +1011,8 @@ const MemoryMatchUi = () => (
           {(screen === 'board' || previousScreen === 'board') && (
             <UiEntity
               uiTransform={{
-                width: HEADER_LEFT_ICON_WIDTH,
-                height: HEADER_LEFT_ICON_HEIGHT_VW,
+                width: HEADER_LEFT_BOX_WIDTH_PX,
+                height: HEADER_LEFT_BOX_HEIGHT_PX,
                 flexShrink: 0,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -998,11 +1027,11 @@ const MemoryMatchUi = () => (
                 uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
                 uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
               />
-              <UiEntity uiTransform={{ width: STAT_ICON_SIZE_VW, height: STAT_ICON_SIZE_VW, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
+              <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
               {screen === 'board' ? (
-                <Label value={`${Math.ceil(timeRemaining)}s`} fontSize={TIMER_FONT_SIZE_VW} textWrap="nowrap" textAlign="middle-center" color={getTimerColor()} />
+                <Label value={`${Math.ceil(timeRemaining)}s`} fontSize={TIMER_FONT_SIZE_PX} textWrap="nowrap" textAlign="middle-center" color={getTimerColor()} />
               ) : (
-                <Label value="Paused" fontSize={SCORE_FONT_SIZE_VW} textWrap="nowrap" textAlign="middle-center" color={getPausedBlinkColor()} />
+                <Label value="Paused" fontSize={SCORE_FONT_SIZE_PX} textWrap="nowrap" textAlign="middle-center" color={getPausedBlinkColor()} />
               )}
             </UiEntity>
           )}
@@ -1019,19 +1048,19 @@ const MemoryMatchUi = () => (
             borderColor: DEBUG_BORDER_WHITE
           }}
         >
-          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE, height: HEADER_RIGHT_ICON_HEIGHT_VW, flexShrink: 0 }} onMouseDown={() => showLeaderboard()}>
+          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE_PX, height: HEADER_RIGHT_ICON_SIZE_PX, flexShrink: 0 }} onMouseDown={() => showLeaderboard()}>
             <UiEntity
               uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: LEADERBOARD_BUTTON_UVS }}
             />
           </UiEntity>
-          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE, height: HEADER_RIGHT_ICON_HEIGHT_VW, flexShrink: 0, margin: { left: 8 } }} onMouseDown={() => showInventory()}>
+          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE_PX, height: HEADER_RIGHT_ICON_SIZE_PX, flexShrink: 0, margin: { left: 8 } }} onMouseDown={() => showInventory()}>
             <UiEntity
               uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CODEX_BUTTON_UVS }}
             />
           </UiEntity>
-          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE, height: HEADER_RIGHT_ICON_HEIGHT_VW, flexShrink: 0, margin: { left: 8 } }} onMouseDown={() => showCheckpointSelect()}>
+          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE_PX, height: HEADER_RIGHT_ICON_SIZE_PX, flexShrink: 0, margin: { left: 8 } }} onMouseDown={() => showCheckpointSelect()}>
             <UiEntity
               uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CHECKPOINTS_BUTTON_UVS }}
@@ -1151,7 +1180,7 @@ const MemoryMatchUi = () => (
                 const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
                 return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
               })()}
-              fontSize={16}
+              fontSize={getScreenSubtitleFontSizeVh()}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1277,7 +1306,7 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeCheckpointSelect()}
             />
-            <Label value="Select checkpoint" fontSize={28} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 4 } }} />
+            <Label value="Select checkpoint" fontSize={getScreenTitleFontSizeVh()} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 4 } }} />
             <UiEntity
               uiTransform={{
                 width: '90%',
@@ -1385,7 +1414,7 @@ const MemoryMatchUi = () => (
             />
             <Label
               value="Monster Codex"
-              fontSize={28}
+              fontSize={getScreenTitleFontSizeVh()}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1459,7 +1488,7 @@ const MemoryMatchUi = () => (
             />
             <Label
               value="Leaderboard"
-              fontSize={28}
+              fontSize={getScreenTitleFontSizeVh()}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1476,7 +1505,7 @@ const MemoryMatchUi = () => (
               }}
             >
               {leaderboard.length === 0 ? (
-                <Label value="No scores yet" fontSize={16} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
+                <Label value="No scores yet" fontSize={getScreenSubtitleFontSizeVh()} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
