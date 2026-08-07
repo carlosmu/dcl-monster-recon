@@ -82,5 +82,6 @@
     "origin": "creator-hub",
     "projectId": "9e5e61d5-04b2-426f-91f9-29e9b58ff48f"
   },
-  "rating": "A"
+  "rating": "A",
+  "landscapeTerrain": true
 }

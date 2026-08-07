@@ -1,6 +1,6 @@
 import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { engine, AudioSource, Transform, type Entity } from '@dcl/sdk/ecs'
+import { engine, AudioSource, Transform, UiCanvasInformation, type Entity } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
@@ -8,12 +8,13 @@ import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 
 const DEBUG_CELL_LABELS = false
-const DEBUG_LAYOUT_BORDERS = true
-// Debug layout border colors at 10% opacity, so they outline containers without obscuring the UI.
-const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 0.1)
-const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 0.1)
-const DEBUG_BORDER_BLUE = Color4.create(0, 0, 1, 0.1)
-const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 0.1)
+const DEBUG_LAYOUT_BORDERS = false
+const DEBUG_CANVAS_INFO = true
+// Debug layout border colors at 100% opacity, so they're clearly visible outlining containers.
+const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 1)
+const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 1)
+const DEBUG_BORDER_BLUE = Color4.create(0, 0, 1, 1)
+const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 1)
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
@@ -167,8 +168,10 @@ const FRAME_PADDING_MOBILE_PX = 72
 function getFramePaddingPx(): number {
   return isMobile() ? FRAME_PADDING_MOBILE_PX : FRAME_PADDING_PX
 }
-// Width of canvas_main (the safe-area column) as a fraction of screen width.
+// Width of canvas_main (the safe-area column) as a fraction of screen width. Narrower on mobile
+// (35vw vs 40vw on desktop) - same 40vw felt too wide on narrow mobile screens.
 const CANVAS_MAIN_WIDTH_FRACTION = 0.4
+const CANVAS_MAIN_WIDTH_FRACTION_MOBILE = 0.35
 // TEST: canvas_main's own width, as raw px (virtualWidth * fraction) instead of '%' of the real
 // screen. This is the anchor fix for the header/L/R/body overflow bug on mobile: '%' NEVER goes
 // through the virtualWidth/virtualHeight scale factor (only raw numbers do - confirmed by reading
@@ -178,21 +181,39 @@ const CANVAS_MAIN_WIDTH_FRACTION = 0.4
 // canvas_main itself in raw px makes every '%' below it resolve against an already-correctly-scaled
 // parent, so header/L/R/body stay consistent with the raw-px leaves without needing their own
 // conversion. canvas_main's height stays '100%' on purpose - see comment at its uiTransform below.
-const CANVAS_MAIN_WIDTH_PX = CANVAS_MAIN_WIDTH_FRACTION * 1920
+function getCanvasMainWidthPx(): number {
+  return (isMobile() ? CANVAS_MAIN_WIDTH_FRACTION_MOBILE : CANVAS_MAIN_WIDTH_FRACTION) * 1920
+}
 // TEST: canvas_main's top/bottom padding, body's top/bottom padding, and the footer's min height -
 // same visual sizes as their old 'vh' values (1vh/2vh/7.5-15vh at a 1080 reference), as raw px
 // relying on virtualWidth/virtualHeight, same approach as everything else converted so far.
 const CANVAS_MAIN_PADDING_PX = 11
 const BODY_PADDING_PX = 22
-const FOOTER_MIN_HEIGHT_MOBILE_PX = 81
+const FOOTER_MIN_HEIGHT_MOBILE_PX = 30
 const FOOTER_MIN_HEIGHT_DESKTOP_PX = 162
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
-// down). Cell height is derived from that same real width fraction, in 'vw' - not from px computed
-// from canvas.height, which drifts out of sync with the real % width whenever the player changes
-// the client's render Resolution setting, deforming the cells (same issue fixed earlier for the
-// Codex icons and checkpoint lock icons).
-function getBoardCellHeightVw(cols: number): `${number}vw` {
-  return `${(CANVAS_MAIN_WIDTH_FRACTION * 100 * 0.95) / cols}vw`
+// down). Cells must stay square: mixing a '%' width (resolves against the real, already-scaled
+// frame) with a 'vw' height (bypasses virtualWidth/virtualHeight entirely and reads the true
+// viewport instead) stretches them whenever the virtual canvas' scale factor isn't 1:1 with real
+// vw - which is exactly the case virtualWidth/virtualHeight was introduced to handle. So both
+// width and height are raw px at the 1920x1080 virtual reference (matching canvas_main's own
+// CANVAS_MAIN_WIDTH_PX anchor), scaled by the same factor as everything else - not '%'/'vw'.
+// Available width is the frame's content box (CANVAS_MAIN_WIDTH_PX minus its own padding on both
+// sides), same as getCodexIconSizePx/checkpoint-select icon sizing below - not the full
+// CANVAS_MAIN_WIDTH_PX, which overshoots the real space inside the frame's padding.
+const BOARD_GRID_WIDTH_FRACTION = 0.95
+// Same issue as CODEX_MAX_ICON_SIZE_PX above: canvas_main's height stays real/unscaled while cell
+// size is virtual-scaled off width alone, so width and height have no fixed relationship - sizing
+// cells purely from width can't guarantee the whole grid (cell height * rows) fits under the
+// title/subtitle on every aspect ratio (mobile in particular). Cap the *total* grid height instead
+// of the cell itself, since boards range from 2 to 4 rows - a flat per-cell cap (like Codex's)
+// would either overshrink 2-row boards or undershrink 4-row ones.
+const BOARD_GRID_MAX_HEIGHT_PX = 440
+function getBoardCellSizePx(cols: number, rows: number): number {
+  const availableWidth = getCanvasMainWidthPx() - 2 * getFramePaddingPx()
+  const widthDerivedSize = (availableWidth * BOARD_GRID_WIDTH_FRACTION) / cols
+  const heightDerivedSize = BOARD_GRID_MAX_HEIGHT_PX / rows
+  return Math.min(widthDerivedSize, heightDerivedSize)
 }
 // Width is 10% of the containing frame (real, dynamic - every screen's frame is width: '100%' of
 // canvas_main). Height can't be '%' of one's own width or 'auto' (there's no aspect-ratio prop,
@@ -451,7 +472,7 @@ const CHECKPOINT_SELECT_LOCK_ICON_SIZE_VW = `${CHECKPOINT_SELECT_CELL_WIDTH_VW *
 // canvas_main's width before the grid ever sees it, so the available width has to subtract that
 // first - the old 'vw' formula never did, which is what caused the grid to overflow the frame.
 function getCheckpointSelectCellWidthPx(): number {
-  const availableWidth = CANVAS_MAIN_WIDTH_PX - 2 * getFramePaddingPx()
+  const availableWidth = getCanvasMainWidthPx() - 2 * getFramePaddingPx()
   return (availableWidth * 0.9) / CHECKPOINT_SELECT_COLS
 }
 
@@ -506,7 +527,7 @@ const CODEX_ICON_HEIGHT_TO_WIDTH_RATIO = 1.25
 // have no fixed relationship - width-based sizing alone can't guarantee it fits vertically).
 const CODEX_MAX_ICON_SIZE_PX = 80
 function getCodexIconSizePx(groupRowSize: number): number {
-  const availableWidth = CANVAS_MAIN_WIDTH_PX - 2 * getFramePaddingPx()
+  const availableWidth = getCanvasMainWidthPx() - 2 * getFramePaddingPx()
   return Math.min((availableWidth * 0.95) / groupRowSize, CODEX_MAX_ICON_SIZE_PX)
 }
 
@@ -995,7 +1016,7 @@ const MemoryMatchUi = () => (
         a sibling "canvas-sidebar" can be added later for anything that belongs outside this column. */}
     <UiEntity
       uiTransform={{
-        width: CANVAS_MAIN_WIDTH_PX,
+        width: getCanvasMainWidthPx(),
         // Stays '100%' (real, unscaled) rather than a raw-px 1080 - height isn't part of the
         // reported bug, and a raw px height would letterbox (stop filling the real screen height)
         // whenever width - not height - ends up being the scale factor's constraining axis
@@ -1215,9 +1236,20 @@ const MemoryMatchUi = () => (
               onMouseDown={() => closeBoard()}
             />
             <Label
-              value={`Checkpoint ${currentCheckpoint} · Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
-              fontSize={28}
+              value={`Checkpoint ${currentCheckpoint}`}
+              fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
+              textWrap="nowrap"
+              uiTransform={{
+                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                borderColor: DEBUG_BORDER_WHITE
+              }}
+            />
+            <Label
+              value={`Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
+              fontSize={SCREEN_TITLE_FONT_SIZE_PX}
+              color={SCREEN_TEXT_COLOR}
+              textWrap="nowrap"
               uiTransform={{
                 margin: { bottom: 4 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1231,6 +1263,7 @@ const MemoryMatchUi = () => (
               })()}
               fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
+              textWrap="nowrap"
               uiTransform={{
                 margin: { bottom: 12 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1239,7 +1272,7 @@ const MemoryMatchUi = () => (
             />
             <UiEntity
               uiTransform={{
-                width: '95%',
+                width: `${BOARD_GRID_WIDTH_FRACTION * 100}%`,
                 height: 'auto',
                 flexDirection: 'column',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1251,8 +1284,9 @@ const MemoryMatchUi = () => (
                     key={rowIndex}
                     uiTransform={{
                       width: '100%',
-                      height: getBoardCellHeightVw(COLS),
+                      height: getBoardCellSizePx(COLS, ROWS),
                       flexDirection: 'row',
+                      flexShrink: 0,
                       borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                       borderColor: DEBUG_BORDER_GREEN
                     }}
@@ -1261,8 +1295,11 @@ const MemoryMatchUi = () => (
                       <UiEntity
                         key={rowIndex * COLS + colIndex}
                         uiTransform={{
-                          width: `${100 / COLS}%`,
-                          height: getBoardCellHeightVw(COLS)
+                          width: getBoardCellSizePx(COLS, ROWS),
+                          height: getBoardCellSizePx(COLS, ROWS),
+                          flexShrink: 0,
+                          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                          borderColor: DEBUG_BORDER_BLUE
                         }}
                         uiBackground={
                           cell.revealed
@@ -1596,17 +1633,43 @@ const MemoryMatchUi = () => (
             <UiEntity
               uiTransform={{
                 positionType: 'absolute',
-                position: { bottom: 4, right: 4 }
+                position: { bottom: 4, right: 4 },
+                padding: { top: 2, bottom: 2, left: 4, right: 4 }
               }}
+              uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
             >
               <Label
                 value={serverOnline ? `Server online (tick ${lastServerTick})` : 'Server offline'}
-                fontSize={12}
+                fontSize={isMobile() ? 18 : 12}
                 color={serverOnline ? Color4.create(0.2, 0.7, 0.3, 1) : Color4.create(0.9, 0.3, 0.3, 1)}
               />
             </UiEntity>
           )
         })()}
+        {DEBUG_CANVAS_INFO &&
+          (() => {
+            const canvasInfo = UiCanvasInformation.getOrNull(engine.RootEntity)
+            return (
+              <UiEntity
+                uiTransform={{
+                  positionType: 'absolute',
+                  position: { bottom: 4, left: 4 },
+                  padding: { top: 2, bottom: 2, left: 4, right: 4 }
+                }}
+                uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
+              >
+                <Label
+                  value={
+                    canvasInfo
+                      ? `canvas ${canvasInfo.width.toFixed(0)}x${canvasInfo.height.toFixed(0)} dpr=${canvasInfo.devicePixelRatio.toFixed(2)} mobile=${isMobile()}`
+                      : 'canvas: null'
+                  }
+                  fontSize={isMobile() ? 18 : 12}
+                  color={Color4.Yellow()}
+                />
+              </UiEntity>
+            )
+          })()}
       </UiEntity>
 
     </UiEntity>
