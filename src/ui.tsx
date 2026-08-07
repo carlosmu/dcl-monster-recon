@@ -152,6 +152,10 @@ const SCREEN_TEXT_COLOR = Color4.fromHexString('#2c180b')
 const SCREEN_TITLE_FONT_SIZE_PX = 28 * 1.2
 // Screen subtitle ("Best Time", "No scores yet"): 60% of the screen title size.
 const SCREEN_SUBTITLE_FONT_SIZE_PX = SCREEN_TITLE_FONT_SIZE_PX * 0.6
+// Leaderboard list: raw px at the 1920x1080 virtual reference, same approach as the constants above.
+const LEADERBOARD_LIST_WIDTH_PX = 300
+const LEADERBOARD_ROW_NAME_FONT_SIZE_PX = 24
+const LEADERBOARD_ROW_SCORE_FONT_SIZE_PX = 16
 // Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
 // the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
 // virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
@@ -1543,7 +1547,7 @@ const MemoryMatchUi = () => (
             />
             <UiEntity
               uiTransform={{
-                width: 300,
+                width: LEADERBOARD_LIST_WIDTH_PX,
                 flexDirection: 'column',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
@@ -1564,8 +1568,8 @@ const MemoryMatchUi = () => (
                       borderColor: DEBUG_BORDER_GREEN
                     }}
                   >
-                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={24} color={SCREEN_TEXT_COLOR} />
-                    <Label value={`${entry.score}`} fontSize={16} color={SCREEN_TEXT_COLOR} />
+                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} />
+                    <Label value={`${entry.score}`} fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} />
                   </UiEntity>
                 ))
               )}
