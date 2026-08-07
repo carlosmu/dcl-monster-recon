@@ -495,9 +495,15 @@ function getGroupRowSize(group: RarityConfig[]): number {
 // screen, which stopped holding once canvas_main got anchored in raw px (see CANVAS_MAIN_WIDTH_PX).
 // A rarity block's own width is now just rarity.rowSize * this icon size - no % chain needed.
 const CODEX_ICON_HEIGHT_TO_WIDTH_RATIO = 1.25
+// Hard cap on icon width (so icon height, at the 1.25 ratio, never exceeds ~100px) - the 3 rows
+// (Common/Rare/Exotic+Epic) plus their labels and the screen's own title/padding add up to more
+// than the available body height on some aspect ratios (mobile in particular: canvas_main's
+// height stays real/unscaled while every icon size here is virtual-scaled off width, so the two
+// have no fixed relationship - width-based sizing alone can't guarantee it fits vertically).
+const CODEX_MAX_ICON_SIZE_PX = 80
 function getCodexIconSizePx(groupRowSize: number): number {
   const availableWidth = CANVAS_MAIN_WIDTH_PX - 2 * getFramePaddingPx()
-  return (availableWidth * 0.95) / groupRowSize
+  return Math.min((availableWidth * 0.95) / groupRowSize, CODEX_MAX_ICON_SIZE_PX)
 }
 
 // Each collection's prize sprite sheet may use a different grid, so its cells aren't necessarily
