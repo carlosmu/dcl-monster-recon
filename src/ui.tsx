@@ -1031,7 +1031,7 @@ const MemoryMatchUi = () => (
               position: { top: '12%', left: `${(100 - PLAY_BUTTON_WIDTH_PERCENT) / 2}%` }
             }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
-            onMouseDown={() => showCheckpointSelect()}
+            onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
           />
         )}
 
