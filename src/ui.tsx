@@ -146,19 +146,12 @@ let SCORE_MULTIPLIER = CHECKPOINTS[0].boards[0].scoreMultiplier
 // Body text color for the memory board, checkpoint select, codex, and leaderboard screens.
 const SCREEN_TEXT_COLOR = Color4.fromHexString('#2c180b')
 // Screen title ("Select checkpoint", "Monster Codex", "Leaderboard"): matched to a 28px/1080px
-// desktop look (x1.2), expressed in 'vh' so it scales with real screen size instead of a fixed px
-// value. 'vh' alone still reads tiny on a small mobile screen (same reasoning as framePadding's
-// isMobile() boost above), so it gets an extra x1.5 there.
-const SCREEN_TITLE_FONT_SIZE_VH_NUM = (28 / 1080) * 100 * 1.2
-
-function getScreenTitleFontSizeVh(): `${number}vh` {
-  return `${SCREEN_TITLE_FONT_SIZE_VH_NUM * (isMobile() ? 1.5 : 1)}vh`
-}
-
+// desktop look (x1.2), as raw px at the 1920x1080 virtual reference - scaled by
+// virtualWidth/virtualHeight instead of the old 'vh' + manual isMobile() boost (no longer needed;
+// the virtual-canvas scale factor already accounts for device screen size on its own).
+const SCREEN_TITLE_FONT_SIZE_PX = 28 * 1.2
 // Screen subtitle ("Best Time", "No scores yet"): 60% of the screen title size.
-function getScreenSubtitleFontSizeVh(): `${number}vh` {
-  return `${SCREEN_TITLE_FONT_SIZE_VH_NUM * (isMobile() ? 1.5 : 1) * 0.6}vh`
-}
+const SCREEN_SUBTITLE_FONT_SIZE_PX = SCREEN_TITLE_FONT_SIZE_PX * 0.6
 // Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
 // the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
 // virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
@@ -494,17 +487,17 @@ function getGroupRowSize(group: RarityConfig[]): number {
   return group.reduce((sum, r) => sum + r.rowSize, 0)
 }
 
-// Codex grid container is width: '95%' of canvas_main (see the JSX further down), so a group's
-// row - and each icon within it - is always that same fixed fraction of the screen's width, in
-// 'vw'. A rarity block is (rarity.rowSize / groupRowSize) of the row, and each icon within it is
-// (1 / rarity.rowSize) of the block, so rarity.rowSize cancels out: every icon in a group ends up
-// the same on-screen width, (CANVAS_MAIN_WIDTH_FRACTION * 95) / groupRowSize vw. Height is just
-// that width * the aspect ratio - both in 'vw' so the icon can never deform, unlike the old
-// px-from-canvas.height approach (see renderRarityBlock's comment).
+// TEST: same idea as the vw-derived approach above (every icon in a group ends up the same
+// on-screen width, (frame content width * 0.95) / groupRowSize), but as raw px so the icon's
+// width AND height both come from the same virtual-canvas-scaled system - a '%' width (the old
+// per-icon `${100/rowSize}%`) next to a 'vw' height is exactly the mismatch fixed for score/timer,
+// since 'vw' assumed canvas_main's real width still equals CANVAS_MAIN_WIDTH_FRACTION of the true
+// screen, which stopped holding once canvas_main got anchored in raw px (see CANVAS_MAIN_WIDTH_PX).
+// A rarity block's own width is now just rarity.rowSize * this icon size - no % chain needed.
 const CODEX_ICON_HEIGHT_TO_WIDTH_RATIO = 1.25
-function getCodexIconHeightVw(groupRowSize: number): `${number}vw` {
-  const iconWidthVw = (CANVAS_MAIN_WIDTH_FRACTION * 100 * 0.95) / groupRowSize
-  return `${iconWidthVw * CODEX_ICON_HEIGHT_TO_WIDTH_RATIO}vw`
+function getCodexIconSizePx(groupRowSize: number): number {
+  const availableWidth = CANVAS_MAIN_WIDTH_PX - 2 * getFramePaddingPx()
+  return (availableWidth * 0.95) / groupRowSize
 }
 
 // Each collection's prize sprite sheet may use a different grid, so its cells aren't necessarily
@@ -522,29 +515,23 @@ function getPrizeCellAspect(collection: CollectionConfig): number {
 const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
 
 // Renders one rarity's label ("Common 3/8") and its badge row(s).
-// widthPercent is this block's share of the grid's width (100% for a standalone rarity, or its
-// proportional share of a combined row like Exotic+Epic) - every width below it (row, icon) is a
-// % of an ancestor, so this is the anchor that keeps them from resolving against nothing.
-// iconHeight is a 'vw' string (not px, not %): height can't be expressed as a fraction of one's
-// own width, and computing it from canvas.width/height at runtime (like we used to) breaks
-// whenever the player changes the client's render Resolution setting - that setting skews
-// UiCanvasInformation's reported canvas size without actually changing the real on-screen %
-// layout, so px math derived from it drifts out of sync with the % width and the icon deforms.
-// 'vw' sidesteps that: it's resolved by the UI layer against the true screen size, unaffected by
-// that setting - see CHECKPOINT_SELECT_ROW_HEIGHT_VW above for the same fix applied earlier.
-function renderRarityBlock(rarity: RarityConfig, widthPercent: number, iconHeightVw: `${number}vw`, marginRight: `${number}vh` | number = 0) {
+// iconSizePx is the icon's width (and, scaled by CODEX_ICON_HEIGHT_TO_WIDTH_RATIO, its height) in
+// raw px - see getCodexIconSizePx(). The block's own width is just rowSize * iconSizePx (its
+// row of icons, back to back), no '%' chain needed since every size here comes from the same
+// virtual-canvas-scaled reference.
+function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRightPx: number = 0) {
   const { collected, total } = getRarityProgress(rarity)
   const rowSize = rarity.rowSize
   const rows = Math.ceil(total / rowSize)
   const slots = Array.from({ length: total }, (_, i) => rarity.start + i)
   const collection = rarity.collection
-  const iconHeight = iconHeightVw
+  const iconHeight = iconSizePx * CODEX_ICON_HEIGHT_TO_WIDTH_RATIO
   return (
     <UiEntity
       key={rarity.label}
-      uiTransform={{ width: `${widthPercent}%`, flexDirection: 'column', alignItems: 'flex-start', margin: { right: marginRight } }}
+      uiTransform={{ width: rowSize * iconSizePx, flexDirection: 'column', alignItems: 'flex-start', margin: { right: marginRightPx } }}
     >
-      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: '2vh', bottom: 0 } }} />
+      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 22, bottom: 0 } }} />
       {Array.from({ length: rows }, (_, rowIndex) => (
         <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
           {Array.from({ length: rowSize }, (_, colIndex) => {
@@ -556,8 +543,8 @@ function renderRarityBlock(rarity: RarityConfig, widthPercent: number, iconHeigh
               <UiEntity
                 key={slot}
                 uiTransform={{
-                  width: `${100 / rowSize}%`,
-                  minWidth: `${100 / rowSize}%`,
+                  width: iconSizePx,
+                  minWidth: iconSizePx,
                   height: iconHeight,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1232,7 +1219,7 @@ const MemoryMatchUi = () => (
                 const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
                 return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
               })()}
-              fontSize={getScreenSubtitleFontSizeVh()}
+              fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1358,7 +1345,7 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeCheckpointSelect()}
             />
-            <Label value="Select checkpoint" fontSize={getScreenTitleFontSizeVh()} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 4 } }} />
+            <Label value="Select checkpoint" fontSize={SCREEN_TITLE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 4, bottom: 12 } }} />
             <UiEntity
               uiTransform={{
                 width: '90%',
@@ -1466,7 +1453,7 @@ const MemoryMatchUi = () => (
             />
             <Label
               value="Monster Codex"
-              fontSize={getScreenTitleFontSizeVh()}
+              fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1485,7 +1472,7 @@ const MemoryMatchUi = () => (
             >
               {CODEX_GROUPS.map((group) => {
                 const groupRowSize = getGroupRowSize(group)
-                const iconHeightVw = getCodexIconHeightVw(groupRowSize)
+                const iconSizePx = getCodexIconSizePx(groupRowSize)
                 return (
                   <UiEntity
                     key={group.map((r) => r.label).join('+')}
@@ -1494,11 +1481,11 @@ const MemoryMatchUi = () => (
                       flexDirection: 'row',
                       justifyContent: group.length > 1 ? 'space-between' : 'flex-start',
                       alignItems: 'flex-start',
-                      margin: { bottom: '5vh' }
+                      margin: { bottom: 54 }
                     }}
                   >
                     {group.map((rarity, rarityIndex) =>
-                      renderRarityBlock(rarity, (rarity.rowSize / groupRowSize) * 100, iconHeightVw, group.length > 1 && rarityIndex === 0 ? '2vh' : 0)
+                      renderRarityBlock(rarity, iconSizePx, group.length > 1 && rarityIndex === 0 ? 21.6 : 0)
                     )}
                   </UiEntity>
                 )
@@ -1540,7 +1527,7 @@ const MemoryMatchUi = () => (
             />
             <Label
               value="Leaderboard"
-              fontSize={getScreenTitleFontSizeVh()}
+              fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
@@ -1557,7 +1544,7 @@ const MemoryMatchUi = () => (
               }}
             >
               {leaderboard.length === 0 ? (
-                <Label value="No scores yet" fontSize={getScreenSubtitleFontSizeVh()} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
+                <Label value="No scores yet" fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
