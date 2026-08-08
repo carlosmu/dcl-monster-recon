@@ -35,6 +35,22 @@ function defaultProgress(): PlayerProgress {
   }
 }
 
+// In-memory per-player progress, cached by the PROMISE (not just the resolved value) so
+// back-to-back reportBoardTime calls for the same player (e.g. clearing checkpoints 1, 2, 3 in
+// quick succession) all await the same in-flight fetch and mutate the same object, instead of
+// each doing its own Storage.player.get and clobbering each other's writes on save - the read/set
+// race that was dropping all but the last checkpoint completed in a burst.
+const progressCache = new Map<string, Promise<PlayerProgress>>()
+
+function getPlayerProgress(address: string): Promise<PlayerProgress> {
+  let progress = progressCache.get(address)
+  if (!progress) {
+    progress = (async () => (await Storage.player.get<PlayerProgress>(address, PROGRESS_KEY)) ?? defaultProgress())()
+    progressCache.set(address, progress)
+  }
+  return progress
+}
+
 export async function startServer() {
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY)) ?? {}
 
@@ -75,7 +91,7 @@ export async function startServer() {
     )
 
     if (data.checkpointComplete) {
-      const progress = (await Storage.player.get<PlayerProgress>(context.from, PROGRESS_KEY)) ?? defaultProgress()
+      const progress = await getPlayerProgress(context.from)
       progress.collectedMonsters[data.checkpoint - 1] = true
       progress.collectionCounts[data.checkpoint - 1] = (progress.collectionCounts[data.checkpoint - 1] ?? 0) + 1
       if (data.checkpoint === progress.highestUnlockedCheckpoint && progress.highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
@@ -88,7 +104,7 @@ export async function startServer() {
 
   room.onMessage('requestProgress', async (_data, context) => {
     if (!context) return
-    const progress = (await Storage.player.get<PlayerProgress>(context.from, PROGRESS_KEY)) ?? defaultProgress()
+    const progress = await getPlayerProgress(context.from)
     room.send('progressUpdate', progress, { to: [context.from] })
   })
 

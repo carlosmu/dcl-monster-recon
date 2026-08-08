@@ -202,18 +202,14 @@ const FOOTER_MIN_HEIGHT_DESKTOP_PX = 162
 // sides), same as getCodexIconSizePx/checkpoint-select icon sizing below - not the full
 // CANVAS_MAIN_WIDTH_PX, which overshoots the real space inside the frame's padding.
 const BOARD_GRID_WIDTH_FRACTION = 0.95
-// Same issue as CODEX_MAX_ICON_SIZE_PX above: canvas_main's height stays real/unscaled while cell
-// size is virtual-scaled off width alone, so width and height have no fixed relationship - sizing
-// cells purely from width can't guarantee the whole grid (cell height * rows) fits under the
-// title/subtitle on every aspect ratio (mobile in particular). Cap the *total* grid height instead
-// of the cell itself, since boards range from 2 to 4 rows - a flat per-cell cap (like Codex's)
-// would either overshrink 2-row boards or undershrink 4-row ones.
-const BOARD_GRID_MAX_HEIGHT_PX = 440
-function getBoardCellSizePx(cols: number, rows: number): number {
+// Cells always fill the full grid width, whatever the row count - a height-derived cap here
+// (tried previously) shrinks cells below the container width on boards with more rows (4x4, 5x4),
+// leaving a gap on the right since the grid/row don't center leftover space. If a tall board
+// (many rows, few cols) ever needs to fit a constrained vertical area again, that has to be solved
+// without capping width - e.g. capping the grid's own font/padding budget, not the cell size.
+function getBoardCellSizePx(cols: number): number {
   const availableWidth = getCanvasMainWidthPx() - 2 * getFramePaddingPx()
-  const widthDerivedSize = (availableWidth * BOARD_GRID_WIDTH_FRACTION) / cols
-  const heightDerivedSize = BOARD_GRID_MAX_HEIGHT_PX / rows
-  return Math.min(widthDerivedSize, heightDerivedSize)
+  return (availableWidth * BOARD_GRID_WIDTH_FRACTION) / cols
 }
 // Width is 10% of the containing frame (real, dynamic - every screen's frame is width: '100%' of
 // canvas_main). Height can't be '%' of one's own width or 'auto' (there's no aspect-ratio prop,
@@ -1295,7 +1291,7 @@ const MemoryMatchUi = () => (
                     key={rowIndex}
                     uiTransform={{
                       width: '100%',
-                      height: getBoardCellSizePx(COLS, ROWS),
+                      height: getBoardCellSizePx(COLS),
                       flexDirection: 'row',
                       flexShrink: 0,
                       borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1306,8 +1302,8 @@ const MemoryMatchUi = () => (
                       <UiEntity
                         key={rowIndex * COLS + colIndex}
                         uiTransform={{
-                          width: getBoardCellSizePx(COLS, ROWS),
-                          height: getBoardCellSizePx(COLS, ROWS),
+                          width: getBoardCellSizePx(COLS),
+                          height: getBoardCellSizePx(COLS),
                           flexShrink: 0,
                           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                           borderColor: DEBUG_BORDER_BLUE
