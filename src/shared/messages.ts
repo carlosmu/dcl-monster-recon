@@ -8,6 +8,10 @@ export const Messages = {
   leaderboardUpdate: Schemas.Map({
     entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number }))
   }),
+  // Client -> Server: ask for the current leaderboard snapshot (e.g. on scene load) - the
+  // server's own startup broadcast only reaches whoever is already connected at that instant,
+  // which is never a client that joins afterward.
+  requestLeaderboard: Schemas.Map({}),
   // Server -> Client: periodic heartbeat so clients can tell the server is alive.
   serverTick: Schemas.Map({ tick: Schemas.Number }),
   // Client -> Server: ask for the caller's personal best time on a board (e.g. when it's opened).
@@ -32,6 +36,15 @@ export const Messages = {
     highestUnlockedCheckpoint: Schemas.Number,
     collectedMonsters: Schemas.Array(Schemas.Boolean),
     collectionCounts: Schemas.Array(Schemas.Number)
+  }),
+  // TEMP (duration calibration): Client -> Server, ask for every bestTime-* entry the caller has
+  // recorded, so they can be dumped to console after a full playthrough and used to recalibrate
+  // each board's `duration` in checkpoints.json. Remove once calibration is done.
+  requestAllBestTimes: Schemas.Map({}),
+  // TEMP (duration calibration): Server -> Client, one entry per recorded bestTime-{checkpoint}-
+  // {boardIndex} key. Remove once calibration is done.
+  allBestTimesUpdate: Schemas.Map({
+    entries: Schemas.Array(Schemas.Map({ key: Schemas.String, seconds: Schemas.Number }))
   })
 }
 

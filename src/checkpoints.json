@@ -4,31 +4,6 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 30,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1
-      },
-      {
-        "cols": 3,
-        "rows": 2,
-        "duration": 29,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1
-      },
-      {
-        "cols": 4,
-        "rows": 3,
-        "duration": 38,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
-      }
-    ]
-  },
-  {
-    "boards": [
-      {
-        "cols": 3,
-        "rows": 2,
         "duration": 27,
         "flipTimeout": 1,
         "scoreMultiplier": 1
@@ -36,7 +11,7 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 26,
+        "duration": 9,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -54,7 +29,7 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 24,
+        "duration": 25,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -79,14 +54,14 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 21,
+        "duration": 22,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
       {
         "cols": 3,
         "rows": 2,
-        "duration": 20,
+        "duration": 22,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -104,14 +79,14 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 18,
+        "duration": 19,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
       {
         "cols": 3,
         "rows": 2,
-        "duration": 17,
+        "duration": 15,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -127,25 +102,25 @@
   {
     "boards": [
       {
-        "cols": 4,
-        "rows": 3,
-        "duration": 40,
+        "cols": 3,
+        "rows": 2,
+        "duration": 16,
         "flipTimeout": 1,
-        "scoreMultiplier": 1.5
+        "scoreMultiplier": 1
+      },
+      {
+        "cols": 3,
+        "rows": 2,
+        "duration": 16,
+        "flipTimeout": 1,
+        "scoreMultiplier": 1
       },
       {
         "cols": 4,
         "rows": 3,
-        "duration": 39,
+        "duration": 24,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
-      },
-      {
-        "cols": 4,
-        "rows": 4,
-        "duration": 48,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
       }
     ]
   },
@@ -161,14 +136,14 @@
       {
         "cols": 4,
         "rows": 3,
-        "duration": 36,
+        "duration": 18,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       },
       {
         "cols": 4,
         "rows": 4,
-        "duration": 45,
+        "duration": 44,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       }
@@ -193,7 +168,7 @@
       {
         "cols": 4,
         "rows": 4,
-        "duration": 42,
+        "duration": 41,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       }
@@ -218,7 +193,7 @@
       {
         "cols": 4,
         "rows": 4,
-        "duration": 39,
+        "duration": 38,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       }
@@ -253,36 +228,29 @@
     "boards": [
       {
         "cols": 4,
-        "rows": 4,
-        "duration": 50,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
+        "rows": 3,
+        "duration": 26,
+        "flipTimeout": 1,
+        "scoreMultiplier": 1.5
+      },
+      {
+        "cols": 4,
+        "rows": 3,
+        "duration": 25,
+        "flipTimeout": 1,
+        "scoreMultiplier": 1.5
       },
       {
         "cols": 4,
         "rows": 4,
-        "duration": 49,
+        "duration": 33,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
-      },
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 58,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
       }
     ]
   },
   {
     "boards": [
-      {
-        "cols": 4,
-        "rows": 4,
-        "duration": 47,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
-      },
       {
         "cols": 4,
         "rows": 4,
@@ -291,9 +259,16 @@
         "scoreMultiplier": 2
       },
       {
+        "cols": 4,
+        "rows": 4,
+        "duration": 31,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
+      },
+      {
         "cols": 5,
         "rows": 4,
-        "duration": 55,
+        "duration": 53,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       }
@@ -301,13 +276,6 @@
   },
   {
     "boards": [
-      {
-        "cols": 4,
-        "rows": 4,
-        "duration": 44,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
-      },
       {
         "cols": 4,
         "rows": 4,
@@ -316,9 +284,16 @@
         "scoreMultiplier": 2
       },
       {
+        "cols": 4,
+        "rows": 4,
+        "duration": 42,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
+      },
+      {
         "cols": 5,
         "rows": 4,
-        "duration": 52,
+        "duration": 50,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       }
@@ -329,7 +304,32 @@
       {
         "cols": 4,
         "rows": 4,
-        "duration": 41,
+        "duration": 40,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
+      },
+      {
+        "cols": 4,
+        "rows": 4,
+        "duration": 39,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
+      },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 47,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      }
+    ]
+  },
+  {
+    "boards": [
+      {
+        "cols": 4,
+        "rows": 4,
+        "duration": 37,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       },
@@ -343,7 +343,7 @@
       {
         "cols": 5,
         "rows": 4,
-        "duration": 49,
+        "duration": 45,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       }
@@ -354,21 +354,21 @@
       {
         "cols": 4,
         "rows": 4,
-        "duration": 38,
+        "duration": 35,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       },
       {
         "cols": 4,
         "rows": 4,
-        "duration": 37,
+        "duration": 50,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       },
       {
         "cols": 5,
         "rows": 4,
-        "duration": 46,
+        "duration": 42,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       }
@@ -376,56 +376,13 @@
   },
   {
     "boards": [
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 60,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
-      },
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 59,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
-      },
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 58,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
-      }
-    ]
-  },
-  {
-    "boards": [
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 57,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
-      },
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 56,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
-      },
       {
         "cols": 5,
         "rows": 4,
         "duration": 55,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
-      }
-    ]
-  },
-  {
-    "boards": [
+      },
       {
         "cols": 5,
         "rows": 4,
@@ -439,18 +396,18 @@
         "duration": 53,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
-      },
+      }
+    ]
+  },
+  {
+    "boards": [
       {
         "cols": 5,
         "rows": 4,
         "duration": 52,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
-      }
-    ]
-  },
-  {
-    "boards": [
+      },
       {
         "cols": 5,
         "rows": 4,
@@ -464,13 +421,6 @@
         "duration": 50,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
-      },
-      {
-        "cols": 5,
-        "rows": 4,
-        "duration": 49,
-        "flipTimeout": 0.8,
-        "scoreMultiplier": 2.5
       }
     ]
   },
@@ -479,10 +429,28 @@
       {
         "cols": 5,
         "rows": 4,
-        "duration": 48,
+        "duration": 49,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 50,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 47,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      }
+    ]
+  },
+  {
+    "boards": [
       {
         "cols": 5,
         "rows": 4,
@@ -494,6 +462,38 @@
         "cols": 5,
         "rows": 4,
         "duration": 46,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 45,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      }
+    ]
+  },
+  {
+    "boards": [
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 44,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 64,
+        "flipTimeout": 0.8,
+        "scoreMultiplier": 2.5
+      },
+      {
+        "cols": 5,
+        "rows": 4,
+        "duration": 61,
         "flipTimeout": 0.8,
         "scoreMultiplier": 2.5
       }

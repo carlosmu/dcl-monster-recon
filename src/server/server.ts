@@ -67,6 +67,11 @@ export async function startServer() {
 
   broadcastLeaderboard(leaderboard)
 
+  room.onMessage('requestLeaderboard', (_data, context) => {
+    if (!context) return
+    broadcastLeaderboard(leaderboard, [context.from])
+  })
+
   room.onMessage('requestBestTime', async (data, context) => {
     if (!context) return
     const key = bestTimeKey(data.checkpoint, data.boardIndex)
@@ -108,6 +113,15 @@ export async function startServer() {
     room.send('progressUpdate', progress, { to: [context.from] })
   })
 
+  // TEMP (duration calibration): dumps every bestTime-* key for the caller. Remove once
+  // checkpoints.json durations have been recalibrated from a real playthrough.
+  room.onMessage('requestAllBestTimes', async (_data, context) => {
+    if (!context) return
+    const { data } = await Storage.player.getValues(context.from, { prefix: 'bestTime-', limit: 200 })
+    const entries = data.map(({ key, value }) => ({ key, seconds: value as number }))
+    room.send('allBestTimesUpdate', { entries }, { to: [context.from] })
+  })
+
   let tick = 0
   let sinceLastTick = 0
   engine.addSystem((dt: number) => {
@@ -120,9 +134,9 @@ export async function startServer() {
   })
 }
 
-function broadcastLeaderboard(leaderboard: LeaderboardMap) {
+function broadcastLeaderboard(leaderboard: LeaderboardMap, to?: string[]) {
   const entries = Object.values(leaderboard)
     .sort((a, b) => b.score - a.score)
     .slice(0, LEADERBOARD_TOP_N)
-  room.send('leaderboardUpdate', { entries })
+  room.send('leaderboardUpdate', { entries }, to ? { to } : undefined)
 }

@@ -10,6 +10,10 @@ import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCame
 const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = false
 const DEBUG_CANVAS_INFO = true
+// TEMP (duration calibration): dumps every recorded board best-time to console on scene load, to
+// recalibrate checkpoints.json's per-board `duration` from a real playthrough. Set to false (or
+// remove, along with requestAllBestTimes/allBestTimesUpdate in messages.ts/server.ts) once done.
+const DEBUG_DUMP_BEST_TIMES = true
 // Debug layout border colors at 100% opacity, so they're clearly visible outlining containers.
 const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 1)
 const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 1)
@@ -847,6 +851,7 @@ export function setupUi() {
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
   })
+  room.send('requestLeaderboard', {})
 
   room.onMessage('serverTick', (data) => {
     lastServerTick = data.tick
@@ -865,6 +870,24 @@ export function setupUi() {
     }
   })
   room.send('requestProgress', {})
+
+  if (DEBUG_DUMP_BEST_TIMES) {
+    room.onMessage('allBestTimesUpdate', (data) => {
+      const parsed = data.entries
+        .map((entry) => {
+          const match = entry.key.match(/^bestTime-(\d+)-(\d+)$/)
+          if (!match) return null
+          return { checkpoint: Number(match[1]), boardIndex: Number(match[2]), seconds: entry.seconds }
+        })
+        .filter((e): e is { checkpoint: number; boardIndex: number; seconds: number } => e !== null)
+        .sort((a, b) => a.checkpoint - b.checkpoint || a.boardIndex - b.boardIndex)
+      console.log(
+        `[DEBUG_DUMP_BEST_TIMES] ${parsed.length} recorded times:\n` +
+          parsed.map((e) => `Checkpoint ${e.checkpoint} Board ${e.boardIndex + 1}: ${e.seconds.toFixed(1)}s`).join('\n')
+      )
+    })
+    room.send('requestAllBestTimes', {})
+  }
 
   // TEST: virtualWidth/virtualHeight lets the renderer scale raw-px sizes to fit any real screen,
   // per the build-ui skill. Trying it out on the R header icons first (see HEADER_RIGHT_ICON_SIZE_PX)
