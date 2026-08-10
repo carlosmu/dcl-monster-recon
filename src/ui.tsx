@@ -194,7 +194,7 @@ function getCanvasMainWidthPx(): number {
 const CANVAS_MAIN_PADDING_PX = 11
 const BODY_PADDING_PX = 22
 const FOOTER_MIN_HEIGHT_MOBILE_PX = 30
-const FOOTER_MIN_HEIGHT_DESKTOP_PX = 162
+const FOOTER_MIN_HEIGHT_DESKTOP_PX = 100
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
 // down). Cells must stay square: mixing a '%' width (resolves against the real, already-scaled
 // frame) with a 'vw' height (bypasses virtualWidth/virtualHeight entirely and reads the true
@@ -291,17 +291,34 @@ const STAT_ICON_SIZE_PX = 60
 const SCORE_FONT_SIZE_PX = 30
 const TIMER_FONT_SIZE_PX = 45
 const HEADER_LEFT_BOX_PADDING_PX = 22
-// Play button lives in the body ("main") container while screen === 'hidden'. Width is 40% of
-// that container (real, dynamic - width: '100%' of canvas_main); height is derived from the same
-// 'vw' width so the 2:1 art (PLAY_BUTTON_UVS is a 4x2 atlas block) never deforms.
-const PLAY_BUTTON_WIDTH_PERCENT = 25
-const PLAY_BUTTON_WIDTH = `${PLAY_BUTTON_WIDTH_PERCENT}%`
-const PLAY_BUTTON_HEIGHT_VW = `${((PLAY_BUTTON_WIDTH_PERCENT / 100) * CANVAS_MAIN_WIDTH_FRACTION * 100) / 2}vw`
-// TEST: same visual size as above (25% of body's 40vw ~ 192x96 at a 1920 reference), as raw px
-// relying on virtualWidth/virtualHeight. `left`/`top` stay '%' - percentages are already
-// resolution-safe on their own, only the raw-px width/height needed the virtual-canvas fix.
+// Play button lives in the body ("main") container while screen === 'hidden'. Raw px at the
+// 1920x1080 virtual reference, scaled by virtualWidth/virtualHeight like everything else here.
 const PLAY_BUTTON_WIDTH_PX = 192
 const PLAY_BUTTON_HEIGHT_PX = 96
+// Bigger hit target on mobile, where fingers are less precise than a mouse cursor.
+const PLAY_BUTTON_MOBILE_SCALE = 1.5
+
+function getPlayButtonWidthPx(): number {
+  return isMobile() ? PLAY_BUTTON_WIDTH_PX * PLAY_BUTTON_MOBILE_SCALE : PLAY_BUTTON_WIDTH_PX
+}
+
+function getPlayButtonHeightPx(): number {
+  return isMobile() ? PLAY_BUTTON_HEIGHT_PX * PLAY_BUTTON_MOBILE_SCALE : PLAY_BUTTON_HEIGHT_PX
+}
+
+const PLAY_BUTTON_BOTTOM_PERCENT_MOBILE = 8
+const PLAY_BUTTON_BOTTOM_PERCENT_DESKTOP = 8
+
+function getPlayButtonBottomPercent(): `${number}%` {
+  return `${isMobile() ? PLAY_BUTTON_BOTTOM_PERCENT_MOBILE : PLAY_BUTTON_BOTTOM_PERCENT_DESKTOP}%`
+}
+
+// Centers the button horizontally within the body (which has no left/right padding of its own,
+// so its content width is exactly canvas_main's width) - computed in raw px, matching the button's
+// own raw-px size, rather than a '%' left inset that would drift once the size became mobile-aware.
+function getPlayButtonLeftPx(): number {
+  return (getCanvasMainWidthPx() - getPlayButtonWidthPx()) / 2
+}
 
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
@@ -1233,13 +1250,13 @@ const MemoryMatchUi = () => (
         {screen === 'hidden' && (
           <UiEntity
             uiTransform={{
-              width: PLAY_BUTTON_WIDTH_PX,
-              height: PLAY_BUTTON_HEIGHT_PX,
+              width: getPlayButtonWidthPx(),
+              height: getPlayButtonHeightPx(),
               flexShrink: 0,
               positionType: 'absolute',
-              // Centered in the body's top third: left keeps it horizontally centered ((100% -
-              // PLAY_BUTTON_WIDTH_PERCENT) / 2), top sits it around the middle of the 0-33% band.
-              position: { top: '12%', left: `${(100 - PLAY_BUTTON_WIDTH_PERCENT) / 2}%` },
+              // Pinned to the bottom of the body, centered horizontally (left computed in raw px
+              // from the button's own size - see getPlayButtonLeftPx()).
+              position: { bottom: getPlayButtonBottomPercent(), left: getPlayButtonLeftPx() },
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'flex-end'
