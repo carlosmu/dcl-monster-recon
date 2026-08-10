@@ -205,7 +205,17 @@ const FOOTER_MIN_HEIGHT_DESKTOP_PX = 162
 // Available width is the frame's content box (CANVAS_MAIN_WIDTH_PX minus its own padding on both
 // sides), same as getCodexIconSizePx/checkpoint-select icon sizing below - not the full
 // CANVAS_MAIN_WIDTH_PX, which overshoots the real space inside the frame's padding.
-const BOARD_GRID_WIDTH_FRACTION = 0.95
+// Lowered from 0.95: cell size (and thus total grid height, since cells are square) is driven
+// entirely by width/cols, with no read of the frame's real available height - canvas_main's height
+// stays real/'%' on purpose (see its own comment) while width is virtual-scaled raw px, so the two
+// are never guaranteed to agree. Across every board in checkpoints.json the 4x4 boards already have
+// the tallest rows/cols ratio in the game (1.0 - a 5x4 board is 0.8, shorter), so a cols/rows-aware
+// cap can't target this: whatever real aspect ratio makes a 5x4 board overflow would make a 4x4
+// board overflow at least as much. This fraction is the only lever that isn't board-specific - a
+// smaller value buys more vertical headroom for every board uniformly. It doesn't guarantee a fit
+// on every possible device aspect ratio (that needs the frame's real available height, e.g. via
+// UiCanvasInformation - not done here), so overflow: 'hidden' on the frame (below) is the backstop.
+const BOARD_GRID_WIDTH_FRACTION = 0.75
 // Cells always fill the full grid width, whatever the row count - a height-derived cap here
 // (tried previously) shrinks cells below the container width on boards with more rows (4x4, 5x4),
 // leaving a gap on the right since the grid/row don't center leftover space. If a tall board
@@ -1227,6 +1237,10 @@ const MemoryMatchUi = () => (
               height: 'auto',
               minHeight: '60%',
               maxHeight: '100%',
+              // Backstop for BOARD_GRID_WIDTH_FRACTION above: if some real device aspect ratio still
+              // makes the grid taller than the frame's real available height, clip it instead of
+              // letting cells render past the parchment art's edge.
+              overflow: 'hidden',
               flexDirection: 'column',
               alignItems: 'center',
               padding: getFramePaddingPx(),
