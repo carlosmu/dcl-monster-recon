@@ -1,14 +1,13 @@
-import { engine, Transform, MainCamera, VirtualCamera, type Entity } from '@dcl/sdk/ecs'
+import { engine, Transform, MainCamera, VirtualCamera, InputModifier, type Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { triggerEmote, stopEmote } from '~system/RestrictedActions'
 
 // Celebration cinematic camera: orbits halfway (180°) around the player over this many seconds.
 const CAM_DURATION = 3
-const CAM_SWEEP_DEG = 180
-// Waist-height camera tilted up at the player for a heroic, low-angle look.
-const CAM_OFFSET = Vector3.create(0, 0.2, 2.5)
-// The camera looks at this point (above head height) instead of the parent's feet-level origin,
-// so it tilts up dramatically rather than looking down at the player's feet.
+const CAM_SWEEP_DEG = -360
+// Elevated camera tilted down at the player, above head height, for a bird's-eye look.
+const CAM_OFFSET = Vector3.create(0, 1.5, 3.5)
+// The camera looks at this point (roughly chest height) instead of the parent's feet-level origin.
 const LOOK_AT_OFFSET = Vector3.create(0, 1.5, 0)
 
 // Predefined avatar emotes (disco, handsair, fistpump, cry) loop forever until explicitly
@@ -45,6 +44,11 @@ export function setupCelebrationCamera() {
 // 180° around them starting at startAngleDeg. Used both for the per-board score screen (hands air/
 // disco, 0deg -> 180deg) and the monster-unlock screen (fist pump, 180deg -> 360deg).
 export function triggerCelebrationCamera(predefinedEmote: string, startAngleDeg: number) {
+  // The orbit is centered on a one-time position snapshot below, not tracked live - if the player
+  // is still moving (e.g. just having run up to catch the scene prize) they'd visibly walk off-
+  // center over the shot's duration, so movement is frozen for as long as the orbit is active.
+  InputModifier.createOrReplace(engine.PlayerEntity, { mode: InputModifier.Mode.Standard({ disableAll: true }) })
+
   const playerPos = Transform.get(engine.PlayerEntity).position
   Transform.getMutable(camParent).position = Vector3.clone(playerPos)
   Transform.getMutable(camParent).rotation = Quaternion.fromAngleAxis(startAngleDeg, Vector3.Up())
@@ -66,6 +70,7 @@ export function updateCelebrationCamera(dt: number) {
   if (elapsed >= CAM_DURATION) {
     active = false
     MainCamera.getMutable(engine.CameraEntity).virtualCameraEntity = undefined
+    InputModifier.deleteFrom(engine.PlayerEntity)
   }
 }
 

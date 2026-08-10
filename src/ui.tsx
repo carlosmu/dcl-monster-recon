@@ -979,7 +979,10 @@ function handlePrizeCaught() {
   }
   room.send('reportMonsterCaught', { checkpoint: currentCheckpoint })
   playPrizeSound()
-  triggerCelebrationCamera('fistpump', 180)
+  // Was 180 (the sweep's opposite half) so it picked up where the board-win orbit (0deg->180deg)
+  // left off - but the catch now happens much later, disconnected from that shot, and 180deg
+  // showed the player's back instead of their front. Same start as the board-win orbit fixes it.
+  triggerCelebrationCamera('fistpump', 0)
   resetToIdleAfterChase()
 }
 
