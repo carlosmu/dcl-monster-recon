@@ -70,7 +70,9 @@
     "nearbyVoiceChat": "enabled"
   },
   "creator": "",
-  "skyboxConfig": {},
+  "skyboxConfig": {
+    "fixedTime": 30780
+  },
   "authoritativeMultiplayer": true,
   "worldConfiguration": {
     "name": "carlosmu.dcl.eth"

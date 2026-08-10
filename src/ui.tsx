@@ -6,6 +6,7 @@ import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
 import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
+import { startPrizeChase, updatePrizeChase, getPrizeChaseSecondsRemaining, stopPrizeChase } from './prizeChase'
 
 const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = false
@@ -44,8 +45,6 @@ const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
-const ALPHAS_IMAGE = 'assets/images/alphas.png'
-const ALPHAS_GRID = 8 // alphas.png grid
 
 // A "collection" is one full monster set: its own memory-match card art, its own prize sprite
 // sheet, and its own rarity breakdown. To add a future collection, append a new entry here (with
@@ -302,6 +301,7 @@ const PLAY_BUTTON_HEIGHT_VW = `${((PLAY_BUTTON_WIDTH_PERCENT / 100) * CANVAS_MAI
 // resolution-safe on their own, only the raw-px width/height needed the virtual-canvas fix.
 const PLAY_BUTTON_WIDTH_PX = 192
 const PLAY_BUTTON_HEIGHT_PX = 96
+const PLAY_BUTTON_CHECKPOINT_FONT_SIZE_PX = 16
 
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
@@ -315,18 +315,6 @@ const MATCH_ANIM_DURATION = 0.7
 const MATCH_FADE_IN_END = 0.1
 const MATCH_FADE_OUT_START = 0.6
 const MATCH_ANIM_DISTANCE = 60
-
-// "Monster collected!" backdrop: continuous linear pulse from 1x to 2x and back to 1x.
-const PRIZE_BACKDROP_SIZE = 270
-const PRIZE_PULSE_PERIOD = 2 // seconds for a full 1x -> 2x -> 1x cycle
-const PRIZE_PULSE_MAX_SCALE = 2
-
-function getPrizePulseSize(): number {
-  const phase = ((elapsedTime % PRIZE_PULSE_PERIOD) / PRIZE_PULSE_PERIOD) * 2 // 0..2
-  const triangle = phase <= 1 ? phase : 2 - phase // 0..1..0
-  const scale = 1 + triangle * (PRIZE_PULSE_MAX_SCALE - 1)
-  return PRIZE_BACKDROP_SIZE * scale
-}
 
 // Timer text: below this many seconds remaining, it blinks white <-> red (ping-pong) instead of
 // staying solid white.
@@ -350,13 +338,6 @@ function getPausedBlinkColor(): Color4 {
   return Color4.create(1, 1, 1, 0.3 + triangle * 0.7) // alpha 0.3..1..0.3
 }
 
-// UiTransform has no scale/transform prop, so a horizontal flip is done by mirroring the UVs.
-const PRIZE_FLIP_INTERVAL = 0.5 // seconds between horizontal flips
-
-function mirrorUvsHorizontal(uvs: number[]): number[] {
-  return [uvs[6], uvs[7], uvs[4], uvs[5], uvs[2], uvs[3], uvs[0], uvs[1]]
-}
-
 // index is LOCAL to the collection's own prize grid (i.e. global slot minus the collection's start).
 function getUvsForPrizeQuadrant(index: number, gridCols: number, gridRows: number): number[] {
   const col = index % gridCols
@@ -366,12 +347,6 @@ function getUvsForPrizeQuadrant(index: number, gridCols: number, gridRows: numbe
   const v1 = (gridRows - row - 1) / gridRows
   const v2 = (gridRows - row) / gridRows
   return [u1, v1, u1, v2, u2, v2, u2, v1]
-}
-
-function getPrizeUvs(localIndex: number, gridCols: number, gridRows: number): number[] {
-  const uvs = getUvsForPrizeQuadrant(localIndex, gridCols, gridRows)
-  const flipped = Math.floor(elapsedTime / PRIZE_FLIP_INTERVAL) % 2 === 1
-  return flipped ? mirrorUvsHorizontal(uvs) : uvs
 }
 
 // Pre-board countdown: "3, 2, 1", one second each, each number scaling up as it appears.
@@ -412,9 +387,6 @@ function getUvsForQuadrant(index: number, grid: number): number[] {
 
 // Card back art now spans a 2x2 block of atlas_01.png: A1, A2, B1, B2
 const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
-
-// "Monster collected!" backdrop spans a 4x4 block of alphas.png: A1 to D4
-const ALPHAS_COLLECTED_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
 
 // Header button icons are 2x2 blocks of atlas_01.png.
 const LEADERBOARD_BUTTON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // A5-B6
@@ -542,14 +514,6 @@ function getCodexIconSizePx(groupRowSize: number): number {
   return Math.min((availableWidth * 0.95) / groupRowSize, CODEX_MAX_ICON_SIZE_PX)
 }
 
-// Each collection's prize sprite sheet may use a different grid, so its cells aren't necessarily
-// square: on a square texture, a cell is taller than it is wide by cols/rows (e.g. a 5x4 grid on a
-// square texture makes each cell 100 wide -> 125 tall). Stretching it into a square box would
-// squash the art, so icon height is derived from width using that collection's own ratio.
-function getPrizeCellAspect(collection: CollectionConfig): number {
-  return collection.prizeGridCols / collection.prizeGridRows
-}
-
 // Locked-monster silhouette: same prize sprite, tinted black. PBUiBackground multiplies
 // color * texture, so black (0,0,0) flattens every pixel's RGB to 0 regardless of the sprite's
 // own shading, while its alpha (the silhouette shape) is preserved. Any non-zero tint would still
@@ -604,16 +568,30 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
                 }
               >
                 {collectedSlot && collectionCounts[slot] > 0 && (
-                  <Label
-                    value={`x${collectionCounts[slot]}`}
-                    fontSize={18}
-                    color={Color4.Yellow()}
-                    textAlign="middle-right"
+                  <UiEntity
                     uiTransform={{
                       positionType: 'absolute',
-                      position: { top: 2, right: 2 }
+                      position: { bottom: -20, right: 0 },
+                      width: '100%',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
-                  />
+                  >
+                    <UiEntity uiTransform={{ padding: { top: 0, bottom: 2, left: 2, right: 0 }}} uiBackground={{ color: Color4.fromHexString('#00692c59') }}>
+                      {/* Label has no intrinsic size in DCL (text isn't measured for layout), so
+                      without an explicit width/height it renders inside an oversized default box.
+                      Width is sized off the string length (no true text measurement available) to
+                      track "x2" vs "x10" instead of leaving slack around longer counts. */}
+                      <Label
+                        value={`x${collectionCounts[slot]}`}
+                        fontSize={14}
+                        color={Color4.White()}
+                        textAlign="middle-center"
+                        textWrap="nowrap"
+                        uiTransform={{ width: `x${collectionCounts[slot]}`.length * 9, height: 16 }}
+                      />
+                    </UiEntity>
+                  </UiEntity>
                 )}
               </UiEntity>
             )
@@ -641,7 +619,10 @@ let timeRemaining = GAME_DURATION
 let gameOver = false
 let won = false
 let checkpointComplete = false
-let showingPrize = false
+// True while the win screen has handed off to a physical prize hunt in the 3D scene (see
+// prizeChase.ts) - the memory board itself stays hidden until it resolves (handlePrizeCaught/
+// handlePrizeChaseFailed).
+let catchingPrize = false
 let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
@@ -728,17 +709,13 @@ function flipCell(cell: CellState) {
         room.send('reportBoardTime', {
           checkpoint: currentCheckpoint,
           boardIndex: currentBoardIndex,
-          timeSeconds: lastBoardTime,
-          checkpointComplete
+          timeSeconds: lastBoardTime
         })
 
+        // Collection/unlock is granted on the physical catch (handlePrizeCaught), not here - just
+        // remember which monster is up for grabs so the chase can say which one to look for.
         if (checkpointComplete) {
           wonMonsterQuadrant = currentCheckpoint - 1
-          collectedMonsters[currentCheckpoint - 1] = true
-          collectionCounts[currentCheckpoint - 1]++
-          if (currentCheckpoint === highestUnlockedCheckpoint && highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
-            highestUnlockedCheckpoint++
-          }
         }
         endScreenShownAt = elapsedTime
       }
@@ -935,22 +912,30 @@ export function setupUi() {
       }
     }
 
+    if (catchingPrize) {
+      updatePrizeChase(dt)
+      timeRemaining = getPrizeChaseSecondsRemaining()
+    }
+
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
       if (won && !checkpointComplete) {
         startBoard(currentCheckpoint, currentBoardIndex + 1)
-      } else if (won && checkpointComplete && !showingPrize) {
-        showingPrize = true
+      } else if (won && checkpointComplete && !catchingPrize) {
+        // Hands off from the "Board complete!" screen to the in-world chase - reused as the timer
+        // for how long the "find this monster" banner below stays up, not a fixed close-out delay.
+        catchingPrize = true
         stopBoardMusic()
         playPrizeSound()
-        triggerCelebrationCamera('fistpump', 180)
+        startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed)
         endScreenShownAt = elapsedTime
+      } else if (catchingPrize) {
+        endScreenShownAt = null // just hides the banner text; the chase itself keeps running
       } else {
         screen = 'checkpointSelect'
         playAmbientMusic()
         won = false
         gameOver = false
         checkpointComplete = false
-        showingPrize = false
         endScreenShownAt = null
       }
     }
@@ -968,6 +953,37 @@ export function setupUi() {
 export function showCheckpointSelect() {
   if (screen === 'board') previousScreen = 'board'
   screen = 'checkpointSelect'
+}
+
+// Chase succeeded: grant the collection (mirrors what reportBoardTime's checkpointComplete used
+// to do client-side, now deferred until the player actually catches the prize) and let the player
+// start another round from the Play button.
+function handlePrizeCaught() {
+  collectedMonsters[currentCheckpoint - 1] = true
+  collectionCounts[currentCheckpoint - 1]++
+  if (currentCheckpoint === highestUnlockedCheckpoint && highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
+    highestUnlockedCheckpoint++
+  }
+  room.send('reportMonsterCaught', { checkpoint: currentCheckpoint })
+  triggerCelebrationCamera('fistpump', 180)
+  resetToIdleAfterChase()
+}
+
+// Chase failed (ran out of attempts): no collection is granted - the player can replay the
+// checkpoint's boards to try catching the monster again.
+function handlePrizeChaseFailed() {
+  playFailSound()
+  resetToIdleAfterChase()
+}
+
+function resetToIdleAfterChase() {
+  screen = 'hidden'
+  playAmbientMusic()
+  won = false
+  gameOver = false
+  checkpointComplete = false
+  catchingPrize = false
+  endScreenShownAt = null
 }
 
 function startBoard(checkpoint: number, boardIndex: number) {
@@ -991,7 +1007,8 @@ function startBoard(checkpoint: number, boardIndex: number) {
   gameOver = false
   won = false
   checkpointComplete = false
-  showingPrize = false
+  stopPrizeChase()
+  catchingPrize = false
   errors = 0
   score = 0
   endScreenShownAt = null
@@ -1011,7 +1028,8 @@ function closeBoard() {
   gameOver = false
   won = false
   checkpointComplete = false
-  showingPrize = false
+  stopPrizeChase()
+  catchingPrize = false
   endScreenShownAt = null
   countdownStart = null
 }
@@ -1201,11 +1219,23 @@ const MemoryMatchUi = () => (
               positionType: 'absolute',
               // Centered in the body's top third: left keeps it horizontally centered ((100% -
               // PLAY_BUTTON_WIDTH_PERCENT) / 2), top sits it around the middle of the 0-33% band.
-              position: { top: '12%', left: `${(100 - PLAY_BUTTON_WIDTH_PERCENT) / 2}%` }
+              position: { top: '12%', left: `${(100 - PLAY_BUTTON_WIDTH_PERCENT) / 2}%` },
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'flex-end'
             }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
             onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
-          />
+          >
+            <Label
+              value={`Checkpoint ${String(highestUnlockedCheckpoint).padStart(2, '0')}`}
+              fontSize={PLAY_BUTTON_CHECKPOINT_FONT_SIZE_PX}
+              color={Color4.White()}
+              textAlign="middle-center"
+              textWrap="nowrap"
+              uiTransform={{ margin: { bottom: '0.5vh' } }}
+            />
+          </UiEntity>
         )}
 
         {screen === 'board' && !won && !gameOver && countdownStart !== null && (
@@ -1762,55 +1792,18 @@ const MemoryMatchUi = () => (
         }}
       >
         {won ? (
-          showingPrize ? (
-            (() => {
-              const wonCollection = getCollectionForSlot(wonMonsterQuadrant)
-              const wonPrizeCellHeight = PRIZE_BACKDROP_SIZE * getPrizeCellAspect(wonCollection)
-              return (
-                <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-                  <Label
-                    value={`${getRarityLabel(wonMonsterQuadrant)} Monster\nCollected!`}
-                    fontSize={36}
-                    color={Color4.White()}
-                    textAlign="middle-center"
-                  />
-                  <UiEntity
-                    uiTransform={{
-                      width: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
-                      height: PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE,
-                      margin: { top: 20 },
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <UiEntity
-                      uiTransform={{ width: getPrizePulseSize(), height: getPrizePulseSize() }}
-                      uiBackground={{
-                        textureMode: 'stretch',
-                        texture: { src: ALPHAS_IMAGE },
-                        uvs: ALPHAS_COLLECTED_UVS
-                      }}
-                    />
-                    <UiEntity
-                      uiTransform={{
-                        width: PRIZE_BACKDROP_SIZE,
-                        height: wonPrizeCellHeight,
-                        positionType: 'absolute',
-                        position: {
-                          top: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - wonPrizeCellHeight) / 2,
-                          left: (PRIZE_BACKDROP_SIZE * PRIZE_PULSE_MAX_SCALE - PRIZE_BACKDROP_SIZE) / 2
-                        }
-                      }}
-                      uiBackground={{
-                        textureMode: 'stretch',
-                        texture: { src: wonCollection.prizeImage },
-                        uvs: getPrizeUvs(wonMonsterQuadrant - wonCollection.start, wonCollection.prizeGridCols, wonCollection.prizeGridRows)
-                      }}
-                    />
-                  </UiEntity>
-                </UiEntity>
-              )
-            })()
+          catchingPrize ? (
+            // Banner only shows for the first END_SCREEN_DURATION seconds of the chase (see the
+            // system loop above) - after that it hides so the 3D scene isn't obstructed while the
+            // player runs around looking for it.
+            endScreenShownAt !== null && (
+              <Label
+                value={`Find the ${getRarityLabel(wonMonsterQuadrant)} monster in the scene!`}
+                fontSize={36}
+                color={Color4.White()}
+                textAlign="middle-center"
+              />
+            )
           ) : (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
               <Label value="Board complete!" fontSize={36} color={Color4.White()} />

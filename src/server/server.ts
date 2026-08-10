@@ -94,17 +94,18 @@ export async function startServer() {
       { checkpoint: data.checkpoint, boardIndex: data.boardIndex, bestTimeSeconds: best },
       { to: [context.from] }
     )
+  })
 
-    if (data.checkpointComplete) {
-      const progress = await getPlayerProgress(context.from)
-      progress.collectedMonsters[data.checkpoint - 1] = true
-      progress.collectionCounts[data.checkpoint - 1] = (progress.collectionCounts[data.checkpoint - 1] ?? 0) + 1
-      if (data.checkpoint === progress.highestUnlockedCheckpoint && progress.highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
-        progress.highestUnlockedCheckpoint++
-      }
-      await Storage.player.set(context.from, PROGRESS_KEY, progress)
-      room.send('progressUpdate', progress, { to: [context.from] })
+  room.onMessage('reportMonsterCaught', async (data, context) => {
+    if (!context) return
+    const progress = await getPlayerProgress(context.from)
+    progress.collectedMonsters[data.checkpoint - 1] = true
+    progress.collectionCounts[data.checkpoint - 1] = (progress.collectionCounts[data.checkpoint - 1] ?? 0) + 1
+    if (data.checkpoint === progress.highestUnlockedCheckpoint && progress.highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
+      progress.highestUnlockedCheckpoint++
     }
+    await Storage.player.set(context.from, PROGRESS_KEY, progress)
+    room.send('progressUpdate', progress, { to: [context.from] })
   })
 
   room.onMessage('requestProgress', async (_data, context) => {

@@ -17,15 +17,19 @@ export const Messages = {
   // Client -> Server: ask for the caller's personal best time on a board (e.g. when it's opened).
   requestBestTime: Schemas.Map({ checkpoint: Schemas.Number, boardIndex: Schemas.Number }),
   // Client -> Server: reported every time a board is won, with the time it took to clear it.
-  // checkpointComplete is true when this was the checkpoint's last board (i.e. its monster was
-  // just collected) - the server uses it to update collectedMonsters/collectionCounts/
-  // highestUnlockedCheckpoint for this player.
+  // Only affects best-time tracking - checkpoint/monster unlock now happens via
+  // reportMonsterCaught below, since completing the last board only spawns a catchable prize in
+  // the scene, it doesn't unlock the checkpoint by itself.
   reportBoardTime: Schemas.Map({
     checkpoint: Schemas.Number,
     boardIndex: Schemas.Number,
-    timeSeconds: Schemas.Number,
-    checkpointComplete: Schemas.Boolean
+    timeSeconds: Schemas.Number
   }),
+  // Client -> Server: sent only when the player physically catches the prize spawned in the scene
+  // after clearing a checkpoint's last board. This is what actually unlocks the monster/checkpoint -
+  // the server updates collectedMonsters/collectionCounts/highestUnlockedCheckpoint for this player.
+  // If the player exhausts their catch attempts instead, this is never sent and nothing unlocks.
+  reportMonsterCaught: Schemas.Map({ checkpoint: Schemas.Number }),
   // Server -> Client: the caller's personal best time for a board. bestTimeSeconds is -1 when no record exists yet.
   personalBestUpdate: Schemas.Map({ checkpoint: Schemas.Number, boardIndex: Schemas.Number, bestTimeSeconds: Schemas.Number }),
   // Client -> Server: ask for the caller's checkpoint/codex progress (e.g. on scene load).
