@@ -31,12 +31,13 @@ const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
 const AMBIENT_MUSIC_CLIP = 'assets/audio/Medieval_Astrology.mp3'
 const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
-const BOARD_END_CLIP = 'assets/audio/tararan.mp3'
+const BOARD_END_CLIP = 'assets/audio/get_points.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
-const PRIZE_CLIP = 'assets/audio/fanfare.mp3'
+const PRIZE_CLIP = 'assets/audio/collected.mp3'
 const MATCH_CLIP = 'assets/audio/match.mp3'
 const COUNTDOWN_CLIP = 'assets/audio/countdown.mp3'
 const FAIL_CLIP = 'assets/audio/fail.mp3'
+const TICKING_CLIP = 'assets/audio/ticking.mp3'
 // Frame background shared by the memory-match board, checkpoint select, codex, and leaderboard
 // screens. Cropped from atlas_02.png quadrants A1-D4 into its own file because nine-slicing in
 // DCL only reads the full texture (no custom uvs).
@@ -301,7 +302,6 @@ const PLAY_BUTTON_HEIGHT_VW = `${((PLAY_BUTTON_WIDTH_PERCENT / 100) * CANVAS_MAI
 // resolution-safe on their own, only the raw-px width/height needed the virtual-canvas fix.
 const PLAY_BUTTON_WIDTH_PX = 192
 const PLAY_BUTTON_HEIGHT_PX = 96
-const PLAY_BUTTON_CHECKPOINT_FONT_SIZE_PX = 16
 
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
@@ -734,6 +734,7 @@ let matchEntity: Entity
 let countdownEntity: Entity
 let failEntity: Entity
 let timeoutEntity: Entity
+let tickingEntity: Entity
 
 function playAmbientMusic() {
   if (musicMuted) return
@@ -752,6 +753,14 @@ function playBoardMusic() {
 
 function stopBoardMusic() {
   AudioSource.getMutable(boardMusicEntity).playing = false
+}
+
+function playTickingSound() {
+  AudioSource.getMutable(tickingEntity).playing = true
+}
+
+function stopTickingSound() {
+  AudioSource.getMutable(tickingEntity).playing = false
 }
 
 function toggleMusic() {
@@ -832,6 +841,10 @@ export function setupUi() {
   timeoutEntity = engine.addEntity()
   Transform.create(timeoutEntity)
   AudioSource.create(timeoutEntity, { audioClipUrl: TIMEOUT_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+
+  tickingEntity = engine.addEntity()
+  Transform.create(tickingEntity)
+  AudioSource.create(tickingEntity, { audioClipUrl: TICKING_CLIP, playing: false, loop: true, volume: 0.6, global: true })
 
   setupCelebrationCamera()
 
@@ -925,7 +938,7 @@ export function setupUi() {
         // for how long the "find this monster" banner below stays up, not a fixed close-out delay.
         catchingPrize = true
         stopBoardMusic()
-        playPrizeSound()
+        playTickingSound()
         startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed)
         endScreenShownAt = elapsedTime
       } else if (catchingPrize) {
@@ -965,6 +978,7 @@ function handlePrizeCaught() {
     highestUnlockedCheckpoint++
   }
   room.send('reportMonsterCaught', { checkpoint: currentCheckpoint })
+  playPrizeSound()
   triggerCelebrationCamera('fistpump', 180)
   resetToIdleAfterChase()
 }
@@ -977,6 +991,7 @@ function handlePrizeChaseFailed() {
 }
 
 function resetToIdleAfterChase() {
+  stopTickingSound()
   screen = 'hidden'
   playAmbientMusic()
   won = false
@@ -1008,6 +1023,7 @@ function startBoard(checkpoint: number, boardIndex: number) {
   won = false
   checkpointComplete = false
   stopPrizeChase()
+  stopTickingSound()
   catchingPrize = false
   errors = 0
   score = 0
@@ -1029,6 +1045,7 @@ function closeBoard() {
   won = false
   checkpointComplete = false
   stopPrizeChase()
+  stopTickingSound()
   catchingPrize = false
   endScreenShownAt = null
   countdownStart = null
@@ -1226,16 +1243,7 @@ const MemoryMatchUi = () => (
             }}
             uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
             onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
-          >
-            <Label
-              value={`Checkpoint ${String(highestUnlockedCheckpoint).padStart(2, '0')}`}
-              fontSize={PLAY_BUTTON_CHECKPOINT_FONT_SIZE_PX}
-              color={Color4.White()}
-              textAlign="middle-center"
-              textWrap="nowrap"
-              uiTransform={{ margin: { bottom: '0.5vh' } }}
-            />
-          </UiEntity>
+          />
         )}
 
         {screen === 'board' && !won && !gameOver && countdownStart !== null && (
