@@ -1,6 +1,12 @@
 import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { engine, AudioSource, Transform, UiCanvasInformation, type Entity } from '@dcl/sdk/ecs'
+import {
+  engine,
+  AudioSource,
+  Transform,
+  UiCanvasInformation,
+  type Entity
+} from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
@@ -10,7 +16,7 @@ import {
   startPrizeChase,
   updatePrizeChase,
   getPrizeChaseSecondsRemaining,
-  getPrizeChaseAttempt,
+  getPrizeChaseChancesRemaining,
   stopPrizeChase,
   PRIZE_CHASE_MAX_ATTEMPTS
 } from './prizeChase'
@@ -346,22 +352,27 @@ function easeOutBack(t: number): number {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
 
-function easeInCubic(t: number): number {
-  return t * t * t
+// easeInBack: mirrors easeOutBack's overshoot but at the start instead of the end - dips backward
+// (here: up, since exiting means animating toward a "smaller" bottom%) before rushing to 1, i.e. a
+// small anticipation rise before the fast drop.
+function easeInBack(t: number): number {
+  const c1 = 3.2
+  const c3 = c1 + 1
+  return c3 * t * t * t - c1 * t * t
 }
 
 function getToastBottomPercent(): number {
   const restPercent = isMobile() ? PLAY_BUTTON_BOTTOM_PERCENT_MOBILE : PLAY_BUTTON_BOTTOM_PERCENT_DESKTOP
   if (toastExitStartedAt !== null) {
     const t = Math.min(1, (elapsedTime - toastExitStartedAt) / TOAST_EXIT_DURATION)
-    return restPercent + (TOAST_OFFSCREEN_BOTTOM_PERCENT - restPercent) * easeInCubic(t)
+    return restPercent + (TOAST_OFFSCREEN_BOTTOM_PERCENT - restPercent) * easeInBack(t)
   }
   const t = Math.min(1, (elapsedTime - (toastPhaseStartedAt ?? elapsedTime)) / TOAST_ENTER_DURATION)
   return TOAST_OFFSCREEN_BOTTOM_PERCENT + (restPercent - TOAST_OFFSCREEN_BOTTOM_PERCENT) * easeOutBack(t)
 }
 
 // Swaps in a new toast phase and (re)starts its entrance animation.
-function showToast(phase: 'boardComplete' | 'findMonster' | 'monsterCollected') {
+function showToast(phase: 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected') {
   toastPhase = phase
   toastPhaseStartedAt = elapsedTime
   toastExitStartedAt = null
@@ -390,7 +401,7 @@ function resetToastState() {
 // "Missed" shake on the find-the-monster toast (see handlePrizeMissed): a decaying horizontal
 // wobble applied as a margin offset on the toast box, independent of its enter/exit slide above.
 const TOAST_SHAKE_DURATION = 0.4 // seconds
-const TOAST_SHAKE_MAGNITUDE_PX = 20
+const TOAST_SHAKE_MAGNITUDE_PX = 40
 const TOAST_SHAKE_OSCILLATIONS = 4 // full left-right cycles over TOAST_SHAKE_DURATION
 
 function triggerToastShake() {
@@ -572,11 +583,6 @@ function getCheckpointSelectLockIconSizePx(): number {
   return getCheckpointSelectCellWidthPx() * 0.6
 }
 
-// Rarity ranges by checkpoint slot index, flattened across all collections. Each rarity is laid
-// out as a single row in the Codex (rowSize equals its slot count), with Exotic and Epic sharing
-// one row per collection (see CODEX_GROUPS below).
-const RARITIES: ResolvedRarity[] = RESOLVED_COLLECTIONS.flatMap((c) => c.rarities)
-
 type RarityConfig = ResolvedRarity
 
 function getRarityProgress(rarity: { start: number; end: number }): { collected: number; total: number } {
@@ -725,11 +731,6 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
   )
 }
 
-function getRarityLabel(slot: number): string {
-  const rarity = RARITIES.find((r) => slot >= r.start && slot <= r.end)
-  return rarity ? rarity.label : ''
-}
-
 
 let cells: CellState[] = []
 // The memory-match card art for the checkpoint currently being played; set by startBoard() from
@@ -750,9 +751,9 @@ let totalScore = 0
 // toast state below.
 let endScreenShownAt: number | null = null
 
-// Bottom "toast" for the win sequence (Board complete -> Find the monster -> Monster collected -
-// see showToast()/hideToast()/getToastBottomPercent()). null means fully hidden/off-screen.
-type ToastPhase = 'boardComplete' | 'findMonster' | 'monsterCollected' | null
+// Bottom "toast" for the win sequence (Board complete -> Find the monster -> Monster collected/Not
+// collected - see showToast()/hideToast()/getToastBottomPercent()). null means fully hidden.
+type ToastPhase = 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected' | null
 let toastPhase: ToastPhase = null
 // When the current phase's entrance animation started (also doubles as its "how long has it been
 // showing" clock for the auto-advance timers below).
@@ -1093,7 +1094,18 @@ export function setupUi() {
         hideToast(() => {
           stopBoardMusic()
           playTickingSound()
-          startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed, handlePrizeMissed)
+          const wonCollection = getCollectionForSlot(wonMonsterQuadrant)
+          startPrizeChase(
+            {
+              image: wonCollection.prizeImage,
+              gridCols: wonCollection.prizeGridCols,
+              gridRows: wonCollection.prizeGridRows,
+              localIndex: wonMonsterQuadrant - wonCollection.start
+            },
+            handlePrizeCaught,
+            handlePrizeChaseFailed,
+            handlePrizeMissed
+          )
           showToast('findMonster')
         })
       } else {
@@ -1103,6 +1115,15 @@ export function setupUi() {
 
     if (
       toastPhase === 'monsterCollected' &&
+      toastExitStartedAt === null &&
+      toastPhaseStartedAt !== null &&
+      elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
+    ) {
+      hideToast(() => resetToIdleAfterChase())
+    }
+
+    if (
+      toastPhase === 'monsterNotCollected' &&
       toastExitStartedAt === null &&
       toastPhaseStartedAt !== null &&
       elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
@@ -1149,8 +1170,8 @@ function handlePrizeCaught() {
 // checkpoint's boards to try catching the monster again.
 function handlePrizeChaseFailed() {
   stopTickingSound()
-  playFailSound()
-  hideToast(() => resetToIdleAfterChase())
+  playTimeoutSound()
+  hideToast(() => showToast('monsterNotCollected'))
 }
 
 // A hop timed out and the prize moved to a new spot without being caught: shake the "find the
@@ -2016,7 +2037,7 @@ const MemoryMatchUi = () => (
           {toastPhase === 'findMonster' && renderMonsterIcon(wonMonsterQuadrant, 64)}
           {toastPhase === 'findMonster' && (
             <Label
-              value={`Mission: Find the ${getRarityLabel(wonMonsterQuadrant)} monster.\nChance ${getPrizeChaseAttempt()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
+              value={`Collect the monster.\nChances: ${getPrizeChaseChancesRemaining()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
               fontSize={20}
               color={Color4.White()}
               textAlign="middle-left"
@@ -2033,6 +2054,9 @@ const MemoryMatchUi = () => (
                 uiTransform={{ margin: { top: 12 } }}
               />
             </UiEntity>
+          )}
+          {toastPhase === 'monsterNotCollected' && (
+            <Label value="Monster Not Collected" fontSize={28} color={Color4.White()} textAlign="middle-center" />
           )}
         </UiEntity>
       </UiEntity>

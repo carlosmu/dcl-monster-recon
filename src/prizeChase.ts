@@ -1,7 +1,11 @@
 import {
   engine,
   Transform,
-  GltfContainer,
+  MeshRenderer,
+  Material,
+  MaterialTransparencyMode,
+  Billboard,
+  BillboardMode,
   Tween,
   TweenSequence,
   TweenLoop,
@@ -10,10 +14,50 @@ import {
   triggerAreaEventsSystem,
   type Entity
 } from '@dcl/sdk/ecs'
-import { Vector3, Quaternion } from '@dcl/sdk/math'
+import { Vector3, Vector2, Color3 } from '@dcl/sdk/math'
 import { EntityNames } from '../assets/scene/entity-names'
 
-const PRIZE_MODEL = 'assets/models/prize_01.gltf'
+// Which monster's art to paint onto the spawned prize's plane - same sprite-sheet cropping idea as
+// the 2D UI (getUvsForPrizeQuadrant in ui.tsx), just expressed as glTF-style texture offset/tiling.
+// Set once per startPrizeChase() call, reused by every hop.
+export interface PrizeIcon {
+  image: string
+  gridCols: number
+  gridRows: number
+  localIndex: number // index within this image's own grid, not the global checkpoint slot
+}
+
+let currentIcon: PrizeIcon | null = null
+
+// Size of the prize's billboard plane (metres) - matches a single sprite-sheet cell's aspect ratio
+// (narrower than tall on prizes_01.png's 5x4 grid) scaled up 1.5x, validated against a standalone
+// test plane before wiring it in here.
+const PRIZE_PLANE_WIDTH = 1.2
+const PRIZE_PLANE_HEIGHT = 1.5
+
+// Crops currentIcon's grid cell onto the plane's material, with cutout alpha and matching emissive
+// so the sprite reads clearly and glows in its own colors rather than relying on scene light.
+function applyPrizeIcon(entity: Entity) {
+  if (!currentIcon) return
+  const { image, gridCols, gridRows, localIndex } = currentIcon
+  const col = localIndex % gridCols
+  const row = Math.floor(localIndex / gridCols)
+  const iconTexture = Material.Texture.Common({
+    src: image,
+    // V=0 is the BOTTOM of the texture here (confirmed visually), so row 0 (A1, the sheet's top
+    // row) needs the same top-row flip as the 2D UI's getUvsForPrizeQuadrant.
+    offset: Vector2.create(col / gridCols, (gridRows - row - 1) / gridRows),
+    tiling: Vector2.create(1 / gridCols, 1 / gridRows)
+  })
+  Material.setPbrMaterial(entity, {
+    texture: iconTexture,
+    transparencyMode: MaterialTransparencyMode.MTM_ALPHA_TEST,
+    alphaTest: 0.5,
+    emissiveTexture: iconTexture,
+    emissiveColor: Color3.White(),
+    emissiveIntensity: 1
+  })
+}
 
 // Spawn-point markers placed in the Creator Hub (Transform + Name only, no visual - see
 // assets/scene/main.composite). One is picked at random for each hop.
@@ -35,14 +79,16 @@ const PRIZE_MARKER_NAMES: string[] = [
 // Seconds the prize stays at one spawn point before hopping to another.
 const HOP_DURATION = 5
 // Total hops the player gets to catch it before the chase counts as failed.
-export const PRIZE_CHASE_MAX_ATTEMPTS = 10
+export const PRIZE_CHASE_MAX_ATTEMPTS = 5
 // Sphere trigger radius (metres) around the prize's current (bobbing) position - forgiving,
 // coin-pickup feel rather than requiring a precise hit.
 const CATCH_RADIUS = 1.5
 
-const BOB_AMPLITUDE = 0.5 // metres up/down from the marker's own height
+// Metres above the marker's own height - was a 0-0.5 range (bottom edge sat at the marker's own
+// height, half-buried in the ground for markers placed flush with the floor); lifted by 1m.
+const BOB_MIN_HEIGHT = 1
+const BOB_MAX_HEIGHT = 1.5
 const BOB_LEG_DURATION_MS = 1200 // one-way (down->up or up->down) bob duration
-const SPIN_DEGREES_PER_SECOND = 180 // full 360 rotation every 2s
 
 let active = false
 let hopElapsed = 0
@@ -94,8 +140,8 @@ function spawnHop() {
     return
   }
 
-  const bobStart = Vector3.create(0, -BOB_AMPLITUDE, 0)
-  const bobEnd = Vector3.create(0, BOB_AMPLITUDE, 0)
+  const bobStart = Vector3.create(0, BOB_MIN_HEIGHT, 0)
+  const bobEnd = Vector3.create(0, BOB_MAX_HEIGHT, 0)
 
   bobAnchor = engine.addEntity()
   Transform.create(bobAnchor, {
@@ -113,20 +159,26 @@ function spawnHop() {
   triggerAreaEventsSystem.onTriggerEnter(bobAnchor, handleCatch)
 
   prizeModel = engine.addEntity()
-  Transform.create(prizeModel, { parent: bobAnchor })
-  GltfContainer.create(prizeModel, { src: PRIZE_MODEL })
-  Tween.setRotateContinuous(prizeModel, Quaternion.fromEulerDegrees(0, 1, 0), SPIN_DEGREES_PER_SECOND)
+  Transform.create(prizeModel, { parent: bobAnchor, scale: Vector3.create(PRIZE_PLANE_WIDTH, PRIZE_PLANE_HEIGHT, 1) })
+  MeshRenderer.setPlane(prizeModel)
+  // BM_Y (not BM_ALL) - rotates to face the player around Y only, stays upright, cheaper to render.
+  // Replaces the old continuous Y-spin: a billboard already always faces the player, so a spin
+  // tween would just fight the billboard system for control of the same Transform.rotation.
+  Billboard.create(prizeModel, { billboardMode: BillboardMode.BM_Y })
+  applyPrizeIcon(prizeModel)
 
   hopElapsed = 0
 }
 
-// Spawns the first hop and starts the chase. onCaught fires once the player touches the prize;
-// onFailed fires if MAX_ATTEMPTS hops pass with no catch; onMissed fires each time a hop times out
-// and a new one spawns (not on the very first hop). Exactly one of onCaught/onFailed fires, once.
-export function startPrizeChase(onCaught: () => void, onFailed: () => void, onMissed: () => void) {
+// Spawns the first hop and starts the chase. icon selects which monster's art is painted onto the
+// plane (see applyPrizeIcon). onCaught fires once the player touches the prize; onFailed fires if
+// MAX_ATTEMPTS hops pass with no catch; onMissed fires each time a hop times out and a new one
+// spawns (not on the very first hop). Exactly one of onCaught/onFailed fires, once.
+export function startPrizeChase(icon: PrizeIcon, onCaught: () => void, onFailed: () => void, onMissed: () => void) {
   active = true
   attempt = 0
   lastMarkerName = null
+  currentIcon = icon
   onCaughtCallback = onCaught
   onFailedCallback = onFailed
   onMissedCallback = onMissed
@@ -159,9 +211,9 @@ export function getPrizeChaseSecondsRemaining(): number {
   return Math.max(0, HOP_DURATION - hopElapsed)
 }
 
-// Current attempt number (1-indexed, PRIZE_CHASE_MAX_ATTEMPTS max), for the "Chance X/Y" UI copy.
-export function getPrizeChaseAttempt(): number {
-  return attempt
+// Chances left, counting the current hop (PRIZE_CHASE_MAX_ATTEMPTS..1), for "Chances: X/Y" copy.
+export function getPrizeChaseChancesRemaining(): number {
+  return Math.max(0, PRIZE_CHASE_MAX_ATTEMPTS - attempt + 1)
 }
 
 // Cancels an in-progress chase without firing either callback (e.g. the board was closed manually).
