@@ -15,6 +15,7 @@ import {
   type Entity
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3 } from '@dcl/sdk/math'
+import { getWorldPosition } from '@dcl-sdk/utils'
 import { EntityNames } from '../assets/scene/entity-names'
 
 // Which monster's art to paint onto the spawned prize's plane - same sprite-sheet cropping idea as
@@ -83,6 +84,10 @@ export const PRIZE_CHASE_MAX_ATTEMPTS = 5
 // Sphere trigger radius (metres) around the prize's current (bobbing) position - forgiving,
 // coin-pickup feel rather than requiring a precise hit.
 const CATCH_RADIUS = 1.5
+// Markers closer than this to the player are skipped when picking a hop's location, so the prize
+// never spawns inside (or right at the edge of) the catch radius and gets caught without the
+// player having to actually move.
+const MIN_SPAWN_DISTANCE_FROM_PLAYER = 4
 
 // Metres above the marker's own height - was a 0-0.5 range (bottom edge sat at the marker's own
 // height, half-buried in the ground for markers placed flush with the floor); lifted by 1m.
@@ -101,10 +106,20 @@ let onFailedCallback: (() => void) | null = null
 let onMissedCallback: (() => void) | null = null
 
 function pickRandomMarkerName(): string {
-  let name = PRIZE_MARKER_NAMES[Math.floor(Math.random() * PRIZE_MARKER_NAMES.length)]
-  while (name === lastMarkerName && PRIZE_MARKER_NAMES.length > 1) {
-    name = PRIZE_MARKER_NAMES[Math.floor(Math.random() * PRIZE_MARKER_NAMES.length)]
-  }
+  const playerPos = Transform.get(engine.PlayerEntity).position
+  // Prefer markers far enough from the player and different from the last spot; fall back to just
+  // "different from the last spot" (then to the full list) if that leaves nothing to pick from -
+  // e.g. every marker happens to be close to the player right now.
+  const farEnough = PRIZE_MARKER_NAMES.filter((name) => {
+    const marker = engine.getEntityOrNullByName(name)
+    if (!marker) return false
+    return Vector3.distance(playerPos, getWorldPosition(marker)) >= MIN_SPAWN_DISTANCE_FROM_PLAYER
+  })
+  const notLastSpot = PRIZE_MARKER_NAMES.filter((name) => name !== lastMarkerName)
+  const pool = farEnough.filter((name) => name !== lastMarkerName)
+  const candidates = pool.length > 0 ? pool : farEnough.length > 0 ? farEnough : notLastSpot.length > 0 ? notLastSpot : PRIZE_MARKER_NAMES
+
+  const name = candidates[Math.floor(Math.random() * candidates.length)]
   lastMarkerName = name
   return name
 }

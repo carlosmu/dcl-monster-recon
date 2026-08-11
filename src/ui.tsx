@@ -51,6 +51,7 @@ const MATCH_CLIP = 'assets/audio/match.mp3'
 const COUNTDOWN_CLIP = 'assets/audio/countdown.mp3'
 const FAIL_CLIP = 'assets/audio/fail.mp3'
 const TICKING_CLIP = 'assets/audio/ticking.mp3'
+const LOSE_A_CHANCE_CLIP = 'assets/audio/lose_a_chance.mp3'
 // Frame background shared by the memory-match board, checkpoint select, codex, and leaderboard
 // screens. Cropped from atlas_02.png quadrants A1-D4 into its own file because nine-slicing in
 // DCL only reads the full texture (no custom uvs).
@@ -871,6 +872,7 @@ let countdownEntity: Entity
 let failEntity: Entity
 let timeoutEntity: Entity
 let tickingEntity: Entity
+let loseAChanceEntity: Entity
 
 function playAmbientMusic() {
   if (musicMuted) return
@@ -937,6 +939,10 @@ function playFailSound() {
   AudioSource.playSound(failEntity, FAIL_CLIP, true)
 }
 
+function playLoseAChanceSound() {
+  AudioSource.playSound(loseAChanceEntity, LOSE_A_CHANCE_CLIP, true)
+}
+
 function reportScore(points: number) {
   // room.send() queues automatically until the room is ready, so no readiness check is needed here.
   const playerName = getPlayer()?.name ?? 'Unknown'
@@ -981,6 +987,10 @@ export function setupUi() {
   tickingEntity = engine.addEntity()
   Transform.create(tickingEntity)
   AudioSource.create(tickingEntity, { audioClipUrl: TICKING_CLIP, playing: false, loop: true, volume: 0.6, global: true })
+
+  loseAChanceEntity = engine.addEntity()
+  Transform.create(loseAChanceEntity)
+  AudioSource.create(loseAChanceEntity, { audioClipUrl: LOSE_A_CHANCE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
   setupCelebrationCamera()
 
@@ -1175,9 +1185,9 @@ function handlePrizeChaseFailed() {
 }
 
 // A hop timed out and the prize moved to a new spot without being caught: shake the "find the
-// monster" toast and play the same fail sound as a missed board match.
+// monster" toast and play a dedicated sound for it (distinct from the board-match fail sound).
 function handlePrizeMissed() {
-  playFailSound()
+  playLoseAChanceSound()
   triggerToastShake()
 }
 
