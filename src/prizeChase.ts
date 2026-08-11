@@ -35,7 +35,7 @@ const PRIZE_MARKER_NAMES: string[] = [
 // Seconds the prize stays at one spawn point before hopping to another.
 const HOP_DURATION = 5
 // Total hops the player gets to catch it before the chase counts as failed.
-const MAX_ATTEMPTS = 10
+export const PRIZE_CHASE_MAX_ATTEMPTS = 10
 // Sphere trigger radius (metres) around the prize's current (bobbing) position - forgiving,
 // coin-pickup feel rather than requiring a precise hit.
 const CATCH_RADIUS = 1.5
@@ -135,7 +135,7 @@ export function updatePrizeChase(dt: number) {
   hopElapsed += dt
   if (hopElapsed < HOP_DURATION) return
 
-  if (attempt >= MAX_ATTEMPTS) {
+  if (attempt >= PRIZE_CHASE_MAX_ATTEMPTS) {
     active = false
     const onFailed = onFailedCallback
     despawnCurrentHop()
@@ -151,6 +151,11 @@ export function updatePrizeChase(dt: number) {
 // Seconds left on the current hop (HOP_DURATION..0), for the UI countdown.
 export function getPrizeChaseSecondsRemaining(): number {
   return Math.max(0, HOP_DURATION - hopElapsed)
+}
+
+// Current attempt number (1-indexed, PRIZE_CHASE_MAX_ATTEMPTS max), for the "Chance X/Y" UI copy.
+export function getPrizeChaseAttempt(): number {
+  return attempt
 }
 
 // Cancels an in-progress chase without firing either callback (e.g. the board was closed manually).

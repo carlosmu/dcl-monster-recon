@@ -6,7 +6,14 @@ import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
 import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
-import { startPrizeChase, updatePrizeChase, getPrizeChaseSecondsRemaining, stopPrizeChase } from './prizeChase'
+import {
+  startPrizeChase,
+  updatePrizeChase,
+  getPrizeChaseSecondsRemaining,
+  getPrizeChaseAttempt,
+  stopPrizeChase,
+  PRIZE_CHASE_MAX_ATTEMPTS
+} from './prizeChase'
 
 const DEBUG_CELL_LABELS = false
 const DEBUG_LAYOUT_BORDERS = false
@@ -320,12 +327,73 @@ function getPlayButtonLeftPx(): number {
   return (getCanvasMainWidthPx() - getPlayButtonWidthPx()) / 2
 }
 
+// Win-sequence toast (Board complete / Find the monster / Monster collected): slides up from
+// below to rest at the Play button's own bottom%, then - later, on hideToast() - slides back down.
+// Position is animated purely in '%' (matching getPlayButtonBottomPercent()'s own unit) so the
+// interpolation never mixes with a raw-px size, the mixing bug this file has hit before.
+const TOAST_OFFSCREEN_BOTTOM_PERCENT = -30
+const TOAST_ENTER_DURATION = 0.4 // seconds - quick slide up
+const TOAST_EXIT_DURATION = 0.25 // seconds - quick slide down
+// Raw px (1920x1080 virtual reference) lift above the resting bottom%, so the toasts sit higher
+// than the Play button rather than exactly on top of it.
+const TOAST_LIFT_PX = 100
+
+// easeOutBack: fast entrance that overshoots slightly past 1 before settling - see easings.net.
+function easeOutBack(t: number): number {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+function easeInCubic(t: number): number {
+  return t * t * t
+}
+
+function getToastBottomPercent(): number {
+  const restPercent = isMobile() ? PLAY_BUTTON_BOTTOM_PERCENT_MOBILE : PLAY_BUTTON_BOTTOM_PERCENT_DESKTOP
+  if (toastExitStartedAt !== null) {
+    const t = Math.min(1, (elapsedTime - toastExitStartedAt) / TOAST_EXIT_DURATION)
+    return restPercent + (TOAST_OFFSCREEN_BOTTOM_PERCENT - restPercent) * easeInCubic(t)
+  }
+  const t = Math.min(1, (elapsedTime - (toastPhaseStartedAt ?? elapsedTime)) / TOAST_ENTER_DURATION)
+  return TOAST_OFFSCREEN_BOTTOM_PERCENT + (restPercent - TOAST_OFFSCREEN_BOTTOM_PERCENT) * easeOutBack(t)
+}
+
+// Swaps in a new toast phase and (re)starts its entrance animation.
+function showToast(phase: 'boardComplete' | 'findMonster' | 'monsterCollected') {
+  toastPhase = phase
+  toastPhaseStartedAt = elapsedTime
+  toastExitStartedAt = null
+  toastExitCallback = null
+}
+
+// Starts the current toast's exit animation; `after` runs once it finishes (see the system loop),
+// right when toastPhase is cleared. If nothing is showing, `after` runs immediately.
+function hideToast(after: () => void) {
+  if (toastPhase === null) {
+    after()
+    return
+  }
+  toastExitStartedAt = elapsedTime
+  toastExitCallback = after
+}
+
+function resetToastState() {
+  toastPhase = null
+  toastPhaseStartedAt = null
+  toastExitStartedAt = null
+  toastExitCallback = null
+}
+
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
 const ERROR_PENALTY = 0.5
 
-// Seconds the "Monster collected!" / "Time's up" screen stays up before the board closes on its own.
+// Seconds the "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
+// Seconds each win-sequence toast stays up before auto-advancing (see showToast()/hideToast()).
+const BOARD_COMPLETE_STAY_DURATION = 4
+const MONSTER_COLLECTED_STAY_DURATION = 6
 
 // "MATCH!" popup: seconds it takes to float up and fade out, and how far (in px) it travels.
 const MATCH_ANIM_DURATION = 0.7
@@ -537,6 +605,24 @@ function getCodexIconSizePx(groupRowSize: number): number {
 // show the sprite's original shading through, since multiply only scales existing brightness.
 const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
 
+// A monster's prize-sheet icon at a given slot, sized by width - height is derived from the
+// collection's own grid aspect (cols/rows) so non-square sheets don't squash the art. Used by the
+// win-sequence toasts (find-the-monster / monster-collected).
+function renderMonsterIcon(slot: number, widthPx: number) {
+  const collection = getCollectionForSlot(slot)
+  const heightPx = widthPx * (collection.prizeGridCols / collection.prizeGridRows)
+  return (
+    <UiEntity
+      uiTransform={{ width: widthPx, height: heightPx, flexShrink: 0 }}
+      uiBackground={{
+        textureMode: 'stretch',
+        texture: { src: collection.prizeImage },
+        uvs: getUvsForPrizeQuadrant(slot - collection.start, collection.prizeGridCols, collection.prizeGridRows)
+      }}
+    />
+  )
+}
+
 // Renders one rarity's label ("Common 3/8") and its badge row(s).
 // iconSizePx is the icon's width (and, scaled by CODEX_ICON_HEIGHT_TO_WIDTH_RATIO, its height) in
 // raw px - see getCodexIconSizePx(). The block's own width is just rowSize * iconSizePx (its
@@ -636,15 +722,25 @@ let timeRemaining = GAME_DURATION
 let gameOver = false
 let won = false
 let checkpointComplete = false
-// True while the win screen has handed off to a physical prize hunt in the 3D scene (see
-// prizeChase.ts) - the memory board itself stays hidden until it resolves (handlePrizeCaught/
-// handlePrizeChaseFailed).
-let catchingPrize = false
 let wonMonsterQuadrant = 0
 let errors = 0
 let score = 0
 let totalScore = 0
+// Drives the gameOver ("Time's up") auto-close only - the win sequence's own timing lives in the
+// toast state below.
 let endScreenShownAt: number | null = null
+
+// Bottom "toast" for the win sequence (Board complete -> Find the monster -> Monster collected -
+// see showToast()/hideToast()/getToastBottomPercent()). null means fully hidden/off-screen.
+type ToastPhase = 'boardComplete' | 'findMonster' | 'monsterCollected' | null
+let toastPhase: ToastPhase = null
+// When the current phase's entrance animation started (also doubles as its "how long has it been
+// showing" clock for the auto-advance timers below).
+let toastPhaseStartedAt: number | null = null
+// Set the moment a hideToast() is requested; once its exit animation finishes, toastExitCallback
+// runs and toastPhase is cleared - see the system loop.
+let toastExitStartedAt: number | null = null
+let toastExitCallback: (() => void) | null = null
 
 let notificationTimer = 0
 let currentNotification: string | null = null
@@ -734,7 +830,7 @@ function flipCell(cell: CellState) {
         if (checkpointComplete) {
           wonMonsterQuadrant = currentCheckpoint - 1
         }
-        endScreenShownAt = elapsedTime
+        showToast('boardComplete')
       }
     } else {
       errors++
@@ -942,32 +1038,54 @@ export function setupUi() {
       }
     }
 
-    if (catchingPrize) {
+    if (toastPhase === 'findMonster') {
       updatePrizeChase(dt)
       timeRemaining = getPrizeChaseSecondsRemaining()
     }
 
+    // gameOver ("Time's up") auto-close - endScreenShownAt is only ever set by that path now, the
+    // win sequence's own timing runs entirely on the toast state below.
     if (endScreenShownAt !== null && elapsedTime - endScreenShownAt >= END_SCREEN_DURATION) {
-      if (won && !checkpointComplete) {
-        startBoard(currentCheckpoint, currentBoardIndex + 1)
-      } else if (won && checkpointComplete && !catchingPrize) {
-        // Hands off from the "Board complete!" screen to the in-world chase - reused as the timer
-        // for how long the "find this monster" banner below stays up, not a fixed close-out delay.
-        catchingPrize = true
-        stopBoardMusic()
-        playTickingSound()
-        startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed)
-        endScreenShownAt = elapsedTime
-      } else if (catchingPrize) {
-        endScreenShownAt = null // just hides the banner text; the chase itself keeps running
+      screen = 'checkpointSelect'
+      playAmbientMusic()
+      won = false
+      gameOver = false
+      checkpointComplete = false
+      endScreenShownAt = null
+    }
+
+    if (toastExitStartedAt !== null && elapsedTime - toastExitStartedAt >= TOAST_EXIT_DURATION) {
+      const afterHide = toastExitCallback
+      resetToastState()
+      afterHide?.()
+    }
+
+    if (
+      toastPhase === 'boardComplete' &&
+      toastExitStartedAt === null &&
+      toastPhaseStartedAt !== null &&
+      elapsedTime - toastPhaseStartedAt >= BOARD_COMPLETE_STAY_DURATION
+    ) {
+      if (checkpointComplete) {
+        // Hands off from the "Board complete!" toast to the in-world chase.
+        hideToast(() => {
+          stopBoardMusic()
+          playTickingSound()
+          startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed)
+          showToast('findMonster')
+        })
       } else {
-        screen = 'checkpointSelect'
-        playAmbientMusic()
-        won = false
-        gameOver = false
-        checkpointComplete = false
-        endScreenShownAt = null
+        hideToast(() => startBoard(currentCheckpoint, currentBoardIndex + 1))
       }
+    }
+
+    if (
+      toastPhase === 'monsterCollected' &&
+      toastExitStartedAt === null &&
+      toastPhaseStartedAt !== null &&
+      elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
+    ) {
+      hideToast(() => resetToIdleAfterChase())
     }
 
     notificationTimer += dt
@@ -986,8 +1104,9 @@ export function showCheckpointSelect() {
 }
 
 // Chase succeeded: grant the collection (mirrors what reportBoardTime's checkpointComplete used
-// to do client-side, now deferred until the player actually catches the prize) and let the player
-// start another round from the Play button.
+// to do client-side, now deferred until the player actually catches the prize), hand off from the
+// "find the monster" toast to "monster collected", and let the player start another round once
+// that toast's own timer closes it (see the system loop).
 function handlePrizeCaught() {
   collectedMonsters[currentCheckpoint - 1] = true
   collectionCounts[currentCheckpoint - 1]++
@@ -995,29 +1114,29 @@ function handlePrizeCaught() {
     highestUnlockedCheckpoint++
   }
   room.send('reportMonsterCaught', { checkpoint: currentCheckpoint })
+  stopTickingSound()
   playPrizeSound()
   // Was 180 (the sweep's opposite half) so it picked up where the board-win orbit (0deg->180deg)
   // left off - but the catch now happens much later, disconnected from that shot, and 180deg
   // showed the player's back instead of their front. Same start as the board-win orbit fixes it.
   triggerCelebrationCamera('fistpump', 0)
-  resetToIdleAfterChase()
+  hideToast(() => showToast('monsterCollected'))
 }
 
 // Chase failed (ran out of attempts): no collection is granted - the player can replay the
 // checkpoint's boards to try catching the monster again.
 function handlePrizeChaseFailed() {
+  stopTickingSound()
   playFailSound()
-  resetToIdleAfterChase()
+  hideToast(() => resetToIdleAfterChase())
 }
 
 function resetToIdleAfterChase() {
-  stopTickingSound()
   screen = 'hidden'
   playAmbientMusic()
   won = false
   gameOver = false
   checkpointComplete = false
-  catchingPrize = false
   endScreenShownAt = null
 }
 
@@ -1044,7 +1163,7 @@ function startBoard(checkpoint: number, boardIndex: number) {
   checkpointComplete = false
   stopPrizeChase()
   stopTickingSound()
-  catchingPrize = false
+  resetToastState()
   errors = 0
   score = 0
   endScreenShownAt = null
@@ -1066,7 +1185,7 @@ function closeBoard() {
   checkpointComplete = false
   stopPrizeChase()
   stopTickingSound()
-  catchingPrize = false
+  resetToastState()
   endScreenShownAt = null
   countdownStart = null
 }
@@ -1807,7 +1926,7 @@ const MemoryMatchUi = () => (
         })()}
     </UiEntity>
 
-    {(won || gameOver) && (
+    {gameOver && !won && (
       <UiEntity
         uiTransform={{
           width: '100%',
@@ -1815,24 +1934,39 @@ const MemoryMatchUi = () => (
           positionType: 'absolute',
           position: { top: 0, left: 0 },
           alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column'
+          justifyContent: 'center'
         }}
       >
-        {won ? (
-          catchingPrize ? (
-            // Banner only shows for the first END_SCREEN_DURATION seconds of the chase (see the
-            // system loop above) - after that it hides so the 3D scene isn't obstructed while the
-            // player runs around looking for it.
-            endScreenShownAt !== null && (
-              <Label
-                value={`Find the ${getRarityLabel(wonMonsterQuadrant)} monster in the scene!`}
-                fontSize={36}
-                color={Color4.White()}
-                textAlign="middle-center"
-              />
-            )
-          ) : (
+        <Label value="Time's up" fontSize={36} color={Color4.White()} />
+      </UiEntity>
+    )}
+
+    {toastPhase !== null && (
+      <UiEntity
+        uiTransform={{
+          width: '100%',
+          positionType: 'absolute',
+          position: { bottom: `${getToastBottomPercent()}%`, left: 0 },
+          // Extra lift above the animated bottom%: margin is raw px (1920x1080 virtual reference,
+          // scaled by virtualWidth/virtualHeight), so it composes with the '%' position above
+          // without mixing units on the same value - '%' drives the slide, this is a fixed offset
+          // on top of wherever that lands.
+          margin: { bottom: TOAST_LIFT_PX },
+          // uiTransform defaults to flexDirection: 'row', where alignItems only centers the
+          // cross axis (vertical) - justifyContent is what centers along a row's main axis.
+          justifyContent: 'center'
+        }}
+      >
+        <UiEntity
+          uiTransform={{
+            flexDirection: toastPhase === 'boardComplete' ? 'column' : 'row',
+            alignItems: 'center',
+            padding: { top: 16, bottom: 16, left: 20, right: 20 }
+          }}
+          // Placeholder background until the toast gets its own frame art - solid black at 50% opacity.
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
+        >
+          {toastPhase === 'boardComplete' && (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
               <Label value="Board complete!" fontSize={36} color={Color4.White()} />
               <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
@@ -1845,10 +1979,29 @@ const MemoryMatchUi = () => (
                 />
               )}
             </UiEntity>
-          )
-        ) : (
-          <Label value="Time's up" fontSize={36} color={Color4.White()} />
-        )}
+          )}
+          {toastPhase === 'findMonster' && renderMonsterIcon(wonMonsterQuadrant, 64)}
+          {toastPhase === 'findMonster' && (
+            <Label
+              value={`Mission: Find the ${getRarityLabel(wonMonsterQuadrant)} monster.\nChance ${getPrizeChaseAttempt()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
+              fontSize={20}
+              color={Color4.White()}
+              textAlign="middle-left"
+              uiTransform={{ margin: { left: 16 } }}
+            />
+          )}
+          {toastPhase === 'monsterCollected' && (
+            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+              {renderMonsterIcon(wonMonsterQuadrant, 192)}
+              <Label
+                value="Monster Collected!"
+                fontSize={28}
+                color={Color4.White()}
+                uiTransform={{ margin: { top: 12 } }}
+              />
+            </UiEntity>
+          )}
+        </UiEntity>
       </UiEntity>
     )}
   </UiEntity>
