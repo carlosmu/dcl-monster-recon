@@ -60,6 +60,8 @@ const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
+const ALPHAS_IMAGE = 'assets/images/alphas.png'
+const ALPHAS_GRID = 8 // alphas.png grid
 
 // A "collection" is one full monster set: its own memory-match card art, its own prize sprite
 // sheet, and its own rarity breakdown. To add a future collection, append a new entry here (with
@@ -502,6 +504,47 @@ function getUvsForQuadrant(index: number, grid: number): number[] {
   return getUvsForBlock(index % grid, Math.floor(index / grid), 1, 1, grid)
 }
 
+// Loading spinner: A1-D4 as ONE combined 4x4 block of alphas.png (same span the old
+// ALPHAS_COLLECTED_UVS used), spun by rotating its 4 UV corners around their own center each
+// frame - UiTransform has no rotate prop, but a quad's UV sampling can still be rotated
+// independently of its (fixed) screen position, which reads as the image itself spinning in place.
+// Unverified in the Explorer: rotated (non-axis-aligned) UV corners are standard for textured
+// quads, but this codebase has only ever fed PBUiBackground axis-aligned rectangles until now.
+const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
+const SPINNER_DEGREES_PER_SECOND = 180
+// Base unit for the spinner behind the Monster Collected toast's icon - box is 3x this, spinner
+// itself is rendered at 4.5x (bigger than its box, so it overflows symmetrically behind the icon).
+const SPINNER_SIZE_PX = 80
+
+function rotateUvsAroundCenter(uvs: number[], angleDeg: number): number[] {
+  const angleRad = (angleDeg * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  const centerU = (uvs[0] + uvs[4]) / 2
+  const centerV = (uvs[1] + uvs[3]) / 2
+  const rotated: number[] = []
+  for (let i = 0; i < uvs.length; i += 2) {
+    const u = uvs[i] - centerU
+    const v = uvs[i + 1] - centerV
+    rotated.push(centerU + u * cos - v * sin, centerV + u * sin + v * cos)
+  }
+  return rotated
+}
+
+function getSpinnerUvs(): number[] {
+  const angle = (elapsedTime * SPINNER_DEGREES_PER_SECOND) % 360
+  return rotateUvsAroundCenter(SPINNER_BASE_UVS, angle)
+}
+
+function renderSpinner(sizePx: number) {
+  return (
+    <UiEntity
+      uiTransform={{ width: sizePx, height: sizePx, flexShrink: 0 }}
+      uiBackground={{ textureMode: 'stretch', texture: { src: ALPHAS_IMAGE }, uvs: getSpinnerUvs() }}
+    />
+  )
+}
+
 // Card back art now spans a 2x2 block of atlas_01.png: A1, A2, B1, B2
 const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
 
@@ -631,6 +674,19 @@ function getCodexIconSizePx(groupRowSize: number): number {
 // own shading, while its alpha (the silhouette shape) is preserved. Any non-zero tint would still
 // show the sprite's original shading through, since multiply only scales existing brightness.
 const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
+
+// 1x -> 1.15x -> 1x breathing pulse for the Monster Collected toast's icon only (1s each leg, 2s
+// full cycle) - same triangle-wave technique as getTimerColor/getPausedBlinkColor above.
+// UiTransform has no scale prop, so this is applied via the icon's own width/height (see
+// renderMonsterIcon) rather than a real transform.
+const MONSTER_PULSE_PERIOD = 2
+const MONSTER_PULSE_MAX_SCALE = 1.15
+
+function getMonsterPulseScale(): number {
+  const phase = ((elapsedTime % MONSTER_PULSE_PERIOD) / MONSTER_PULSE_PERIOD) * 2 // 0..2
+  const triangle = phase <= 1 ? phase : 2 - phase // 0..1..0
+  return 1 + triangle * (MONSTER_PULSE_MAX_SCALE - 1)
+}
 
 // A monster's prize-sheet icon at a given slot, sized by width - height is derived from the
 // collection's own grid aspect (cols/rows) so non-square sheets don't squash the art. Used by the
@@ -2055,14 +2111,36 @@ const MemoryMatchUi = () => (
             />
           )}
           {toastPhase === 'monsterCollected' && (
-            <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              {renderMonsterIcon(wonMonsterQuadrant, 192)}
-              <Label
-                value="Monster Collected!"
-                fontSize={28}
-                color={Color4.White()}
-                uiTransform={{ margin: { top: 12 } }}
-              />
+            <UiEntity
+              uiTransform={{
+                width: SPINNER_SIZE_PX * 3,
+                height: SPINNER_SIZE_PX * 3,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {/* Spinner (4.5x) is bigger than its box (3x) - overflows symmetrically behind the
+              monster icon since the box centers it via flex, no clipping set. */}
+              {renderSpinner(SPINNER_SIZE_PX * 4.5)}
+              <UiEntity
+                uiTransform={{
+                  positionType: 'absolute',
+                  position: { top: 0, left: 0 },
+                  width: '100%',
+                  height: '100%',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {renderMonsterIcon(wonMonsterQuadrant, 192 * getMonsterPulseScale())}
+                <Label
+                  value="Monster Collected!"
+                  fontSize={28}
+                  color={Color4.White()}
+                  uiTransform={{ margin: { top: 12 } }}
+                />
+              </UiEntity>
             </UiEntity>
           )}
           {toastPhase === 'monsterNotCollected' && (
