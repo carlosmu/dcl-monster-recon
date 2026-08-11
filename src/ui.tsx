@@ -335,6 +335,46 @@ function getPlayButtonWidthPx(): number {
   return isMobile() ? PLAY_BUTTON_WIDTH_PX * PLAY_BUTTON_MOBILE_SCALE : PLAY_BUTTON_WIDTH_PX
 }
 
+// Glow behind the Play button: a dedicated glow sprite (PLAY_GLOW_UVS, atlas_01.png A7-D8), the
+// same 4x2 atlas span as the button's own art (PLAY_BUTTON_UVS, C3-F4) - so the button's own real
+// size is a valid reference for scaling this up. 1.5x so it visibly sticks out around the button.
+// color stays white (no tint), only alpha pulses - same triangle-wave technique as other pulses.
+const PLAY_GLOW_SCALE = 1.4
+const PLAY_GLOW_MIN_OPACITY = 0.1
+const PLAY_GLOW_MAX_OPACITY = 1
+
+// Button+glow group scale (1x -> 1.2x -> 1x) and glow opacity (0.1 -> 1 -> 0.1) share the SAME
+// period below, so max scale always lands exactly on max opacity in time - they just use different
+// curve shapes (confirmed by ear: easeOutBack/easeInBack reads better for the scale pop, plain
+// cosine reads better for the opacity fade). UiTransform has no scale prop, so scale is faked by
+// animating the group's own box width/height - the outer anchor stays fixed at the button's base
+// position/size, and the pulse is applied to a nested wrapper centered on that same point (top/left
+// 50% + negative margin), so it grows/shrinks symmetrically in place rather than drifting.
+const PLAY_PULSE_PERIOD = 4 // 2s growing + 2s shrinking
+const PLAY_BUTTON_PULSE_MAX_SCALE = 1.2
+
+// Same easeOutBack/easeInBack pair as the toasts, one per leg (growing/shrinking).
+function getPlayScalePulse(): number {
+  const cyclePos = (elapsedTime % PLAY_PULSE_PERIOD) / PLAY_PULSE_PERIOD // 0..1 over the full period
+  if (cyclePos <= 0.5) {
+    return easeOutBack(cyclePos / 0.5) // 0..1 growing leg
+  }
+  return 1 - easeInBack((cyclePos - 0.5) / 0.5) // 0..1 shrinking leg, inverted to read as 1..0
+}
+
+// Ease-in-out sine (0..1..0) - smoothly accelerates/decelerates through both extremes, no overshoot.
+function getPlayOpacityPulse(): number {
+  return (1 - Math.cos((elapsedTime / PLAY_PULSE_PERIOD) * Math.PI * 2)) / 2
+}
+
+function getPlayButtonPulseScale(): number {
+  return 1 + getPlayScalePulse() * (PLAY_BUTTON_PULSE_MAX_SCALE - 1)
+}
+
+function getPlayGlowOpacity(): number {
+  return PLAY_GLOW_MIN_OPACITY + getPlayOpacityPulse() * (PLAY_GLOW_MAX_OPACITY - PLAY_GLOW_MIN_OPACITY)
+}
+
 function getPlayButtonHeightPx(): number {
   return isMobile() ? PLAY_BUTTON_HEIGHT_PX * PLAY_BUTTON_MOBILE_SCALE : PLAY_BUTTON_HEIGHT_PX
 }
@@ -528,7 +568,7 @@ function getUvsForQuadrant(index: number, grid: number): number[] {
 // Unverified in the Explorer: rotated (non-axis-aligned) UV corners are standard for textured
 // quads, but this codebase has only ever fed PBUiBackground axis-aligned rectangles until now.
 const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
-const SPINNER_DEGREES_PER_SECOND = 180
+const SPINNER_DEGREES_PER_SECOND = 90
 // Base unit for the spinner behind the Monster Collected toast's icon - box is 3x this, spinner
 // itself is rendered at 4.5x (bigger than its box, so it overflows symmetrically behind the icon).
 const SPINNER_SIZE_PX = 80
@@ -553,10 +593,12 @@ function getSpinnerUvs(): number[] {
   return rotateUvsAroundCenter(SPINNER_BASE_UVS, angle)
 }
 
-function renderSpinner(sizePx: number) {
+// heightPx defaults to widthPx (square/circular); pass a smaller value to squash it - the UV
+// rotation math doesn't care about the element's own aspect ratio, it just spins elliptically.
+function renderSpinner(widthPx: number, heightPx: number = widthPx) {
   return (
     <UiEntity
-      uiTransform={{ width: sizePx, height: sizePx, flexShrink: 0 }}
+      uiTransform={{ width: widthPx, height: heightPx, flexShrink: 0 }}
       uiBackground={{ textureMode: 'stretch', texture: { src: ALPHAS_IMAGE }, uvs: getSpinnerUvs() }}
     />
   )
@@ -571,6 +613,7 @@ const CODEX_BUTTON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // A3-B4
 const CHECKPOINTS_BUTTON_UVS = getUvsForBlock(2, 4, 2, 2, BACK_ATLAS_GRID) // C5-D6
 const SCORE_BACKGROUND_UVS = getUvsForBlock(2, 0, 4, 2, BACK_ATLAS_GRID) // C1-F2
 const PLAY_BUTTON_UVS = getUvsForBlock(2, 2, 4, 2, BACK_ATLAS_GRID) // C3-F4
+const PLAY_GLOW_UVS = getUvsForBlock(0, 6, 4, 2, BACK_ATLAS_GRID) // A7-D8 - same 4x2 span as the button
 const SCORE_ICON_UVS = getUvsForBlock(6, 4, 2, 2, BACK_ATLAS_GRID) // G5-H6
 const TIMER_ICON_UVS = getUvsForBlock(4, 4, 2, 2, BACK_ATLAS_GRID) // E5-F6
 const CLOSE_BUTTON_UVS = getUvsForBlock(4, 1, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E2
@@ -1499,24 +1542,72 @@ const MemoryMatchUi = () => (
           borderColor: DEBUG_BORDER_RED
         }}
       >
-        {screen === 'hidden' && (
-          <UiEntity
-            uiTransform={{
-              width: getPlayButtonWidthPx(),
-              height: getPlayButtonHeightPx(),
-              flexShrink: 0,
-              positionType: 'absolute',
-              // Pinned to the bottom of the body, centered horizontally (left computed in raw px
-              // from the button's own size - see getPlayButtonLeftPx()).
-              position: { bottom: getPlayButtonBottomPercent(), left: getPlayButtonLeftPx() },
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'flex-end'
-            }}
-            uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
-            onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
-          />
-        )}
+        {screen === 'hidden' &&
+          (() => {
+            const pulseScale = getPlayButtonPulseScale()
+            const pulseWidth = getPlayButtonWidthPx() * pulseScale
+            const pulseHeight = getPlayButtonHeightPx() * pulseScale
+            return (
+              <UiEntity
+                uiTransform={{
+                  positionType: 'absolute',
+                  // Pinned to the bottom of the body, centered horizontally (left computed in raw
+                  // px from the button's own size - see getPlayButtonLeftPx()). Fixed at the
+                  // button's base position/size - just an anchor point for the pulsing group below.
+                  position: { bottom: getPlayButtonBottomPercent(), left: getPlayButtonLeftPx() },
+                  width: getPlayButtonWidthPx(),
+                  height: getPlayButtonHeightPx()
+                }}
+              >
+                {/* Pulsing group (button + glow together): centered on the anchor's own center via
+                top/left 50% + negative margin, so it grows/shrinks in place. */}
+                <UiEntity
+                  uiTransform={{
+                    positionType: 'absolute',
+                    position: { top: '50%', left: '50%' },
+                    margin: { top: -pulseHeight / 2, left: -pulseWidth / 2 },
+                    width: pulseWidth,
+                    height: pulseHeight,
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {/* Glow: dedicated sprite (PLAY_GLOW_UVS), 1.4x the button's size, pulsing opacity. */}
+                  <UiEntity
+                    uiTransform={{
+                      positionType: 'absolute',
+                      position: { top: 0, left: 0 },
+                      margin: {
+                        top: -(pulseHeight * (PLAY_GLOW_SCALE - 1)) / 2,
+                        left: -(pulseWidth * (PLAY_GLOW_SCALE - 1)) / 2
+                      },
+                      width: pulseWidth * PLAY_GLOW_SCALE,
+                      height: pulseHeight * PLAY_GLOW_SCALE
+                    }}
+                    uiBackground={{
+                      textureMode: 'stretch',
+                      texture: { src: BACK_IMAGE },
+                      uvs: PLAY_GLOW_UVS,
+                      color: Color4.create(1, 1, 1, getPlayGlowOpacity())
+                    }}
+                  />
+                  <UiEntity
+                    uiTransform={{
+                      positionType: 'absolute',
+                      position: { top: 0, left: 0 },
+                      width: '100%',
+                      height: '100%',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end'
+                    }}
+                    uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
+                    onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
+                  />
+                </UiEntity>
+              </UiEntity>
+            )
+          })()}
 
         {/* PROVISIONAL: board 1/2/3 progress, see showingBoardProgress(). */}
         {showingBoardProgress() && (
@@ -2206,13 +2297,15 @@ const MemoryMatchUi = () => (
           )}
           {toastPhase === 'findMonster' && renderMonsterIcon(wonMonsterQuadrant, 64)}
           {toastPhase === 'findMonster' && (
-            <Label
-              value={`Collect the monster.\nChances: ${getPrizeChaseChancesRemaining()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
-              fontSize={20}
-              color={Color4.White()}
-              textAlign="middle-left"
-              uiTransform={{ margin: { left: 16 } }}
-            />
+            <UiEntity uiTransform={{ flexDirection: 'column', margin: { left: 16 } }}>
+              <Label value="Mission:" fontSize={28} color={Color4.White()} textAlign="middle-left" />
+              <Label
+                value={`Collect the monster.\nChances: ${getPrizeChaseChancesRemaining()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
+                fontSize={20}
+                color={Color4.White()}
+                textAlign="middle-left"
+              />
+            </UiEntity>
           )}
           {toastPhase === 'monsterCollected' && (
             <Label value="Monster Collected!" fontSize={28} color={Color4.White()} textAlign="middle-center" />
