@@ -211,6 +211,23 @@ const CANVAS_MAIN_PADDING_PX = 11
 const BODY_PADDING_PX = 22
 const FOOTER_MIN_HEIGHT_MOBILE_PX = 30
 const FOOTER_MIN_HEIGHT_DESKTOP_PX = 100
+
+// PROVISIONAL: board-progress pips (1/2/3), shown just below the header while playing through a
+// checkpoint's 3 boards. Real screen units ('vh'/'%'), not raw px - this is a standalone strip,
+// not mixed with any raw-px sibling, so there's no virtual-scale mismatch to worry about here.
+const BOARD_PROGRESS_TOP_INSET_VH = '1vh'
+const BOARD_PROGRESS_BAR_WIDTH_PERCENT = '60%'
+const BOARD_PROGRESS_BAR_PADDING_VH = '0.3vh'
+const BOARD_PROGRESS_BAR_COLOR = Color4.create(0, 0, 0, 1)
+const BOARD_PROGRESS_PIP_SIZE_VH = '3.15vh'
+const BOARD_PROGRESS_PIP_ACTIVE_COLOR = Color4.fromHexString('#2ecc71')
+const BOARD_PROGRESS_PIP_INACTIVE_COLOR = Color4.create(1, 1, 1, 0.25)
+
+// Visible from Play through the checkpoint's 3 boards (including the "Board complete!" toast
+// between them) - hidden once the sequence moves into the prize chase, and on every other screen.
+function showingBoardProgress(): boolean {
+  return screen === 'board' && toastPhase !== 'findMonster' && toastPhase !== 'monsterCollected' && toastPhase !== 'monsterNotCollected'
+}
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
 // down). Cells must stay square: mixing a '%' width (resolves against the real, already-scaled
 // frame) with a 'vw' height (bypasses virtualWidth/virtualHeight entirely and reads the true
@@ -1501,6 +1518,60 @@ const MemoryMatchUi = () => (
           />
         )}
 
+        {/* PROVISIONAL: board 1/2/3 progress, see showingBoardProgress(). */}
+        {showingBoardProgress() && (
+          <UiEntity
+            uiTransform={{
+              positionType: 'absolute',
+              position: { top: BOARD_PROGRESS_TOP_INSET_VH, left: 0 },
+              width: '100%',
+              margin: { top: '3vh' },
+              justifyContent: 'center'
+            }}
+          >
+            <UiEntity
+              uiTransform={{
+                width: BOARD_PROGRESS_BAR_WIDTH_PERCENT,
+                height: 'auto',
+                borderRadius: 20,
+                padding: { left: BOARD_PROGRESS_BAR_PADDING_VH, right: BOARD_PROGRESS_BAR_PADDING_VH },
+                flexDirection: 'row',
+                alignItems: 'center'
+              }}
+              uiBackground={{ color: BOARD_PROGRESS_BAR_COLOR }}
+            >
+              <UiEntity uiTransform={{ width: '50%', padding: { left: 10, right: 10 }, flexDirection: 'row', justifyContent: 'center' }}>
+                <Label value="Board progression:" fontSize={20} color={Color4.White()} textWrap="nowrap" />
+              </UiEntity>
+              <UiEntity
+                uiTransform={{
+                  width: '50%',
+                  padding: { left: 10, right: 10 },
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                {[0, 1, 2].map((boardIndex) => (
+                  <UiEntity
+                    key={boardIndex}
+                    uiTransform={{
+                      width: BOARD_PROGRESS_PIP_SIZE_VH,
+                      height: BOARD_PROGRESS_PIP_SIZE_VH,
+                      borderRadius: 999,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    uiBackground={{ color: boardIndex === currentBoardIndex ? BOARD_PROGRESS_PIP_ACTIVE_COLOR : BOARD_PROGRESS_PIP_INACTIVE_COLOR }}
+                  >
+                    <Label value={`${boardIndex + 1}`} fontSize={31.5} color={Color4.White()} textAlign="middle-center" />
+                  </UiEntity>
+                ))}
+              </UiEntity>
+            </UiEntity>
+          </UiEntity>
+        )}
+
         {screen === 'board' && !won && !gameOver && countdownStart !== null && (
           (() => {
             const elapsed = elapsedTime - countdownStart
@@ -2057,6 +2128,39 @@ const MemoryMatchUi = () => (
       </UiEntity>
     )}
 
+    {/* Spinner + pulsing monster icon, centered on screen - separate from the bottom toast so it
+    reads as "the reward", while the toast box below just carries the "Monster Collected!" text.
+    Visible for exactly as long as the toast phase is (including its slide in/out window). */}
+    {toastPhase === 'monsterCollected' && (
+      <UiEntity
+        uiTransform={{
+          positionType: 'absolute',
+          position: { top: '50%', left: '50%' },
+          margin: { top: -(SPINNER_SIZE_PX * 3) / 2, left: -(SPINNER_SIZE_PX * 3) / 2 },
+          width: SPINNER_SIZE_PX * 3,
+          height: SPINNER_SIZE_PX * 3,
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {/* Spinner (4.5x) is bigger than its box (3x) - overflows symmetrically behind the icon
+        since the box centers it via flex, no clipping set. */}
+        {renderSpinner(SPINNER_SIZE_PX * 4.5)}
+        <UiEntity
+          uiTransform={{
+            positionType: 'absolute',
+            position: { top: 0, left: 0 },
+            width: '100%',
+            height: '100%',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {renderMonsterIcon(wonMonsterQuadrant, 192 * getMonsterPulseScale())}
+        </UiEntity>
+      </UiEntity>
+    )}
+
     {toastPhase !== null && (
       <UiEntity
         uiTransform={{
@@ -2111,37 +2215,7 @@ const MemoryMatchUi = () => (
             />
           )}
           {toastPhase === 'monsterCollected' && (
-            <UiEntity
-              uiTransform={{
-                width: SPINNER_SIZE_PX * 3,
-                height: SPINNER_SIZE_PX * 3,
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {/* Spinner (4.5x) is bigger than its box (3x) - overflows symmetrically behind the
-              monster icon since the box centers it via flex, no clipping set. */}
-              {renderSpinner(SPINNER_SIZE_PX * 4.5)}
-              <UiEntity
-                uiTransform={{
-                  positionType: 'absolute',
-                  position: { top: 0, left: 0 },
-                  width: '100%',
-                  height: '100%',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                {renderMonsterIcon(wonMonsterQuadrant, 192 * getMonsterPulseScale())}
-                <Label
-                  value="Monster Collected!"
-                  fontSize={28}
-                  color={Color4.White()}
-                  uiTransform={{ margin: { top: 12 } }}
-                />
-              </UiEntity>
-            </UiEntity>
+            <Label value="Monster Collected!" fontSize={28} color={Color4.White()} textAlign="middle-center" />
           )}
           {toastPhase === 'monsterNotCollected' && (
             <Label value="Monster Not Collected" fontSize={28} color={Color4.White()} textAlign="middle-center" />
