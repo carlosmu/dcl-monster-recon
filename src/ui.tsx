@@ -331,16 +331,17 @@ function getPlayButtonLeftPx(): number {
 // below to rest at the Play button's own bottom%, then - later, on hideToast() - slides back down.
 // Position is animated purely in '%' (matching getPlayButtonBottomPercent()'s own unit) so the
 // interpolation never mixes with a raw-px size, the mixing bug this file has hit before.
-const TOAST_OFFSCREEN_BOTTOM_PERCENT = -30
+const TOAST_OFFSCREEN_BOTTOM_PERCENT = -55
 const TOAST_ENTER_DURATION = 0.4 // seconds - quick slide up
 const TOAST_EXIT_DURATION = 0.25 // seconds - quick slide down
 // Raw px (1920x1080 virtual reference) lift above the resting bottom%, so the toasts sit higher
 // than the Play button rather than exactly on top of it.
 const TOAST_LIFT_PX = 100
 
-// easeOutBack: fast entrance that overshoots slightly past 1 before settling - see easings.net.
+// easeOutBack: fast entrance that overshoots past 1 before settling - see easings.net. c1 controls
+// how big the overshoot is (1.70158 is the "standard" amount; bumped up for a punchier bounce).
 function easeOutBack(t: number): number {
-  const c1 = 1.70158
+  const c1 = 3.2
   const c3 = c1 + 1
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
@@ -383,6 +384,25 @@ function resetToastState() {
   toastPhaseStartedAt = null
   toastExitStartedAt = null
   toastExitCallback = null
+  toastShakeStartedAt = null
+}
+
+// "Missed" shake on the find-the-monster toast (see handlePrizeMissed): a decaying horizontal
+// wobble applied as a margin offset on the toast box, independent of its enter/exit slide above.
+const TOAST_SHAKE_DURATION = 0.4 // seconds
+const TOAST_SHAKE_MAGNITUDE_PX = 20
+const TOAST_SHAKE_OSCILLATIONS = 4 // full left-right cycles over TOAST_SHAKE_DURATION
+
+function triggerToastShake() {
+  toastShakeStartedAt = elapsedTime
+}
+
+function getToastShakeOffsetPx(): number {
+  if (toastShakeStartedAt === null) return 0
+  const t = elapsedTime - toastShakeStartedAt
+  if (t >= TOAST_SHAKE_DURATION) return 0
+  const decay = 1 - t / TOAST_SHAKE_DURATION
+  return Math.sin(t * TOAST_SHAKE_OSCILLATIONS * Math.PI * 2) * TOAST_SHAKE_MAGNITUDE_PX * decay
 }
 
 const BASE_POINTS_PER_PAIR = 5
@@ -741,6 +761,8 @@ let toastPhaseStartedAt: number | null = null
 // runs and toastPhase is cleared - see the system loop.
 let toastExitStartedAt: number | null = null
 let toastExitCallback: (() => void) | null = null
+// Set on a missed hop (see triggerToastShake()); decays back to null-effect after TOAST_SHAKE_DURATION.
+let toastShakeStartedAt: number | null = null
 
 let notificationTimer = 0
 let currentNotification: string | null = null
@@ -1071,7 +1093,7 @@ export function setupUi() {
         hideToast(() => {
           stopBoardMusic()
           playTickingSound()
-          startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed)
+          startPrizeChase(handlePrizeCaught, handlePrizeChaseFailed, handlePrizeMissed)
           showToast('findMonster')
         })
       } else {
@@ -1129,6 +1151,13 @@ function handlePrizeChaseFailed() {
   stopTickingSound()
   playFailSound()
   hideToast(() => resetToIdleAfterChase())
+}
+
+// A hop timed out and the prize moved to a new spot without being caught: shake the "find the
+// monster" toast and play the same fail sound as a missed board match.
+function handlePrizeMissed() {
+  playFailSound()
+  triggerToastShake()
 }
 
 function resetToIdleAfterChase() {
@@ -1961,10 +1990,14 @@ const MemoryMatchUi = () => (
           uiTransform={{
             flexDirection: toastPhase === 'boardComplete' ? 'column' : 'row',
             alignItems: 'center',
-            padding: { top: 16, bottom: 16, left: 20, right: 20 }
+            padding: { top: 16, bottom: 16, left: 20, right: 20 },
+            borderRadius: 15,
+            // Missed-hop shake (see triggerToastShake()) - a decaying left/right wobble independent
+            // of the enter/exit slide on the wrapper above.
+            margin: { left: getToastShakeOffsetPx() }
           }}
-          // Placeholder background until the toast gets its own frame art - solid black at 50% opacity.
-          uiBackground={{ color: Color4.create(0, 0, 0, 0.5) }}
+          // Placeholder background until the toast gets its own frame art - solid black at 85% opacity.
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
         >
           {toastPhase === 'boardComplete' && (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>

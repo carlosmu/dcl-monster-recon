@@ -52,6 +52,7 @@ let prizeModel: Entity | null = null
 let lastMarkerName: string | null = null
 let onCaughtCallback: (() => void) | null = null
 let onFailedCallback: (() => void) | null = null
+let onMissedCallback: (() => void) | null = null
 
 function pickRandomMarkerName(): string {
   let name = PRIZE_MARKER_NAMES[Math.floor(Math.random() * PRIZE_MARKER_NAMES.length)]
@@ -79,6 +80,7 @@ function handleCatch() {
   despawnCurrentHop()
   onCaughtCallback = null
   onFailedCallback = null
+  onMissedCallback = null
   onCaught?.()
 }
 
@@ -119,13 +121,15 @@ function spawnHop() {
 }
 
 // Spawns the first hop and starts the chase. onCaught fires once the player touches the prize;
-// onFailed fires if MAX_ATTEMPTS hops pass with no catch. Exactly one of the two fires, once.
-export function startPrizeChase(onCaught: () => void, onFailed: () => void) {
+// onFailed fires if MAX_ATTEMPTS hops pass with no catch; onMissed fires each time a hop times out
+// and a new one spawns (not on the very first hop). Exactly one of onCaught/onFailed fires, once.
+export function startPrizeChase(onCaught: () => void, onFailed: () => void, onMissed: () => void) {
   active = true
   attempt = 0
   lastMarkerName = null
   onCaughtCallback = onCaught
   onFailedCallback = onFailed
+  onMissedCallback = onMissed
   spawnHop()
 }
 
@@ -141,10 +145,12 @@ export function updatePrizeChase(dt: number) {
     despawnCurrentHop()
     onCaughtCallback = null
     onFailedCallback = null
+    onMissedCallback = null
     onFailed?.()
     return
   }
 
+  onMissedCallback?.()
   spawnHop()
 }
 
@@ -163,5 +169,6 @@ export function stopPrizeChase() {
   active = false
   onCaughtCallback = null
   onFailedCallback = null
+  onMissedCallback = null
   despawnCurrentHop()
 }
