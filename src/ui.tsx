@@ -178,6 +178,14 @@ const SCREEN_SUBTITLE_FONT_SIZE_PX = SCREEN_TITLE_FONT_SIZE_PX * 0.6
 const LEADERBOARD_LIST_WIDTH_PX = 300
 const LEADERBOARD_ROW_NAME_FONT_SIZE_PX = 24
 const LEADERBOARD_ROW_SCORE_FONT_SIZE_PX = 16
+// Fixed width for the "1." / "10." rank column - wide enough for 2 digits + the dot, so every
+// row's rank is the same width and right-aligned (name column starts at the same x regardless of
+// rank digit count).
+const LEADERBOARD_RANK_WIDTH_PX = 40
+// PLACEHOLDER: reserved square for each row's profile picture. No real avatar data available yet
+// (LeaderboardEntry only carries playerName/score, no userId - see messages.ts) - this is layout
+// only, filled with a solid color until that's wired up.
+const LEADERBOARD_AVATAR_SIZE_PX = 28
 // Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
 // the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
 // virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
@@ -826,7 +834,18 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
                     }}
                   >
                     <UiEntity uiTransform={{ padding: { top: 0, bottom: 2, left: 2, right: 0 }}} uiBackground={{ color: Color4.fromHexString('#00692c59') }}>
-                      <BitmapText text={`x${collectionCounts[slot]}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={14} />
+                      {/* Label has no intrinsic size in DCL (text isn't measured for layout), so
+                      without an explicit width/height it renders inside an oversized default box.
+                      Width is sized off the string length (no true text measurement available) to
+                      track "x2" vs "x10" instead of leaving slack around longer counts. */}
+                      <Label
+                        value={`x${collectionCounts[slot]}`}
+                        fontSize={14}
+                        color={Color4.White()}
+                        textAlign="middle-center"
+                        textWrap="nowrap"
+                        uiTransform={{ width: `x${collectionCounts[slot]}`.length * 9, height: 16 }}
+                      />
                     </UiEntity>
                   </UiEntity>
                 )}
@@ -2041,7 +2060,7 @@ const MemoryMatchUi = () => (
               flexDirection: 'column',
               alignItems: 'center',
               padding: getFramePaddingPx(),
-              borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+              borderWidth: 2,
               borderColor: DEBUG_BORDER_RED
             }}
             uiBackground={{
@@ -2057,7 +2076,9 @@ const MemoryMatchUi = () => (
                 positionType: 'absolute',
                 position: { top: 8, right: 8 },
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: DEBUG_BORDER_BLUE
               }}
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeLeaderboard()}
@@ -2069,20 +2090,20 @@ const MemoryMatchUi = () => (
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               uiTransform={{
                 margin: { bottom: 12 },
-                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                borderWidth: 2,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             />
             <UiEntity
               uiTransform={{
-                width: LEADERBOARD_LIST_WIDTH_PX,
+                width: '90%',
                 flexDirection: 'column',
-                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                borderWidth: 2,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             >
               {leaderboard.length === 0 ? (
-                <BitmapText text="No scores yet" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} uiTransform={{ width: '100%' }} align="center" />
+                <BitmapText text="No scores yet" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} uiTransform={{ width: '100%', borderWidth: 2, borderColor: DEBUG_BORDER_WHITE }} align="center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
@@ -2092,12 +2113,59 @@ const MemoryMatchUi = () => (
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       padding: { top: 4, bottom: 4 },
-                      borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
+                      borderWidth: 2,
                       borderColor: DEBUG_BORDER_GREEN
                     }}
                   >
-                    <Label value={`${index + 1}. ${entry.playerName}`} fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} />
-                    <BitmapText text={`${entry.score}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX} />
+                    <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+                      <Label
+                        value={`${index + 1}.`}
+                        fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX}
+                        color={SCREEN_TEXT_COLOR}
+                        textAlign="middle-right"
+                        textWrap="nowrap"
+                        uiTransform={{
+                          width: LEADERBOARD_RANK_WIDTH_PX,
+                          height: LEADERBOARD_ROW_NAME_FONT_SIZE_PX * 1.3,
+                          flexShrink: 0,
+                          borderWidth: 2,
+                          borderColor: Color4.Yellow()
+                        }}
+                      />
+                      <UiEntity
+                        uiTransform={{
+                          width: LEADERBOARD_AVATAR_SIZE_PX,
+                          height: LEADERBOARD_AVATAR_SIZE_PX,
+                          flexShrink: 0,
+                          borderRadius: 999,
+                          margin: { right: 6 },
+                          borderWidth: 2,
+                          borderColor: Color4.Yellow()
+                        }}
+                        uiBackground={{ color: Color4.create(0.5, 0.5, 0.5, 1) }}
+                      />
+                      <Label
+                        value={entry.playerName}
+                        fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX}
+                        color={SCREEN_TEXT_COLOR}
+                        textWrap="nowrap"
+                        uiTransform={{
+                          width: LEADERBOARD_LIST_WIDTH_PX - 70 - LEADERBOARD_RANK_WIDTH_PX - LEADERBOARD_AVATAR_SIZE_PX - 6,
+                          height: LEADERBOARD_ROW_NAME_FONT_SIZE_PX * 1.3,
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                          borderWidth: 2,
+                          borderColor: Color4.Yellow()
+                        }}
+                      />
+                    </UiEntity>
+                    <BitmapText
+                      text={`${entry.score}`}
+                      font={GERM_ONE_FONT}
+                      image={GERM_ONE_IMAGE_BROWN}
+                      fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX}
+                      uiTransform={{ borderWidth: 2, borderColor: DEBUG_BORDER_BLUE }}
+                    />
                   </UiEntity>
                 ))
               )}
