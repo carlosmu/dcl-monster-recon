@@ -4,14 +4,14 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 27,
+        "duration": 25,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
       {
         "cols": 3,
         "rows": 2,
-        "duration": 9,
+        "duration": 12,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -36,14 +36,14 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 23,
+        "duration": 12,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
       {
         "cols": 4,
         "rows": 3,
-        "duration": 32,
+        "duration": 30,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       }
@@ -54,14 +54,14 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 22,
+        "duration": 20,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
       {
         "cols": 3,
         "rows": 2,
-        "duration": 22,
+        "duration": 13,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -111,7 +111,7 @@
       {
         "cols": 3,
         "rows": 2,
-        "duration": 16,
+        "duration": 10,
         "flipTimeout": 1,
         "scoreMultiplier": 1
       },
@@ -129,21 +129,21 @@
       {
         "cols": 4,
         "rows": 3,
-        "duration": 37,
+        "duration": 27,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       },
       {
         "cols": 4,
         "rows": 3,
-        "duration": 18,
+        "duration": 25,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       },
       {
         "cols": 4,
         "rows": 4,
-        "duration": 44,
+        "duration": 40,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       }
@@ -155,31 +155,6 @@
         "cols": 4,
         "rows": 3,
         "duration": 34,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
-      },
-      {
-        "cols": 4,
-        "rows": 3,
-        "duration": 33,
-        "flipTimeout": 1,
-        "scoreMultiplier": 1.5
-      },
-      {
-        "cols": 4,
-        "rows": 4,
-        "duration": 41,
-        "flipTimeout": 0.9,
-        "scoreMultiplier": 2
-      }
-    ]
-  },
-  {
-    "boards": [
-      {
-        "cols": 4,
-        "rows": 3,
-        "duration": 31,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       },
@@ -204,6 +179,31 @@
       {
         "cols": 4,
         "rows": 3,
+        "duration": 31,
+        "flipTimeout": 1,
+        "scoreMultiplier": 1.5
+      },
+      {
+        "cols": 4,
+        "rows": 3,
+        "duration": 22,
+        "flipTimeout": 1,
+        "scoreMultiplier": 1.5
+      },
+      {
+        "cols": 4,
+        "rows": 4,
+        "duration": 33,
+        "flipTimeout": 0.9,
+        "scoreMultiplier": 2
+      }
+    ]
+  },
+  {
+    "boards": [
+      {
+        "cols": 4,
+        "rows": 3,
         "duration": 28,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
@@ -211,14 +211,14 @@
       {
         "cols": 4,
         "rows": 3,
-        "duration": 27,
+        "duration": 20,
         "flipTimeout": 1,
         "scoreMultiplier": 1.5
       },
       {
         "cols": 4,
         "rows": 4,
-        "duration": 36,
+        "duration": 30,
         "flipTimeout": 0.9,
         "scoreMultiplier": 2
       }

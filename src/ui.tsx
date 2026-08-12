@@ -10,6 +10,7 @@ import {
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
+import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 import {
@@ -42,7 +43,7 @@ const DEBUG_SCORE_OVERRIDE = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
-const AMBIENT_MUSIC_CLIP = 'assets/audio/Medieval_Astrology.mp3'
+const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
 const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
 const BOARD_END_CLIP = 'assets/audio/get_points.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
@@ -321,8 +322,9 @@ const TIMER_FONT_SIZE_VW = `${HEADER_LEFT_ICON_HEIGHT_VW_NUM * 0.37}vw`
 const HEADER_LEFT_BOX_WIDTH_PX = 180
 const HEADER_LEFT_BOX_HEIGHT_PX = 90
 const STAT_ICON_SIZE_PX = 60
-const SCORE_FONT_SIZE_PX = 30
-const TIMER_FONT_SIZE_PX = 45
+// Score and timer/"Paused" text share this one size now (bitmap font, header stat boxes) - the
+// midpoint of the old separate score (30px) and timer (45px) sizes.
+const STAT_FONT_SIZE_PX = 37.5
 const HEADER_LEFT_BOX_PADDING_PX = 22
 // Play button lives in the body ("main") container while screen === 'hidden'. Raw px at the
 // 1920x1080 virtual reference, scaled by virtualWidth/virtualHeight like everything else here.
@@ -783,7 +785,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
       key={rarity.label}
       uiTransform={{ width: rowSize * iconSizePx, flexDirection: 'column', alignItems: 'flex-start', margin: { right: marginRightPx } }}
     >
-      <Label value={`${rarity.label} ${collected}/${total}`} fontSize={24} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 22, bottom: 0 } }} />
+      <BitmapText text={`${rarity.label} ${collected}/${total}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={24} uiTransform={{ margin: { top: 22, bottom: 0 } }} />
       {Array.from({ length: rows }, (_, rowIndex) => (
         <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
           {Array.from({ length: rowSize }, (_, colIndex) => {
@@ -824,18 +826,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
                     }}
                   >
                     <UiEntity uiTransform={{ padding: { top: 0, bottom: 2, left: 2, right: 0 }}} uiBackground={{ color: Color4.fromHexString('#00692c59') }}>
-                      {/* Label has no intrinsic size in DCL (text isn't measured for layout), so
-                      without an explicit width/height it renders inside an oversized default box.
-                      Width is sized off the string length (no true text measurement available) to
-                      track "x2" vs "x10" instead of leaving slack around longer counts. */}
-                      <Label
-                        value={`x${collectionCounts[slot]}`}
-                        fontSize={14}
-                        color={Color4.White()}
-                        textAlign="middle-center"
-                        textWrap="nowrap"
-                        uiTransform={{ width: `x${collectionCounts[slot]}`.length * 9, height: 16 }}
-                      />
+                      <BitmapText text={`x${collectionCounts[slot]}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={14} />
                     </UiEntity>
                   </UiEntity>
                 )}
@@ -1070,7 +1061,7 @@ export function setupUi() {
 
   ambientMusicEntity = engine.addEntity()
   Transform.create(ambientMusicEntity)
-  AudioSource.create(ambientMusicEntity, { audioClipUrl: AMBIENT_MUSIC_CLIP, playing: true, loop: true, volume: 0.1, global: true })
+  AudioSource.create(ambientMusicEntity, { audioClipUrl: AMBIENT_MUSIC_CLIP, playing: true, loop: true, volume: 1, global: true })
 
   boardMusicEntity = engine.addEntity()
   Transform.create(boardMusicEntity)
@@ -1460,13 +1451,15 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
             />
             <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_ICON_UVS }} />
-            <Label
-              value={DEBUG_SCORE_OVERRIDE ? '99.999' : `${totalScore}`}
-              fontSize={SCORE_FONT_SIZE_PX}
-              textWrap="nowrap"
-              textAlign="middle-right"
-              color={Color4.White()}
-            />
+            <UiEntity uiTransform={{ flexGrow: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <BitmapText
+                text={DEBUG_SCORE_OVERRIDE ? '99.999' : `${totalScore}`}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE}
+                fontSize={STAT_FONT_SIZE_PX}
+                color={Color4.White()}
+              />
+            </UiEntity>
           </UiEntity>
 
           {(screen === 'board' || previousScreen === 'board') && (
@@ -1489,11 +1482,13 @@ const MemoryMatchUi = () => (
                 uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
               />
               <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
-              {screen === 'board' ? (
-                <Label value={`${Math.ceil(timeRemaining)}s`} fontSize={TIMER_FONT_SIZE_PX} textWrap="nowrap" textAlign="middle-center" color={getTimerColor()} />
-              ) : (
-                <Label value="Paused" fontSize={SCORE_FONT_SIZE_PX} textWrap="nowrap" textAlign="middle-center" color={getPausedBlinkColor()} />
-              )}
+              <UiEntity uiTransform={{ flexGrow: 1, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+                {screen === 'board' ? (
+                  <BitmapText text={`${Math.ceil(timeRemaining)}s`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={STAT_FONT_SIZE_PX} color={getTimerColor()} />
+                ) : (
+                  <BitmapText text="Paused" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={STAT_FONT_SIZE_PX} color={getPausedBlinkColor()} />
+                )}
+              </UiEntity>
             </UiEntity>
           )}
         </UiEntity>
@@ -1632,7 +1627,7 @@ const MemoryMatchUi = () => (
               uiBackground={{ color: BOARD_PROGRESS_BAR_COLOR }}
             >
               <UiEntity uiTransform={{ width: '50%', padding: { left: 10, right: 10 }, flexDirection: 'row', justifyContent: 'center' }}>
-                <Label value="Board progression:" fontSize={20} color={Color4.White()} textWrap="nowrap" />
+                <BitmapText text="Board progression:" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={20} />
               </UiEntity>
               <UiEntity
                 uiTransform={{
@@ -1655,7 +1650,7 @@ const MemoryMatchUi = () => (
                     }}
                     uiBackground={{ color: boardIndex === currentBoardIndex ? BOARD_PROGRESS_PIP_ACTIVE_COLOR : BOARD_PROGRESS_PIP_INACTIVE_COLOR }}
                   >
-                    <Label value={`${boardIndex + 1}`} fontSize={31.5} color={Color4.White()} textAlign="middle-center" />
+                    <BitmapText text={`${boardIndex + 1}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={31.5} />
                   </UiEntity>
                 ))}
               </UiEntity>
@@ -1679,7 +1674,7 @@ const MemoryMatchUi = () => (
                 }}
                 uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: COUNTDOWN_BACKGROUND_UVS }}
               >
-                <Label value={`${value}`} fontSize={fontSize} color={Color4.White()} textAlign="middle-center" />
+                <BitmapText text={`${value}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={fontSize} />
               </UiEntity>
             )
           })()
@@ -1734,35 +1729,35 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeBoard()}
             />
-            <Label
-              value={`Checkpoint ${currentCheckpoint}`}
+            <BitmapText
+              text={`Checkpoint ${currentCheckpoint}`}
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
-              color={SCREEN_TEXT_COLOR}
-              textWrap="nowrap"
               uiTransform={{
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             />
-            <Label
-              value={`Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
+            <BitmapText
+              text={`Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
-              color={SCREEN_TEXT_COLOR}
-              textWrap="nowrap"
               uiTransform={{
                 margin: { bottom: 4 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             />
-            <Label
-              value={(() => {
+            <BitmapText
+              text={(() => {
                 const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
                 return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
               })()}
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
-              color={SCREEN_TEXT_COLOR}
-              textWrap="nowrap"
               uiTransform={{
                 margin: { bottom: 12 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -1891,7 +1886,7 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeCheckpointSelect()}
             />
-            <Label value="Select checkpoint" fontSize={SCREEN_TITLE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} uiTransform={{ margin: { top: 4, bottom: 12 } }} />
+            <BitmapText text="Select checkpoint" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_TITLE_FONT_SIZE_PX} uiTransform={{ margin: { top: 4, bottom: 12 } }} />
             <UiEntity
               uiTransform={{
                 width: '90%',
@@ -1945,12 +1940,7 @@ const MemoryMatchUi = () => (
                         onMouseDown={unlocked ? () => startCheckpoint(checkpoint) : undefined}
                       >
                         {unlocked ? (
-                          <Label
-                            value={String(checkpoint).padStart(2, '0')}
-                            fontSize={35}
-                            color={SCREEN_TEXT_COLOR}
-                            textAlign="middle-center"
-                          />
+                          <BitmapText text={String(checkpoint).padStart(2, '0')} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={35} />
                         ) : (
                           <UiEntity
                             uiTransform={{ width: getCheckpointSelectLockIconSizePx(), height: getCheckpointSelectLockIconSizePx() }}
@@ -1997,10 +1987,11 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeInventory()}
             />
-            <Label
-              value="Monster Codex"
+            <BitmapText
+              text="Monster Codex"
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
-              color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -2071,10 +2062,11 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeLeaderboard()}
             />
-            <Label
-              value="Leaderboard"
+            <BitmapText
+              text="Leaderboard"
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
-              color={SCREEN_TEXT_COLOR}
               uiTransform={{
                 margin: { bottom: 12 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -2090,7 +2082,7 @@ const MemoryMatchUi = () => (
               }}
             >
               {leaderboard.length === 0 ? (
-                <Label value="No scores yet" fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} textAlign="middle-center" />
+                <BitmapText text="No scores yet" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} uiTransform={{ width: '100%' }} align="center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
@@ -2105,7 +2097,7 @@ const MemoryMatchUi = () => (
                     }}
                   >
                     <Label value={`${index + 1}. ${entry.playerName}`} fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} />
-                    <Label value={`${entry.score}`} fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX} color={SCREEN_TEXT_COLOR} />
+                    <BitmapText text={`${entry.score}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX} />
                   </UiEntity>
                 ))
               )}
@@ -2198,7 +2190,7 @@ const MemoryMatchUi = () => (
               }}
               uiBackground={{ color: Color4.fromHexString('#522c14') }}
             >
-              <Label value={currentNotification} fontSize={24} color={Color4.White()} textAlign="middle-center" />
+              <BitmapText text={currentNotification} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={24} uiTransform={{ width: '100%' }} align="center" />
             </UiEntity>
           )
         })()}
@@ -2215,7 +2207,7 @@ const MemoryMatchUi = () => (
           justifyContent: 'center'
         }}
       >
-        <Label value="Time's up" fontSize={36} color={Color4.White()} />
+        <BitmapText text="Time's up" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={36} />
       </UiEntity>
     )}
 
@@ -2283,13 +2275,14 @@ const MemoryMatchUi = () => (
         >
           {toastPhase === 'boardComplete' && (
             <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
-              <Label value="Board complete!" fontSize={36} color={Color4.White()} />
-              <Label value={`+${score} pts`} fontSize={24} color={Color4.White()} uiTransform={{ margin: { top: 8 } }} />
+              <BitmapText text="Board complete!" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={36} />
+              <BitmapText text={`+${score} pts`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={24} uiTransform={{ margin: { top: 8 } }} />
               {isNewBestTime && (
-                <Label
-                  value={`New Best Time! ${lastBoardTime.toFixed(1)}s`}
+                <BitmapText
+                  text={`New Best Time! ${lastBoardTime.toFixed(1)}s`}
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE}
                   fontSize={20}
-                  color={Color4.White()}
                   uiTransform={{ margin: { top: 8 } }}
                 />
               )}
@@ -2298,20 +2291,20 @@ const MemoryMatchUi = () => (
           {toastPhase === 'findMonster' && renderMonsterIcon(wonMonsterQuadrant, 64)}
           {toastPhase === 'findMonster' && (
             <UiEntity uiTransform={{ flexDirection: 'column', margin: { left: 16 } }}>
-              <Label value="Mission:" fontSize={28} color={Color4.White()} textAlign="middle-left" />
-              <Label
-                value={`Collect the monster.\nChances: ${getPrizeChaseChancesRemaining()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
+              <BitmapText text="Mission:" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
+              <BitmapText
+                text={`Collect the monster.\nChances: ${getPrizeChaseChancesRemaining()}/${PRIZE_CHASE_MAX_ATTEMPTS}`}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE}
                 fontSize={20}
-                color={Color4.White()}
-                textAlign="middle-left"
               />
             </UiEntity>
           )}
           {toastPhase === 'monsterCollected' && (
-            <Label value="Monster Collected!" fontSize={28} color={Color4.White()} textAlign="middle-center" />
+            <BitmapText text="Monster Collected!" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
           )}
           {toastPhase === 'monsterNotCollected' && (
-            <Label value="Monster Not Collected" fontSize={28} color={Color4.White()} textAlign="middle-center" />
+            <BitmapText text="Monster Not Collected" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
           )}
         </UiEntity>
       </UiEntity>
