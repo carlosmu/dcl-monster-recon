@@ -23,6 +23,30 @@ interface BitmapFont {
   scaleH: number
   glyphs: Map<number, Glyph>
   kernings: Map<string, number>
+  // Native-unit vertical nudge added to every glyph's yoffset before scaling - see
+  // computeVerticalCenterOffset below for why this is needed.
+  verticalOffset: number
+}
+
+// BMFont's own lineHeight is the font's nominal ascent+descent, not the actual pixel range any
+// glyph in this atlas uses - a font exported with a baked drop shadow (like germ_one's) has real
+// glyph ink (yoffset..yoffset+height) that runs taller than lineHeight and sits mostly in its top
+// half (shadow adds height at the bottom with no matching gap at the top). Centering a row box
+// sized to lineHeight then visually centers empty padding, not the ink - text reads low/subscript-
+// like. This re-centers by measuring the actual top/bottom ink extent across the common alphanumeric
+// glyphs (letters+digits - the vast majority of this game's copy) and returns a constant to add to
+// every glyph's yoffset so that measured extent sits centered within lineHeight instead.
+function computeVerticalCenterOffset(glyphs: Map<number, Glyph>, lineHeight: number): number {
+  let top = Infinity
+  let bottom = -Infinity
+  for (const [id, g] of glyphs) {
+    const isAlphanumeric = (id >= 48 && id <= 57) || (id >= 65 && id <= 90) || (id >= 97 && id <= 122)
+    if (!isAlphanumeric || g.width === 0 || g.height === 0) continue
+    top = Math.min(top, g.yoffset)
+    bottom = Math.max(bottom, g.yoffset + g.height)
+  }
+  if (!isFinite(top)) return 0
+  return (lineHeight - (bottom - top)) / 2 - top
 }
 
 // Parses the AngelCode BMFont text format (the .fnt SnowB BMF exports alongside its spritesheet
@@ -49,7 +73,15 @@ function parseFnt(fnt: string): BitmapFont {
     kernings.set(`${first}:${second}`, Number(amount))
   }
 
-  return { lineHeight: Number(lineHeight), scaleW: Number(scaleW), scaleH: Number(scaleH), glyphs, kernings }
+  const lineHeightNum = Number(lineHeight)
+  return {
+    lineHeight: lineHeightNum,
+    scaleW: Number(scaleW),
+    scaleH: Number(scaleH),
+    glyphs,
+    kernings,
+    verticalOffset: computeVerticalCenterOffset(glyphs, lineHeightNum)
+  }
 }
 
 // Raw contents of assets/images/germ_one.fnt (SnowB BMF export, AngelCode BMFont text format).
@@ -215,7 +247,7 @@ function BitmapTextLine({ line, font, image, scale, rowHeight, color }: { key?: 
             <UiEntity
               uiTransform={{
                 positionType: 'absolute',
-                position: { left: glyph.xoffset * scale, top: glyph.yoffset * scale },
+                position: { left: glyph.xoffset * scale, top: (glyph.yoffset + font.verticalOffset) * scale },
                 width: glyph.width * scale,
                 height: glyph.height * scale
               }}
