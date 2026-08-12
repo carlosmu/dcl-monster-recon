@@ -12,11 +12,50 @@ import {
   EasingFunction,
   TriggerArea,
   triggerAreaEventsSystem,
+  ParticleSystem,
+  PBParticleSystem_BlendMode,
   type Entity
 } from '@dcl/sdk/ecs'
-import { Vector3, Vector2, Color3 } from '@dcl/sdk/math'
-import { getWorldPosition } from '@dcl-sdk/utils'
+import { Vector3, Vector2, Color3, Color4 } from '@dcl/sdk/math'
+import { getWorldPosition, timers } from '@dcl-sdk/utils'
 import { EntityNames } from '../assets/scene/entity-names'
+
+// One-shot sparkle burst at the exact spot a prize was caught. Adapted from a fireworks manager
+// copied from a different (match-based) project - dropped its GameState-phase trigger and its
+// multi-entity "Firework_N" cascade (both specific to that game's arena setup), kept the particle
+// config shape and the utils.timers cleanup pattern. Particles only render in the Unity desktop
+// Explorer (not mobile/Bevy) - a known SDK limitation, not a bug here.
+const CATCH_BURST_LIFETIME = 2.5
+const CATCH_BURST_CLEANUP_DELAY_MS = 3000 // a bit more than lifetime, so particles finish naturally
+
+function spawnCatchBurst(position: Vector3) {
+  const burst = engine.addEntity()
+  Transform.create(burst, { position })
+  ParticleSystem.create(burst, {
+    loop: false,
+    rate: 0,
+    lifetime: CATCH_BURST_LIFETIME,
+    maxParticles: 150,
+    gravity: 0.3,
+    blendMode: PBParticleSystem_BlendMode.PSB_ADD,
+    shape: ParticleSystem.Shape.Sphere({ radius: 0.3 }),
+    initialVelocitySpeed: { start: 3, end: 5 },
+    initialSize: { start: 0.08, end: 0.18 },
+    sizeOverTime: { start: 1, end: 0 },
+    initialColor: {
+      start: Color4.create(1, 0.9, 0.4, 1),
+      end: Color4.create(1, 0.4, 0.1, 1)
+    },
+    colorOverTime: {
+      start: Color4.create(1, 0.8, 0.5, 1),
+      end: Color4.create(0.8, 0.2, 0, 0)
+    },
+    bursts: {
+      values: [{ time: 0, count: 60, cycles: 1, interval: 0.01, probability: 1 }]
+    }
+  })
+  timers.setTimeout(() => engine.removeEntity(burst), CATCH_BURST_CLEANUP_DELAY_MS)
+}
 
 // Which monster's art to paint onto the spawned prize's plane - same sprite-sheet cropping idea as
 // the 2D UI (getUvsForPrizeQuadrant in ui.tsx), just expressed as glTF-style texture offset/tiling.
@@ -138,6 +177,7 @@ function handleCatch() {
   if (!active) return
   active = false
   const onCaught = onCaughtCallback
+  if (bobAnchor !== null) spawnCatchBurst(getWorldPosition(bobAnchor))
   despawnCurrentHop()
   onCaughtCallback = null
   onFailedCallback = null
