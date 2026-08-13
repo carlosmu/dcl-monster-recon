@@ -6,7 +6,7 @@ export const Messages = {
   reportScore: Schemas.Map({ playerName: Schemas.String, points: Schemas.Number }),
   // Server -> Client: current top-of-leaderboard snapshot.
   leaderboardUpdate: Schemas.Map({
-    entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number }))
+    entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String }))
   }),
   // Client -> Server: ask for the current leaderboard snapshot (e.g. on scene load) - the
   // server's own startup broadcast only reaches whoever is already connected at that instant,

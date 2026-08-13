@@ -11,6 +11,7 @@ import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
+import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
 import { room } from './shared/messages'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 import {
@@ -78,6 +79,10 @@ interface CollectionConfig {
   cardImage: string // memory-match card faces (square grid)
   cardGrid: number
   prizeImage: string // monster prize sprites
+  // Same grid/coordinates as prizeImage, pre-rendered black at low opacity - used instead of
+  // prizeImage + a runtime black tint for locked slots, since uiBackground.color tinting isn't
+  // honored on mobile (same issue as the bitmap-font titles - see bitmapFont.tsx).
+  prizeImageLocked: string
   prizeGridCols: number
   prizeGridRows: number
   rarities: RarityDef[] // Common, Rare, Exotic, Epic, in that order
@@ -89,6 +94,7 @@ const COLLECTIONS: CollectionConfig[] = [
     cardImage: 'assets/images/cards_01.png',
     cardGrid: 5,
     prizeImage: 'assets/images/prizes_01.png',
+    prizeImageLocked: 'assets/images/prizes_01_not_collected.png',
     prizeGridCols: 5,
     prizeGridRows: 4,
     rarities: [
@@ -177,15 +183,15 @@ const SCREEN_SUBTITLE_FONT_SIZE_PX = SCREEN_TITLE_FONT_SIZE_PX * 0.6
 // Leaderboard list: raw px at the 1920x1080 virtual reference, same approach as the constants above.
 const LEADERBOARD_LIST_WIDTH_PX = 300
 const LEADERBOARD_ROW_NAME_FONT_SIZE_PX = 24
-const LEADERBOARD_ROW_SCORE_FONT_SIZE_PX = 16
+const LEADERBOARD_ROW_SCORE_FONT_SIZE_PX = 24
 // Fixed width for the "1." / "10." rank column - wide enough for 2 digits + the dot, so every
 // row's rank is the same width and right-aligned (name column starts at the same x regardless of
 // rank digit count).
 const LEADERBOARD_RANK_WIDTH_PX = 40
-// PLACEHOLDER: reserved square for each row's profile picture. No real avatar data available yet
-// (LeaderboardEntry only carries playerName/score, no userId - see messages.ts) - this is layout
-// only, filled with a solid color until that's wired up.
-const LEADERBOARD_AVATAR_SIZE_PX = 28
+// Profile picture (face256/face128 from the Decentraland lambdas profile, see
+// leaderboardProfileCache.ts) - falls back to a solid gray circle while it's loading or if the
+// fetch failed.
+const LEADERBOARD_AVATAR_SIZE_PX = 42
 // Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
 // the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
 // virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
@@ -555,6 +561,9 @@ const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on sc
 // Notification slide-in: starts 10vh below its resting position and slides up over this long.
 const NOTIFICATION_SLIDE_DURATION = 0.5
 const NOTIFICATION_SLIDE_DISTANCE_VH = 10
+// canvas-sidebar is 25% of the 1920px virtual width; the box's own left/right padding (20px each,
+// see below) eats into that before text wrapping should kick in.
+const NOTIFICATION_TEXT_MAX_WIDTH_PX = 1920 * 0.25 - 40
 
 
 function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
@@ -645,6 +654,7 @@ type Screen = 'hidden' | 'checkpointSelect' | 'board' | 'inventory' | 'leaderboa
 interface LeaderboardEntry {
   playerName: string
   score: number
+  address: string
 }
 
 let leaderboard: LeaderboardEntry[] = []
@@ -739,12 +749,6 @@ function getCodexIconSizePx(groupRowSize: number): number {
   return Math.min((availableWidth * 0.95) / groupRowSize, CODEX_MAX_ICON_SIZE_PX)
 }
 
-// Locked-monster silhouette: same prize sprite, tinted black. PBUiBackground multiplies
-// color * texture, so black (0,0,0) flattens every pixel's RGB to 0 regardless of the sprite's
-// own shading, while its alpha (the silhouette shape) is preserved. Any non-zero tint would still
-// show the sprite's original shading through, since multiply only scales existing brightness.
-const LOCKED_MONSTER_TINT = Color4.create(0, 0, 0, 0.4)
-
 // 1x -> 1.15x -> 1x breathing pulse for the Monster Collected toast's icon only (1s each leg, 2s
 // full cycle) - same triangle-wave technique as getTimerColor/getPausedBlinkColor above.
 // UiTransform has no scale prop, so this is applied via the icon's own width/height (see
@@ -816,9 +820,8 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
                   slot < TOTAL_CHECKPOINTS
                     ? {
                         textureMode: 'stretch',
-                        texture: { src: collection.prizeImage },
-                        uvs: getUvsForPrizeQuadrant(slot - collection.start, collection.prizeGridCols, collection.prizeGridRows),
-                        color: collectedSlot ? undefined : LOCKED_MONSTER_TINT
+                        texture: { src: collectedSlot ? collection.prizeImage : collection.prizeImageLocked },
+                        uvs: getUvsForPrizeQuadrant(slot - collection.start, collection.prizeGridCols, collection.prizeGridRows)
                       }
                     : { color: Color4.create(0, 0, 0, 0.5) }
                 }
@@ -1122,6 +1125,7 @@ export function setupUi() {
 
   room.onMessage('leaderboardUpdate', (data) => {
     leaderboard = data.entries
+    prefetchLeaderboardFaces(leaderboard.map((entry) => entry.address))
   })
   room.send('requestLeaderboard', {})
 
@@ -1500,14 +1504,24 @@ const MemoryMatchUi = () => (
                 uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
                 uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: SCORE_BACKGROUND_UVS }}
               />
-              <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
-              <UiEntity uiTransform={{ flexGrow: 1, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-                {screen === 'board' ? (
-                  <BitmapText text={`${Math.ceil(timeRemaining)}s`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={STAT_FONT_SIZE_PX} color={getTimerColor()} />
-                ) : (
-                  <BitmapText text="Paused" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={STAT_FONT_SIZE_PX} color={getPausedBlinkColor()} />
-                )}
-              </UiEntity>
+              {screen === 'board' ? (
+                <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center', flexGrow: 1, height: '100%' }}>
+                  <UiEntity uiTransform={{ width: STAT_ICON_SIZE_PX, height: STAT_ICON_SIZE_PX, flexShrink: 0 }} uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: TIMER_ICON_UVS }} />
+                  <UiEntity uiTransform={{ flexGrow: 1, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+                    <BitmapText text={`${Math.ceil(timeRemaining)}s`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={STAT_FONT_SIZE_PX} color={getTimerColor()} />
+                  </UiEntity>
+                </UiEntity>
+              ) : (
+                <BitmapText
+                  text="Paused"
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE}
+                  fontSize={STAT_FONT_SIZE_PX}
+                  color={getPausedBlinkColor()}
+                  uiTransform={{ width: '100%', flexGrow: 1, height: '100%', justifyContent: 'center' }}
+                  align="right"
+                />
+              )}
             </UiEntity>
           )}
         </UiEntity>
@@ -2060,7 +2074,7 @@ const MemoryMatchUi = () => (
               flexDirection: 'column',
               alignItems: 'center',
               padding: getFramePaddingPx(),
-              borderWidth: 2,
+              borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
               borderColor: DEBUG_BORDER_RED
             }}
             uiBackground={{
@@ -2076,9 +2090,7 @@ const MemoryMatchUi = () => (
                 positionType: 'absolute',
                 position: { top: 8, right: 8 },
                 alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 2,
-                borderColor: DEBUG_BORDER_BLUE
+                justifyContent: 'center'
               }}
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeLeaderboard()}
@@ -2090,7 +2102,7 @@ const MemoryMatchUi = () => (
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               uiTransform={{
                 margin: { bottom: 12 },
-                borderWidth: 2,
+                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             />
@@ -2098,12 +2110,12 @@ const MemoryMatchUi = () => (
               uiTransform={{
                 width: '90%',
                 flexDirection: 'column',
-                borderWidth: 2,
+                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
             >
               {leaderboard.length === 0 ? (
-                <BitmapText text="No scores yet" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} uiTransform={{ width: '100%', borderWidth: 2, borderColor: DEBUG_BORDER_WHITE }} align="center" />
+                <BitmapText text="No scores yet" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX} uiTransform={{ width: '100%' }} align="center" />
               ) : (
                 leaderboard.map((entry, index) => (
                   <UiEntity
@@ -2112,8 +2124,9 @@ const MemoryMatchUi = () => (
                       width: '100%',
                       flexDirection: 'row',
                       justifyContent: 'space-between',
+                      alignItems: 'center',
                       padding: { top: 4, bottom: 4 },
-                      borderWidth: 2,
+                      borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                       borderColor: DEBUG_BORDER_GREEN
                     }}
                   >
@@ -2127,9 +2140,7 @@ const MemoryMatchUi = () => (
                         uiTransform={{
                           width: LEADERBOARD_RANK_WIDTH_PX,
                           height: LEADERBOARD_ROW_NAME_FONT_SIZE_PX * 1.3,
-                          flexShrink: 0,
-                          borderWidth: 2,
-                          borderColor: Color4.Yellow()
+                          flexShrink: 0
                         }}
                       />
                       <UiEntity
@@ -2138,24 +2149,26 @@ const MemoryMatchUi = () => (
                           height: LEADERBOARD_AVATAR_SIZE_PX,
                           flexShrink: 0,
                           borderRadius: 999,
-                          margin: { right: 6 },
-                          borderWidth: 2,
-                          borderColor: Color4.Yellow()
+                          margin: { right: 6 }
                         }}
-                        uiBackground={{ color: Color4.create(0.5, 0.5, 0.5, 1) }}
+                        uiBackground={(() => {
+                          const faceUrl = getLeaderboardFaceUrl(entry.address)
+                          return faceUrl
+                            ? { textureMode: 'stretch', texture: { src: faceUrl }, uvs: [0, 0, 0, 1, 1, 1, 1, 0], color: Color4.White() }
+                            : { color: Color4.create(0.5, 0.5, 0.5, 1) }
+                        })()}
                       />
                       <Label
                         value={entry.playerName}
                         fontSize={LEADERBOARD_ROW_NAME_FONT_SIZE_PX}
                         color={SCREEN_TEXT_COLOR}
                         textWrap="nowrap"
+                        textAlign="middle-left"
                         uiTransform={{
-                          width: LEADERBOARD_LIST_WIDTH_PX - 70 - LEADERBOARD_RANK_WIDTH_PX - LEADERBOARD_AVATAR_SIZE_PX - 6,
+                          width: 'auto',
                           height: LEADERBOARD_ROW_NAME_FONT_SIZE_PX * 1.3,
                           flexShrink: 0,
-                          overflow: 'hidden',
-                          borderWidth: 2,
-                          borderColor: Color4.Yellow()
+                          overflow: 'hidden'
                         }}
                       />
                     </UiEntity>
@@ -2164,7 +2177,6 @@ const MemoryMatchUi = () => (
                       font={GERM_ONE_FONT}
                       image={GERM_ONE_IMAGE_BROWN}
                       fontSize={LEADERBOARD_ROW_SCORE_FONT_SIZE_PX}
-                      uiTransform={{ borderWidth: 2, borderColor: DEBUG_BORDER_BLUE }}
                     />
                   </UiEntity>
                 ))
@@ -2256,9 +2268,19 @@ const MemoryMatchUi = () => (
                 padding: { top: 10, bottom: 10, left: 20, right: 20 },
                 borderRadius: 16
               }}
-              uiBackground={{ color: Color4.fromHexString('#522c14') }}
+              // Same placeholder background as the win-sequence toasts (see the toast's own
+              // uiBackground below) - solid black at 85% opacity, until there's dedicated frame art.
+              uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
             >
-              <BitmapText text={currentNotification} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={24} uiTransform={{ width: '100%' }} align="center" />
+              <BitmapText
+                text={currentNotification}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE}
+                fontSize={24}
+                uiTransform={{ width: '100%' }}
+                align="center"
+                maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
+              />
             </UiEntity>
           )
         })()}

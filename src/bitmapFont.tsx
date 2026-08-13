@@ -218,6 +218,49 @@ interface BitmapTextProps {
   color?: Color4
   uiTransform?: UiTransformProps // merged onto the outer container (margin, borders, etc.)
   align?: 'left' | 'center' | 'right' // horizontal alignment of each line; only matters with >1 line
+  // Word-wrap width in px. There's no real text layout here (each char is its own quad), so this
+  // pre-splits `text` into '\n'-separated lines that each fit, greedily by word - a UiEntity row
+  // never wraps its own children on its own. Long unbreakable words still overflow one line as-is.
+  maxWidth?: number
+}
+
+function measureLineWidth(line: string, font: BitmapFont, scale: number): number {
+  const chars = Array.from(line)
+  const spaceAdvance = font.glyphs.get(32)?.xadvance ?? 0
+  let width = 0
+  for (let i = 0; i < chars.length; i++) {
+    const id = chars[i].codePointAt(0) ?? 32
+    const glyph = font.glyphs.get(id)
+    const prevId = i > 0 ? chars[i - 1].codePointAt(0) : undefined
+    const kerning = prevId !== undefined ? (font.kernings.get(`${prevId}:${id}`) ?? 0) : 0
+    width += ((glyph?.xadvance ?? spaceAdvance) + kerning) * scale
+  }
+  return width
+}
+
+// Greedily wraps each existing line (split on the caller's own '\n') so no rendered line exceeds
+// maxWidth, breaking only at spaces. A single word wider than maxWidth is left on its own line
+// (overflowing) rather than being split mid-word.
+function wrapText(text: string, font: BitmapFont, scale: number, maxWidth: number): string {
+  return text
+    .split('\n')
+    .map((paragraph) => {
+      const words = paragraph.split(' ')
+      const wrapped: string[] = []
+      let current = ''
+      for (const word of words) {
+        const candidate = current === '' ? word : `${current} ${word}`
+        if (current !== '' && measureLineWidth(candidate, font, scale) > maxWidth) {
+          wrapped.push(current)
+          current = word
+        } else {
+          current = candidate
+        }
+      }
+      wrapped.push(current)
+      return wrapped.join('\n')
+    })
+    .join('\n')
 }
 
 // One line's worth of glyph quads, each cropped out of `image` via the matching glyph's uvs.
@@ -265,10 +308,11 @@ function BitmapTextLine({ line, font, image, scale, rowHeight, color }: { key?: 
   )
 }
 
-export function BitmapText({ text, font, image, fontSize, color, uiTransform, align = 'left' }: BitmapTextProps) {
+export function BitmapText({ text, font, image, fontSize, color, uiTransform, align = 'left', maxWidth }: BitmapTextProps) {
   const scale = fontSize / font.lineHeight
   const rowHeight = font.lineHeight * scale
-  const lines = text.split('\n')
+  const wrappedText = maxWidth !== undefined ? wrapText(text, font, scale, maxWidth) : text
+  const lines = wrappedText.split('\n')
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
 
   return (

@@ -136,7 +136,8 @@ export async function startServer() {
 }
 
 function broadcastLeaderboard(leaderboard: LeaderboardMap, to?: string[]) {
-  const entries = Object.values(leaderboard)
+  const entries = Object.entries(leaderboard)
+    .map(([address, entry]) => ({ ...entry, address }))
     .sort((a, b) => b.score - a.score)
     .slice(0, LEADERBOARD_TOP_N)
   room.send('leaderboardUpdate', { entries }, to ? { to } : undefined)
