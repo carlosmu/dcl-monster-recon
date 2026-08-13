@@ -1259,7 +1259,7 @@ export function setupUi() {
       toastPhaseStartedAt !== null &&
       elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
     ) {
-      hideToast(() => resetToIdleAfterChase())
+      hideToast(() => resetToIdleAfterChase('inventory'))
     }
 
     if (
@@ -1321,8 +1321,8 @@ function handlePrizeMissed() {
   triggerToastShake()
 }
 
-function resetToIdleAfterChase() {
-  screen = 'hidden'
+function resetToIdleAfterChase(nextScreen: Screen = 'hidden') {
+  screen = nextScreen
   playAmbientMusic()
   won = false
   gameOver = false
