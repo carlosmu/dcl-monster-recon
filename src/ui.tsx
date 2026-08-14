@@ -229,17 +229,35 @@ const FOOTER_MIN_HEIGHT_DESKTOP_PX = 100
 // checkpoint's 3 boards. Real screen units ('vh'/'%'), not raw px - this is a standalone strip,
 // not mixed with any raw-px sibling, so there's no virtual-scale mismatch to worry about here.
 const BOARD_PROGRESS_TOP_INSET_VH = '1vh'
-const BOARD_PROGRESS_BAR_WIDTH_PERCENT = '60%'
+// The bar sizes itself to its content (label + pips) rather than to a fixed percentage: the label
+// is a bitmap text with an intrinsic width that can't shrink, so a rigid width made it overflow as
+// soon as the font or pip size grew. This is only an upper bound for very narrow screens.
+const BOARD_PROGRESS_BAR_MAX_WIDTH = '90%'
+// Gap between pips, now that they're content-sized instead of spread by space-between.
+const BOARD_PROGRESS_PIP_GAP_PX = 14
+// Fully transparent, so an uncleared pip shows the bar behind it. Exists because the background has
+// to be overwritten rather than omitted - see the pip's uiBackground for why.
+const BOARD_PROGRESS_PIP_EMPTY_COLOR = Color4.create(0, 0, 0, 0)
 const BOARD_PROGRESS_BAR_PADDING_VH = '0.3vh'
 const BOARD_PROGRESS_BAR_COLOR = Color4.create(0, 0, 0, 1)
-const BOARD_PROGRESS_PIP_SIZE_VH = '3.15vh'
-const BOARD_PROGRESS_PIP_ACTIVE_COLOR = Color4.fromHexString('#2ecc71')
-const BOARD_PROGRESS_PIP_INACTIVE_COLOR = Color4.create(1, 1, 1, 0.25)
+// Raw px on the 1920x1080 virtual canvas, deliberately NOT vh: the pip number uses
+// BOARD_PROGRESS_FONT_SIZE, which is virtual-canvas px, so a vh-sized circle drifted out of
+// proportion with the digit inside it on any screen whose height ratio differs from desktop's -
+// on mobile the circle shrank while the number kept its size. Same unit for both now.
+const BOARD_PROGRESS_PIP_SIZE_PX = 44
+// Shared by the "Board progression:" label and the pip numbers, which used to be 20 and 31.5.
+const BOARD_PROGRESS_FONT_SIZE = 26
 
 // Visible from Play through the checkpoint's 3 boards (including the "Board complete!" toast
 // between them) - hidden once the sequence moves into the prize chase, and on every other screen.
 function showingBoardProgress(): boolean {
   return screen === 'board' && toastPhase !== 'findMonster' && toastPhase !== 'monsterCollected' && toastPhase !== 'monsterNotCollected'
+}
+
+// A pip is filled as soon as its board STARTS, not when it's cleared - so board 1 is marked the
+// moment it opens, and by the time board 3 begins all three are filled.
+function isBoardReached(boardIndex: number): boolean {
+  return boardIndex <= currentBoardIndex
 }
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
 // down). Cells must stay square: mixing a '%' width (resolves against the real, already-scaled
@@ -637,6 +655,8 @@ const MUSIC_ON_UVS = getUvsForBlock(4, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png
 const MUSIC_OFF_UVS = getUvsForBlock(5, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png F3
 const LOCK_ICON_UVS = getUvsForBlock(6, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png G3
 const COUNTDOWN_BACKGROUND_UVS = getUvsForBlock(6, 2, 2, 2, BACK_ATLAS_GRID) // atlas_01.png G3-H4
+// Backs the active pip in the board-progression bar - a single cell, unlike the countdown's 2x2.
+const BOARD_PROGRESS_PIP_UVS = getUvsForBlock(6, 6, 1, 1, BACK_ATLAS_GRID) // atlas_01.png G7
 
 interface CellState {
   frontQuadrant: number
@@ -1682,7 +1702,8 @@ const MemoryMatchUi = () => (
           >
             <UiEntity
               uiTransform={{
-                width: BOARD_PROGRESS_BAR_WIDTH_PERCENT,
+                width: 'auto',
+                maxWidth: BOARD_PROGRESS_BAR_MAX_WIDTH,
                 height: 'auto',
                 borderRadius: 20,
                 padding: { left: BOARD_PROGRESS_BAR_PADDING_VH, right: BOARD_PROGRESS_BAR_PADDING_VH },
@@ -1691,31 +1712,42 @@ const MemoryMatchUi = () => (
               }}
               uiBackground={{ color: BOARD_PROGRESS_BAR_COLOR }}
             >
-              <UiEntity uiTransform={{ width: '50%', padding: { left: 10, right: 10 }, flexDirection: 'row', justifyContent: 'center' }}>
-                <BitmapText text="Board progression:" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={20} />
+              <UiEntity uiTransform={{ padding: { left: 10, right: 10 }, flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+                <BitmapText text="Board progression:" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={BOARD_PROGRESS_FONT_SIZE} />
               </UiEntity>
               <UiEntity
                 uiTransform={{
-                  width: '50%',
-                  padding: { left: 10, right: 10 },
+                  // Bigger left pad than right, to keep the first pip off the label's tail.
+                  padding: { left: 32, right: 10 },
                   flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  flexShrink: 0
                 }}
               >
                 {[0, 1, 2].map((boardIndex) => (
                   <UiEntity
                     key={boardIndex}
                     uiTransform={{
-                      width: BOARD_PROGRESS_PIP_SIZE_VH,
-                      height: BOARD_PROGRESS_PIP_SIZE_VH,
-                      borderRadius: 999,
+                      width: BOARD_PROGRESS_PIP_SIZE_PX,
+                      height: BOARD_PROGRESS_PIP_SIZE_PX,
+                      flexShrink: 0,
+                      margin: { left: boardIndex === 0 ? 0 : BOARD_PROGRESS_PIP_GAP_PX },
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
-                    uiBackground={{ color: boardIndex === currentBoardIndex ? BOARD_PROGRESS_PIP_ACTIVE_COLOR : BOARD_PROGRESS_PIP_INACTIVE_COLOR }}
+                    // Reached boards get the circle art behind their number; the rest are the bare
+                    // number on the bar's own background.
+                    //
+                    // The unreached case is an explicit transparent color rather than undefined:
+                    // these three entities are keyed and reused across renders, so omitting the prop
+                    // risks leaving whatever background the entity last had instead of clearing it.
+                    uiBackground={
+                      isBoardReached(boardIndex)
+                        ? { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: BOARD_PROGRESS_PIP_UVS }
+                        : { color: BOARD_PROGRESS_PIP_EMPTY_COLOR }
+                    }
                   >
-                    <BitmapText text={`${boardIndex + 1}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={31.5} />
+                    <BitmapText text={`${boardIndex + 1}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={BOARD_PROGRESS_FONT_SIZE} />
                   </UiEntity>
                 ))}
               </UiEntity>
@@ -1800,17 +1832,6 @@ const MemoryMatchUi = () => (
               image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
               uiTransform={{
-                borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
-                borderColor: DEBUG_BORDER_WHITE
-              }}
-            />
-            <BitmapText
-              text={`Board ${currentBoardIndex + 1}/${CHECKPOINTS[currentCheckpoint - 1].boards.length}`}
-              font={GERM_ONE_FONT}
-              image={GERM_ONE_IMAGE_BROWN}
-              fontSize={SCREEN_TITLE_FONT_SIZE_PX}
-              uiTransform={{
-                margin: { bottom: 4 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
@@ -1951,7 +1972,7 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
               onMouseDown={() => closeCheckpointSelect()}
             />
-            <BitmapText text="Select checkpoint" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_TITLE_FONT_SIZE_PX} uiTransform={{ margin: { top: 4, bottom: 12 } }} />
+            <BitmapText text="Select checkpoint" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={SCREEN_TITLE_FONT_SIZE_PX} uiTransform={{ margin: { top: 4, bottom: 32 } }} />
             <UiEntity
               uiTransform={{
                 width: '90%',

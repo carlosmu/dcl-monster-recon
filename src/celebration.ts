@@ -88,7 +88,7 @@ function startEmote(predefinedEmote: string) {
 // Ends the emote after one cycle, since predefined avatar emotes loop until replaced.
 //
 // Deliberately NOT stopEmote: that only exists in the SDK's typings and in the desktop Unity
-// Explorer - the mobile (Bevy) client doesn't expose it, so calling it there threw "stopEmote is
+// Explorer - the mobile (Godot) client doesn't expose it, so calling it there threw "stopEmote is
 // not a function" and took the whole scene down ("SCENE ERROR") the first time a celebration emote
 // finished. tsc can't catch that; the symbol is present at compile time and missing only at
 // runtime. Triggering the predefined 'idle' emote overrides the looping one and goes through

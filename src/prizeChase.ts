@@ -17,6 +17,7 @@ import {
   type Entity
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Color4 } from '@dcl/sdk/math'
+import { isMobile } from '@dcl/sdk/platform'
 import { getWorldPosition, timers } from '@dcl-sdk/utils'
 import { EntityNames } from '../assets/scene/entity-names'
 import { guard } from './errorTrap'
@@ -25,7 +26,7 @@ import { guard } from './errorTrap'
 // copied from a different (match-based) project - dropped its GameState-phase trigger and its
 // multi-entity "Firework_N" cascade (both specific to that game's arena setup), kept the particle
 // config shape and the utils.timers cleanup pattern. Particles only render in the Unity desktop
-// Explorer (not mobile/Bevy) - a known SDK limitation, not a bug here.
+// Explorer (not mobile/Godot) - a known SDK limitation, not a bug here.
 const CATCH_BURST_LIFETIME = 2.5
 const CATCH_BURST_CLEANUP_DELAY_MS = 3000 // a bit more than lifetime, so particles finish naturally
 
@@ -83,11 +84,15 @@ function applyPrizeIcon(entity: Entity) {
   const { image, gridCols, gridRows, localIndex } = currentIcon
   const col = localIndex % gridCols
   const row = Math.floor(localIndex / gridCols)
+  // The two renderers disagree on where V=0 sits. In the desktop Explorer it's the BOTTOM of the
+  // texture, so row 0 (A1, the sheet's top row) has to be flipped to land on the right cell - the
+  // same top-row flip the 2D UI's getUvsForPrizeQuadrant does. The mobile (Godot) renderer puts
+  // V=0 at the TOP, so applying that flip there mirrors the sheet vertically: A1 lands on the
+  // bottom row and every row is off. Only this axis differs; the column math is identical on both.
+  const rowOffset = isMobile() ? row / gridRows : (gridRows - row - 1) / gridRows
   const iconTexture = Material.Texture.Common({
     src: image,
-    // V=0 is the BOTTOM of the texture here (confirmed visually), so row 0 (A1, the sheet's top
-    // row) needs the same top-row flip as the 2D UI's getUvsForPrizeQuadrant.
-    offset: Vector2.create(col / gridCols, (gridRows - row - 1) / gridRows),
+    offset: Vector2.create(col / gridCols, rowOffset),
     tiling: Vector2.create(1 / gridCols, 1 / gridRows)
   })
   Material.setPbrMaterial(entity, {
