@@ -14,6 +14,19 @@ import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from 
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
 import { room } from './shared/messages'
 import { guard, getCapturedError } from './errorTrap'
+import {
+  DEBUG_CELL_LABELS,
+  DEBUG_LAYOUT_BORDERS,
+  DEBUG_CANVAS_INFO,
+  DEBUG_DUMP_BEST_TIMES,
+  DEBUG_CODEX_SHOW_ALL_MONSTERS,
+  DEBUG_SCORE_OVERRIDE,
+  DEBUG_UNLOCK_ALL_CHECKPOINTS,
+  DEBUG_BORDER_RED,
+  DEBUG_BORDER_GREEN,
+  DEBUG_BORDER_BLUE,
+  DEBUG_BORDER_WHITE
+} from './debugFlags'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 import {
   startPrizeChase,
@@ -23,25 +36,6 @@ import {
   stopPrizeChase,
   PRIZE_CHASE_MAX_ATTEMPTS
 } from './prizeChase'
-
-const DEBUG_CELL_LABELS = false
-const DEBUG_LAYOUT_BORDERS = false
-const DEBUG_CANVAS_INFO = true
-// TEMP (duration calibration): dumps every recorded board best-time to console on scene load, to
-// recalibrate checkpoints.json's per-board `duration` from a real playthrough. Set to false (or
-// remove, along with requestAllBestTimes/allBestTimesUpdate in messages.ts/server.ts) once done.
-const DEBUG_DUMP_BEST_TIMES = true
-// Debug layout border colors at 100% opacity, so they're clearly visible outlining containers.
-const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 1)
-const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 1)
-const DEBUG_BORDER_BLUE = Color4.create(0, 0, 1, 1)
-const DEBUG_BORDER_WHITE = Color4.create(1, 1, 1, 1)
-// Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
-// Does not touch real collection progress. Flip to false to see actual player progress.
-const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
-// Visual-only: forces the header score display to a 5-digit value, to check it fits without
-// overflowing the box. Does not touch the real score. Flip to false to see the actual score.
-const DEBUG_SCORE_OVERRIDE = false
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -672,7 +666,7 @@ let currentCheckpoint = 1
 let currentBoardIndex = 0 // 0-based index into the current checkpoint's boards array
 // Synced from the server on connect via 'requestProgress'/'progressUpdate', and updated locally
 // (then re-synced) whenever a checkpoint is completed - see reportBoardTime below.
-let highestUnlockedCheckpoint = 1
+let highestUnlockedCheckpoint = DEBUG_UNLOCK_ALL_CHECKPOINTS ? TOTAL_CHECKPOINTS : 1
 // One slot per checkpoint; true once that checkpoint's monster prize has been collected.
 const collectedMonsters: boolean[] = new Array(TOTAL_CHECKPOINTS).fill(false)
 // One slot per checkpoint; how many times that checkpoint's monster prize has been collected.
@@ -1103,7 +1097,7 @@ export function setupUi() {
 
   boardMusicEntity = engine.addEntity()
   Transform.create(boardMusicEntity)
-  AudioSource.create(boardMusicEntity, { audioClipUrl: BOARD_MUSIC_CLIP, playing: false, loop: true, volume: 0.5, global: true })
+  AudioSource.create(boardMusicEntity, { audioClipUrl: BOARD_MUSIC_CLIP, playing: false, loop: true, volume: 1, global: true })
 
   boardEndEntity = engine.addEntity()
   Transform.create(boardEndEntity)
@@ -1119,7 +1113,7 @@ export function setupUi() {
 
   countdownEntity = engine.addEntity()
   Transform.create(countdownEntity)
-  AudioSource.create(countdownEntity, { audioClipUrl: COUNTDOWN_CLIP, playing: false, loop: false, volume: 0.8, global: true })
+  AudioSource.create(countdownEntity, { audioClipUrl: COUNTDOWN_CLIP, playing: false, loop: false, volume: 0.5, global: true })
 
   failEntity = engine.addEntity()
   Transform.create(failEntity)
@@ -1156,7 +1150,7 @@ export function setupUi() {
   }))
 
   room.onMessage('progressUpdate', (data) => guard('progressUpdate', () => {
-    highestUnlockedCheckpoint = data.highestUnlockedCheckpoint
+    if (!DEBUG_UNLOCK_ALL_CHECKPOINTS) highestUnlockedCheckpoint = data.highestUnlockedCheckpoint
     for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
       collectedMonsters[i] = data.collectedMonsters[i] ?? false
       collectionCounts[i] = data.collectionCounts[i] ?? 0
