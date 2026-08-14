@@ -65,6 +65,9 @@ const FRAME_SLICE = 0.22
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
 const ALPHAS_IMAGE = 'assets/images/alphas.png'
 const ALPHAS_GRID = 8 // alphas.png grid
+// Shown in the leaderboard when a wallet has no Decentraland profile (the lambdas endpoint 404s for
+// guests and never-configured avatars) or while its face is still loading.
+const FALLBACK_PROFILE_PIC_IMAGE = 'assets/images/fallback_profile_pic.png'
 
 // A "collection" is one full monster set: its own memory-match card art, its own prize sprite
 // sheet, and its own rarity breakdown. To add a future collection, append a new entry here (with
@@ -2184,12 +2187,12 @@ const MemoryMatchUi = () => (
                           borderRadius: 999,
                           margin: { right: 6 }
                         }}
-                        uiBackground={(() => {
-                          const faceUrl = getLeaderboardFaceUrl(entry.address)
-                          return faceUrl
-                            ? { textureMode: 'stretch', texture: { src: faceUrl }, uvs: [0, 0, 0, 1, 1, 1, 1, 0], color: Color4.White() }
-                            : { color: Color4.create(0.5, 0.5, 0.5, 1) }
-                        })()}
+                        uiBackground={{
+                          textureMode: 'stretch',
+                          texture: { src: getLeaderboardFaceUrl(entry.address) ?? FALLBACK_PROFILE_PIC_IMAGE },
+                          uvs: [0, 0, 0, 1, 1, 1, 1, 0],
+                          color: Color4.White()
+                        }}
                       />
                       <Label
                         value={entry.playerName}
