@@ -627,7 +627,6 @@ const BACK_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID)
 // Header button icons are 2x2 blocks of atlas_01.png.
 const LEADERBOARD_BUTTON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // A5-B6
 const CODEX_BUTTON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // A3-B4
-const CHECKPOINTS_BUTTON_UVS = getUvsForBlock(2, 4, 2, 2, BACK_ATLAS_GRID) // C5-D6
 const SCORE_BACKGROUND_UVS = getUvsForBlock(2, 0, 4, 2, BACK_ATLAS_GRID) // C1-F2
 const PLAY_BUTTON_UVS = getUvsForBlock(2, 2, 4, 2, BACK_ATLAS_GRID) // C3-F4
 const PLAY_GLOW_UVS = getUvsForBlock(0, 6, 4, 2, BACK_ATLAS_GRID) // A7-D8 - same 4x2 span as the button
@@ -1298,6 +1297,15 @@ export function showCheckpointSelect() {
   screen = 'checkpointSelect'
 }
 
+// Play is now the only way into the game (the header's checkpoint-select icon is gone), so it has
+// to cover both cases: with a single level unlocked there is nothing to choose and the selector
+// would just be an extra tap, so drop straight into level 1; from the second level onward, open the
+// selector so the player can pick which one to replay.
+function handlePlayPressed() {
+  if (highestUnlockedCheckpoint > 1) showCheckpointSelect()
+  else startCheckpoint(1)
+}
+
 // Chase succeeded: grant the collection (mirrors what reportBoardTime's checkpointComplete used
 // to do client-side, now deferred until the player actually catches the prize), hand off from the
 // "find the monster" toast to "monster collected", and let the player start another round once
@@ -1579,12 +1587,6 @@ const MemoryMatchUi = () => (
               uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CODEX_BUTTON_UVS }}
             />
           </UiEntity>
-          <UiEntity uiTransform={{ width: HEADER_RIGHT_ICON_SIZE_PX, height: HEADER_RIGHT_ICON_SIZE_PX, flexShrink: 0, margin: { left: 8 } }} onMouseDown={() => showCheckpointSelect()}>
-            <UiEntity
-              uiTransform={{ positionType: 'absolute', position: { left: 0, top: 0 }, width: '100%', height: '100%' }}
-              uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CHECKPOINTS_BUTTON_UVS }}
-            />
-          </UiEntity>
         </UiEntity>
       </UiEntity>
 
@@ -1660,7 +1662,7 @@ const MemoryMatchUi = () => (
                       justifyContent: 'flex-end'
                     }}
                     uiBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: PLAY_BUTTON_UVS }}
-                    onMouseDown={() => startCheckpoint(highestUnlockedCheckpoint)}
+                    onMouseDown={() => handlePlayPressed()}
                   />
                 </UiEntity>
               </UiEntity>
