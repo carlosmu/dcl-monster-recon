@@ -1,6 +1,6 @@
 import { engine, Transform, MainCamera, VirtualCamera, InputModifier, type Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
-import { triggerEmote, stopEmote } from '~system/RestrictedActions'
+import { triggerEmote } from '~system/RestrictedActions'
 
 // Celebration cinematic camera: orbits halfway (180°) around the player over this many seconds.
 const CAM_DURATION = 3
@@ -10,8 +10,8 @@ const CAM_OFFSET = Vector3.create(0, 1.5, 3.5)
 // The camera looks at this point (roughly chest height) instead of the parent's feet-level origin.
 const LOOK_AT_OFFSET = Vector3.create(0, 1.5, 0)
 
-// Predefined avatar emotes (disco, handsair, fistpump, cry) loop forever until explicitly
-// stopped, so every trigger below is paired with a stopEmote() once it has played through once.
+// Predefined avatar emotes (disco, handsair, fistpump, cry) loop forever until replaced, so every
+// trigger below is paired with an 'idle' emote once it has played through once (see updateEmote).
 const EMOTE_DURATION = 3
 
 let camParent: Entity
@@ -85,12 +85,19 @@ function startEmote(predefinedEmote: string) {
   void triggerEmote({ predefinedEmote })
 }
 
-// Stops the emote after one cycle, since predefined avatar emotes loop until told to stop.
+// Ends the emote after one cycle, since predefined avatar emotes loop until replaced.
+//
+// Deliberately NOT stopEmote: that only exists in the SDK's typings and in the desktop Unity
+// Explorer - the mobile (Bevy) client doesn't expose it, so calling it there threw "stopEmote is
+// not a function" and took the whole scene down ("SCENE ERROR") the first time a celebration emote
+// finished. tsc can't catch that; the symbol is present at compile time and missing only at
+// runtime. Triggering the predefined 'idle' emote overrides the looping one and goes through
+// triggerEmote, which is proven to work on both clients.
 function updateEmote(dt: number) {
   if (!emoteActive) return
   emoteElapsed += dt
   if (emoteElapsed >= EMOTE_DURATION) {
     emoteActive = false
-    void stopEmote({})
+    void triggerEmote({ predefinedEmote: 'idle' })
   }
 }

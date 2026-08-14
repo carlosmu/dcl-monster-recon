@@ -13,6 +13,7 @@ import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
 import { room } from './shared/messages'
+import { guard, getCapturedError } from './errorTrap'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 import {
   startPrizeChase,
@@ -1072,6 +1073,18 @@ function playLoseAChanceSound() {
   AudioSource.playSound(loseAChanceEntity, LOSE_A_CHANCE_CLIP, true)
 }
 
+// The server's leaderboard entry is the player's real running total (reportScore accumulates into
+// it and it's persisted per wallet), so adopt it every time the leaderboard arrives - including the
+// requestLeaderboard on scene load. Without this, totalScore is a purely local counter that starts
+// at 0 on every reload. The local `totalScore += score` on a board win stays for instant feedback;
+// this reconciles it once the server echoes back.
+function adoptLeaderboardScore() {
+  const address = getPlayer()?.userId
+  if (!address) return
+  const mine = leaderboard.find((entry) => entry.address.toLowerCase() === address.toLowerCase())
+  if (mine) totalScore = mine.score
+}
+
 function reportScore(points: number) {
   // room.send() queues automatically until the room is ready, so no readiness check is needed here.
   const playerName = getPlayer()?.name ?? 'Unknown'
@@ -1123,28 +1136,29 @@ export function setupUi() {
 
   setupCelebrationCamera()
 
-  room.onMessage('leaderboardUpdate', (data) => {
+  room.onMessage('leaderboardUpdate', (data) => guard('leaderboardUpdate', () => {
     leaderboard = data.entries
     prefetchLeaderboardFaces(leaderboard.map((entry) => entry.address))
-  })
+    adoptLeaderboardScore()
+  }))
   room.send('requestLeaderboard', {})
 
-  room.onMessage('serverTick', (data) => {
+  room.onMessage('serverTick', (data) => guard('serverTick', () => {
     lastServerTick = data.tick
     lastServerTickAt = elapsedTime
-  })
+  }))
 
-  room.onMessage('personalBestUpdate', (data) => {
+  room.onMessage('personalBestUpdate', (data) => guard('personalBestUpdate', () => {
     personalBests[bestTimeKey(data.checkpoint, data.boardIndex)] = data.bestTimeSeconds
-  })
+  }))
 
-  room.onMessage('progressUpdate', (data) => {
+  room.onMessage('progressUpdate', (data) => guard('progressUpdate', () => {
     highestUnlockedCheckpoint = data.highestUnlockedCheckpoint
     for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
       collectedMonsters[i] = data.collectedMonsters[i] ?? false
       collectionCounts[i] = data.collectionCounts[i] ?? 0
     }
-  })
+  }))
   room.send('requestProgress', {})
 
   if (DEBUG_DUMP_BEST_TIMES) {
@@ -1169,7 +1183,7 @@ export function setupUi() {
   // per the build-ui skill. Trying it out on the R header icons first (see HEADER_RIGHT_ICON_SIZE_PX)
   // before migrating the rest of the manual vw/vh sizing done elsewhere in this file.
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
-  engine.addSystem((dt: number) => {
+  const tick = (dt: number) => {
     elapsedTime += dt
     if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
       matchAnimStart = null
@@ -1278,7 +1292,8 @@ export function setupUi() {
     } else if (currentNotification !== null && notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
       currentNotification = null
     }
-  })
+  }
+  engine.addSystem((dt: number) => guard('uiSystem', () => tick(dt)))
 }
 
 export function showCheckpointSelect() {
@@ -1415,6 +1430,24 @@ const MemoryMatchUi = () => (
     }}
     uiBackground={{ color: screen === 'board' ? Color4.create(0, 0, 0, 0.2) : Color4.create(0, 0, 0, 0) }}
   >
+    {/* TEMP (crash diagnosis): see errorTrap.ts. Plain Label on purpose - the sprite font would be
+        one more thing that could fail while we're trying to read why something else failed. */}
+    {getCapturedError() !== null && (
+      <UiEntity
+        uiTransform={{
+          positionType: 'absolute',
+          position: { top: 0, left: 0 },
+          // No width: the box shrinks to fit the text so the black plate hugs it instead of
+          // banding across the screen. maxWidth still wraps a stack trace that runs long.
+          maxWidth: '90%',
+          alignSelf: 'flex-start',
+          padding: 16
+        }}
+        uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
+      >
+        <Label value={getCapturedError() ?? ''} fontSize={18} color={Color4.Red()} textAlign="top-left" />
+      </UiEntity>
+    )}
     {/* canvas_main: the safe-area column. Reserves 8% top/bottom for the system bar and stays
         within the 30%-75% horizontal safe zone (40% wide, centered). Reuse this for all scene UI;
         a sibling "canvas-sidebar" can be added later for anything that belongs outside this column. */}
