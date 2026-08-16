@@ -2,6 +2,7 @@ import ReactEcs, { ReactEcsRenderer, UiEntity, Label } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import {
   engine,
+  AssetLoad,
   AudioSource,
   Transform,
   UiCanvasInformation,
@@ -135,6 +136,20 @@ const RESOLVED_COLLECTIONS: ResolvedCollection[] = (() => {
     return resolved
   })
 })()
+
+// Every UI texture in the scene. The renderer only fetches a texture the first time something draws
+// it, so the big sheets (cards_01.png, prizes_01.png) render white for a beat when the board opens
+// or a monster is revealed. These get warmed at startup instead - see TexturePreloader.
+const PRELOAD_TEXTURES: string[] = [
+  BACK_IMAGE,
+  ATLAS_02_IMAGE,
+  BOARD_FRAME_IMAGE,
+  ALPHAS_IMAGE,
+  FALLBACK_PROFILE_PIC_IMAGE,
+  GERM_ONE_IMAGE,
+  GERM_ONE_IMAGE_BROWN,
+  ...COLLECTIONS.flatMap((c) => [c.cardImage, c.prizeImage, c.prizeImageLocked])
+]
 
 function getCollectionForSlot(slot: number): ResolvedCollection {
   return RESOLVED_COLLECTIONS.find((c) => slot >= c.start && slot <= c.end) ?? RESOLVED_COLLECTIONS[0]
@@ -885,6 +900,10 @@ let cells: CellState[] = []
 let currentCardImage = COLLECTIONS[0].cardImage
 let currentCardGrid = COLLECTIONS[0].cardGrid
 let elapsedTime = 0
+// Warm-up window for PRELOAD_TEXTURES. Generous on purpose: the strip costs a single pixel row and
+// dropping it early just puts us back to loading on first use.
+const PRELOAD_WARMUP_SECONDS = 30
+let preloadWarmupDone = false
 let revealedUnmatched: CellState[] = []
 let timeRemaining = GAME_DURATION
 let gameOver = false
@@ -1110,6 +1129,11 @@ function reportScore(points: number) {
 export function setupUi() {
   cells = buildCells()
 
+  // Renderer-side hint to start downloading the UI sheets right away. TexturePreloader does the
+  // part this doesn't cover (getting them onto the GPU).
+  const preloadEntity = engine.addEntity()
+  AssetLoad.create(preloadEntity, { assets: PRELOAD_TEXTURES })
+
   ambientMusicEntity = engine.addEntity()
   Transform.create(ambientMusicEntity)
   AudioSource.create(ambientMusicEntity, { audioClipUrl: AMBIENT_MUSIC_CLIP, playing: true, loop: true, volume: 1, global: true })
@@ -1201,6 +1225,7 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
   const tick = (dt: number) => {
     elapsedTime += dt
+    if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) preloadWarmupDone = true
     if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
       matchAnimStart = null
     }
@@ -1445,6 +1470,31 @@ function closeLeaderboard() {
   previousScreen = null
 }
 
+// Draws every PRELOAD_TEXTURES sheet once, at 1x1 px in the screen corner, so the renderer fetches
+// and uploads them while the player is still walking around instead of on the frame the board or
+// the prize reveal first needs them. The AssetLoad component in setupUi() asks for the same files,
+// but only an actual draw guarantees the UI texture is resident - hence both. Unmounted after
+// PRELOAD_WARMUP_SECONDS.
+const TexturePreloader = () => (
+  <UiEntity
+    uiTransform={{
+      positionType: 'absolute',
+      position: { top: 0, left: 0 },
+      width: PRELOAD_TEXTURES.length,
+      height: 1,
+      flexDirection: 'row'
+    }}
+  >
+    {PRELOAD_TEXTURES.map((src) => (
+      <UiEntity
+        key={src}
+        uiTransform={{ width: 1, height: 1, flexShrink: 0 }}
+        uiBackground={{ textureMode: 'stretch', texture: { src } }}
+      />
+    ))}
+  </UiEntity>
+)
+
 const MemoryMatchUi = () => (
   <UiEntity
     uiTransform={{
@@ -1455,6 +1505,7 @@ const MemoryMatchUi = () => (
     }}
     uiBackground={{ color: screen === 'board' ? Color4.create(0, 0, 0, 0.2) : Color4.create(0, 0, 0, 0) }}
   >
+    {!preloadWarmupDone && <TexturePreloader />}
     {/* TEMP (crash diagnosis): see errorTrap.ts. Plain Label on purpose - the sprite font would be
         one more thing that could fail while we're trying to read why something else failed. */}
     {getCapturedError() !== null && (
