@@ -13,6 +13,7 @@ import { getPlayer } from '@dcl/sdk/players'
 import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
+import { setupLeaderboard3d, updateLeaderboard3d } from './leaderboard3d'
 import { room } from './shared/messages'
 import { guard, getCapturedError } from './errorTrap'
 import {
@@ -23,6 +24,8 @@ import {
   DEBUG_CODEX_SHOW_ALL_MONSTERS,
   DEBUG_SCORE_OVERRIDE,
   DEBUG_UNLOCK_ALL_CHECKPOINTS,
+  DEBUG_FAKE_LEADERBOARD,
+  DEBUG_FAKE_LEADERBOARD_ENTRIES,
   DEBUG_BORDER_RED,
   DEBUG_BORDER_GREEN,
   DEBUG_BORDER_BLUE,
@@ -694,7 +697,9 @@ interface LeaderboardEntry {
   address: string
 }
 
-let leaderboard: LeaderboardEntry[] = []
+// Seeded with the fake roster (rather than only swapping it in on leaderboardUpdate) so the boards
+// show it even with no server reply - e.g. a preview run with no scores recorded yet.
+let leaderboard: LeaderboardEntry[] = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : []
 // UTC date of the current week's Monday, as reported by the server. Only used to detect a rollover
 // while connected - see adoptLeaderboardScore.
 let leaderboardWeekId: string | null = null
@@ -1186,13 +1191,18 @@ export function setupUi() {
   AudioSource.create(loseAChanceEntity, { audioClipUrl: LOSE_A_CHANCE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
   setupCelebrationCamera()
+  setupLeaderboard3d()
+  // Paints whatever `leaderboard` already holds - nothing in the normal case, the fake roster under
+  // DEBUG_FAKE_LEADERBOARD. Without this the 3D panel would stay blank until a leaderboardUpdate.
+  updateLeaderboard3d(leaderboard)
 
   room.onMessage('leaderboardUpdate', (data) => guard('leaderboardUpdate', () => {
     const weekRolledOver = leaderboardWeekId !== null && leaderboardWeekId !== data.weekId
     leaderboardWeekId = data.weekId
-    leaderboard = data.entries
+    leaderboard = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : data.entries
     prefetchLeaderboardFaces(leaderboard.map((entry) => entry.address))
     adoptLeaderboardScore(weekRolledOver)
+    updateLeaderboard3d(leaderboard)
   }))
   room.send('requestLeaderboard', {})
 

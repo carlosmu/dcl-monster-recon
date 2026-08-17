@@ -34,6 +34,29 @@ export const DEBUG_SCORE_OVERRIDE = false
 // the way in, but nothing writes it back, so real stored progress is left untouched.
 export const DEBUG_UNLOCK_ALL_CHECKPOINTS = false
 
+// Visual-only: replaces the leaderboard with the 10 made-up players below, so the leaderboard
+// screen and the in-world 3D panel can both be checked full without 10 real wallets having played.
+// Nothing is sent to the server and no real score is touched - the fake addresses belong to nobody,
+// so adoptLeaderboardScore never matches one and the header score is left alone.
+export const DEBUG_FAKE_LEADERBOARD = false
+
+// Deliberately awkward on purpose: a name long enough to run into the score column, a single-letter
+// name, and a 5-digit score, so the layout is checked at its extremes rather than at a comfortable
+// average. The addresses are placeholders - no profile exists for them, so every row falls back to
+// fallback_profile_pic.png. Swap one for your own wallet to see a real face in the mix.
+export const DEBUG_FAKE_LEADERBOARD_ENTRIES: Array<{ playerName: string; score: number; address: string }> = [
+  { playerName: 'MonsterHunter99', score: 12480, address: '0x1000000000000000000000000000000000000001' },
+  { playerName: 'Luz', score: 9975, address: '0x1000000000000000000000000000000000000002' },
+  { playerName: 'thegreatpumpkinsmasher', score: 8210, address: '0x1000000000000000000000000000000000000003' },
+  { playerName: 'Nyx', score: 7640, address: '0x1000000000000000000000000000000000000004' },
+  { playerName: 'Vittorio', score: 6155, address: '0x1000000000000000000000000000000000000005' },
+  { playerName: 'dcl_wanderer', score: 5030, address: '0x1000000000000000000000000000000000000006' },
+  { playerName: 'Ramona', score: 4415, address: '0x1000000000000000000000000000000000000007' },
+  { playerName: 'K', score: 3200, address: '0x1000000000000000000000000000000000000008' },
+  { playerName: 'PixelPirate', score: 1875, address: '0x1000000000000000000000000000000000000009' },
+  { playerName: 'zzz_lastplace_zzz', score: 640, address: '0x100000000000000000000000000000000000000a' }
+]
+
 // Debug layout border colors at 100% opacity, so they're clearly visible outlining containers.
 export const DEBUG_BORDER_RED = Color4.create(1, 0, 0, 1)
 export const DEBUG_BORDER_GREEN = Color4.create(0, 1, 0, 1)
