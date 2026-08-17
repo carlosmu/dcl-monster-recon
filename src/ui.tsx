@@ -834,7 +834,7 @@ function renderRarityBlock(rarity: RarityConfig, iconSizePx: number, marginRight
       key={rarity.label}
       uiTransform={{ width: rowSize * iconSizePx, flexDirection: 'column', alignItems: 'flex-start', margin: { right: marginRightPx } }}
     >
-      <BitmapText text={`${rarity.label} ${collected}/${total}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={24} uiTransform={{ margin: { top: 22, bottom: 0 } }} />
+      <BitmapText text={`${rarity.label} ${collected}/${total}`} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={24} uiTransform={{ margin: { top: 14, bottom: 0 } }} />
       {Array.from({ length: rows }, (_, rowIndex) => (
         <UiEntity key={rowIndex} uiTransform={{ width: '100%', height: iconHeight, flexDirection: 'row', justifyContent: 'flex-start' }}>
           {Array.from({ length: rowSize }, (_, colIndex) => {
@@ -2165,7 +2165,7 @@ const MemoryMatchUi = () => (
                       flexDirection: 'row',
                       justifyContent: group.length > 1 ? 'space-between' : 'flex-start',
                       alignItems: 'flex-start',
-                      margin: { bottom: 54 }
+                      margin: { bottom: 34 }
                     }}
                   >
                     {group.map((rarity, rarityIndex) =>
