@@ -917,6 +917,7 @@ let elapsedTime = 0
 // dropping it early just puts us back to loading on first use.
 const PRELOAD_WARMUP_SECONDS = 30
 let preloadWarmupDone = false
+let preloadEntity: Entity | null = null
 let revealedUnmatched: CellState[] = []
 let timeRemaining = GAME_DURATION
 let gameOver = false
@@ -1146,8 +1147,12 @@ export function setupUi() {
   cells = buildCells()
 
   // Renderer-side hint to start downloading the UI sheets right away. TexturePreloader does the
-  // part this doesn't cover (getting them onto the GPU).
-  const preloadEntity = engine.addEntity()
+  // part this doesn't cover (getting them onto the GPU). Torn down after PRELOAD_WARMUP_SECONDS
+  // (see the tick below), same as TexturePreloader - AssetLoad has no "done" event exposed to
+  // scene code, so nothing here can tell success from failure. Leaving it attached indefinitely
+  // would leave the renderer free to keep retrying a slow/failed fetch in this list for the rest
+  // of the session; bounding its lifetime bounds that too.
+  preloadEntity = engine.addEntity()
   AssetLoad.create(preloadEntity, { assets: PRELOAD_TEXTURES })
 
   ambientMusicEntity = engine.addEntity()
@@ -1248,7 +1253,10 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
   const tick = (dt: number) => {
     elapsedTime += dt
-    if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) preloadWarmupDone = true
+    if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) {
+      preloadWarmupDone = true
+      if (preloadEntity !== null) engine.removeEntity(preloadEntity)
+    }
     if (matchAnimStart !== null && elapsedTime - matchAnimStart >= MATCH_ANIM_DURATION) {
       matchAnimStart = null
     }

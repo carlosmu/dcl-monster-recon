@@ -602,7 +602,7 @@
         "serializationType": "map"
       },
       "data": {
-        "0": {
+        "1": {
           "json": {
             "gizmo": 0
           }
@@ -1618,9 +1618,12 @@
             "ageRating": "A",
             "categories": [],
             "author": "SDK",
-            "email": "",
             "tags": [],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -1686,14 +1689,8 @@
                   "x": 3,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
-            "silenceVoiceChat": false,
-            "disablePortableExperiences": false,
             "spawnPoints": [
               {
                 "name": "SpawnArea1",
@@ -1702,36 +1699,30 @@
                   "x": {
                     "$case": "range",
                     "value": [
-                      39.06999969482422,
-                      42.06999969482422
+                      40.790000915527344,
+                      43.790000915527344
                     ]
                   },
                   "y": {
-                    "$case": "range",
-                    "value": [
-                      1.399999976158142,
-                      1.399999976158142
-                    ]
+                    "$case": "single",
+                    "value": 2.049999952316284
                   },
                   "z": {
                     "$case": "range",
                     "value": [
-                      36.959999084472656,
-                      39.959999084472656
+                      40.970001220703125,
+                      43.970001220703125
                     ]
                   }
                 },
                 "cameraTarget": {
-                  "x": 36.72999954223633,
+                  "x": 32.279998779296875,
                   "y": 2.640000104904175,
-                  "z": 34.90999984741211
+                  "z": 32.220001220703125
                 }
               }
             ],
-            "skyboxConfig": {},
-            "creator": "",
-            "disableNearbyVoiceChat": false,
-            "hideLandscapeTerrain": false
+            "skyboxConfig": {}
           }
         }
       }
