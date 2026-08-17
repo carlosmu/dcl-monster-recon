@@ -271,10 +271,13 @@ function showingBoardProgress(): boolean {
   return screen === 'board' && toastPhase !== 'findMonster' && toastPhase !== 'monsterCollected' && toastPhase !== 'monsterNotCollected'
 }
 
-// A pip is filled as soon as its board STARTS, not when it's cleared - so board 1 is marked the
-// moment it opens, and by the time board 3 begins all three are filled.
+// A pip is filled as soon as its board is actually on screen, not when it's cleared - so board 1 is
+// marked the moment the grid appears, and by the time board 3 is playable all three are filled.
+// startBoard() sets currentBoardIndex up front, but the countdown still runs before the grid shows,
+// so while it's counting the pip stays on the board the player just finished (and no pip at all is
+// filled during board 1's countdown, since there's no previous board).
 function isBoardReached(boardIndex: number): boolean {
-  return boardIndex <= currentBoardIndex
+  return boardIndex <= (countdownStart !== null ? currentBoardIndex - 1 : currentBoardIndex)
 }
 // Memory-board grid container is width: '95%' of its frame (real, dynamic - see the JSX further
 // down). Cells must stay square: mixing a '%' width (resolves against the real, already-scaled
