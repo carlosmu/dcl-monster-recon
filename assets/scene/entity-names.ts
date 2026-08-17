@@ -6,6 +6,7 @@
  */
 export enum EntityNames {
   Admin_Tools = "Admin Tools",
+  Leaderboard_parent = "Leaderboard_parent",
   Prizes = "Prizes",
   camp_gltf = "camp.gltf",
   prize_1 = "prize_1",
