@@ -205,6 +205,8 @@ const LEADERBOARD_RANK_WIDTH_PX = 40
 // leaderboardProfileCache.ts) - falls back to a solid gray circle while it's loading or if the
 // fetch failed.
 const LEADERBOARD_AVATAR_SIZE_PX = 42
+// Footnote under the list explaining the weekly reset - deliberately smaller than a row's name.
+const LEADERBOARD_RESET_NOTE_FONT_SIZE_PX = 18
 // Frame padding for board/checkpointSelect/inventory/leaderboard's nine-slice frame. Raw px at
 // the 1920x1080 virtual reference (matches the old 48px/1080px desktop look), scaled by
 // virtualWidth/virtualHeight - replaces the old runtime UiCanvasInformation.height read, which
@@ -690,6 +692,9 @@ interface LeaderboardEntry {
 }
 
 let leaderboard: LeaderboardEntry[] = []
+// UTC date of the current week's Monday, as reported by the server. Only used to detect a rollover
+// while connected - see adoptLeaderboardScore.
+let leaderboardWeekId: string | null = null
 
 let screen: Screen = 'hidden'
 // Set to 'board' when checkpointSelect/inventory/leaderboard is opened while a board is in
@@ -1108,16 +1113,19 @@ function playLoseAChanceSound() {
   AudioSource.playSound(loseAChanceEntity, LOSE_A_CHANCE_CLIP, true)
 }
 
-// The server's leaderboard entry is the player's real running total (reportScore accumulates into
-// it and it's persisted per wallet), so adopt it every time the leaderboard arrives - including the
-// requestLeaderboard on scene load. Without this, totalScore is a purely local counter that starts
-// at 0 on every reload. The local `totalScore += score` on a board win stays for instant feedback;
-// this reconciles it once the server echoes back.
-function adoptLeaderboardScore() {
+// The server's leaderboard entry is the player's real running total for the current week
+// (reportScore accumulates into it and it's persisted per wallet), so adopt it every time the
+// leaderboard arrives - including the requestLeaderboard on scene load. Without this, totalScore is
+// a purely local counter that starts at 0 on every reload. The local `totalScore += score` on a
+// board win stays for instant feedback; this reconciles it once the server echoes back.
+// Being absent from the snapshot normally just means "outside the top N", so the score is left
+// alone - except right after a week rollover, where absent means the week's score really is 0.
+function adoptLeaderboardScore(weekRolledOver: boolean) {
   const address = getPlayer()?.userId
   if (!address) return
   const mine = leaderboard.find((entry) => entry.address.toLowerCase() === address.toLowerCase())
   if (mine) totalScore = mine.score
+  else if (weekRolledOver) totalScore = 0
 }
 
 function reportScore(points: number) {
@@ -1177,9 +1185,11 @@ export function setupUi() {
   setupCelebrationCamera()
 
   room.onMessage('leaderboardUpdate', (data) => guard('leaderboardUpdate', () => {
+    const weekRolledOver = leaderboardWeekId !== null && leaderboardWeekId !== data.weekId
+    leaderboardWeekId = data.weekId
     leaderboard = data.entries
     prefetchLeaderboardFaces(leaderboard.map((entry) => entry.address))
-    adoptLeaderboardScore()
+    adoptLeaderboardScore(weekRolledOver)
   }))
   room.send('requestLeaderboard', {})
 
@@ -2200,7 +2210,7 @@ const MemoryMatchUi = () => (
               onMouseDown={() => closeLeaderboard()}
             />
             <BitmapText
-              text="Leaderboard"
+              text="Weekly Leaderboard"
               font={GERM_ONE_FONT}
               image={GERM_ONE_IMAGE_BROWN}
               fontSize={SCREEN_TITLE_FONT_SIZE_PX}
@@ -2286,6 +2296,13 @@ const MemoryMatchUi = () => (
                 ))
               )}
             </UiEntity>
+            <Label
+              value="*Resets every Monday at 00:00 UTC."
+              fontSize={LEADERBOARD_RESET_NOTE_FONT_SIZE_PX}
+              color={SCREEN_TEXT_COLOR}
+              textAlign="middle-center"
+              uiTransform={{ width: '90%', margin: { top: 12 } }}
+            />
           </UiEntity>
         )}
       </UiEntity>

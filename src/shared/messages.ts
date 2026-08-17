@@ -4,8 +4,11 @@ import { registerMessages } from '@dcl/sdk/network'
 export const Messages = {
   // Client -> Server: reported every time a board is won.
   reportScore: Schemas.Map({ playerName: Schemas.String, points: Schemas.Number }),
-  // Server -> Client: current top-of-leaderboard snapshot.
+  // Server -> Client: current top-of-leaderboard snapshot. weekId is the UTC date of the week's
+  // Monday - it lets a client that's been connected across the Monday 00:00 UTC reset tell "I'm not
+  // in the top N" (keep my score) apart from "the week rolled over" (my score is back to 0).
   leaderboardUpdate: Schemas.Map({
+    weekId: Schemas.String,
     entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String }))
   }),
   // Client -> Server: ask for the current leaderboard snapshot (e.g. on scene load) - the
