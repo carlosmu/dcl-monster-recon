@@ -448,6 +448,11 @@ function getPlayButtonLeftPx(): number {
   return (getCanvasMainWidthPx() - getPlayButtonWidthPx()) / 2
 }
 
+function isPlayerInPlayArea(): boolean {
+  const pos = Transform.get(engine.PlayerEntity).position
+  return pos.x >= PLAY_AREA_MIN_X && pos.x <= PLAY_AREA_MAX_X && pos.z >= PLAY_AREA_MIN_Z && pos.z <= PLAY_AREA_MAX_Z
+}
+
 // Win-sequence toast (Board complete / Find the monster / Monster collected): slides up from
 // below to rest at the Play button's own bottom%, then - later, on hideToast() - slides back down.
 // Position is animated purely in '%' (matching getPlayButtonBottomPercent()'s own unit) so the
@@ -703,6 +708,14 @@ let leaderboard: LeaderboardEntry[] = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADER
 // UTC date of the current week's Monday, as reported by the server. Only used to detect a rollover
 // while connected - see adoptLeaderboardScore.
 let leaderboardWeekId: string | null = null
+
+// Play button is only shown while the player stands inside this X/Z area (world coordinates),
+// checked each tick in tick() below. Ignores Y so it doesn't matter which floor/level the player is on.
+const PLAY_AREA_MIN_X = 16
+const PLAY_AREA_MAX_X = 48
+const PLAY_AREA_MIN_Z = 16
+const PLAY_AREA_MAX_Z = 48
+let playerInPlayArea = false
 
 let screen: Screen = 'hidden'
 // Set to 'board' when checkpointSelect/inventory/leaderboard is opened while a board is in
@@ -1253,6 +1266,7 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
   const tick = (dt: number) => {
     elapsedTime += dt
+    playerInPlayArea = isPlayerInPlayArea()
     if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) {
       preloadWarmupDone = true
       if (preloadEntity !== null) engine.removeEntity(preloadEntity)
@@ -1704,7 +1718,7 @@ const MemoryMatchUi = () => (
           borderColor: DEBUG_BORDER_RED
         }}
       >
-        {screen === 'hidden' &&
+        {screen === 'hidden' && playerInPlayArea &&
           (() => {
             const pulseScale = getPlayButtonPulseScale()
             const pulseWidth = getPlayButtonWidthPx() * pulseScale
