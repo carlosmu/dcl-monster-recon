@@ -1457,6 +1457,7 @@ function handlePrizeCaught() {
 function handlePrizeChaseFailed() {
   stopTickingSound()
   playTimeoutSound()
+  triggerDefeatEmote()
   hideToast(() => showToast('monsterNotCollected'))
 }
 
