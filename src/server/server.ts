@@ -138,6 +138,13 @@ export async function startServer() {
     broadcastLeaderboard(leaderboard, currentWeekId, [context.from])
   })
 
+  room.onMessage('requestMyScore', async (_data, context) => {
+    if (!context) return
+    trackPlayer(context.from)
+    await rolloverIfNeeded()
+    room.send('myScoreUpdate', { score: leaderboard[context.from]?.score ?? 0 }, { to: [context.from] })
+  })
+
   room.onMessage('requestBestTime', async (data, context) => {
     if (!context) return
     trackPlayer(context.from)

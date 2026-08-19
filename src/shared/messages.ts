@@ -15,6 +15,14 @@ export const Messages = {
   // server's own startup broadcast only reaches whoever is already connected at that instant,
   // which is never a client that joins afterward.
   requestLeaderboard: Schemas.Map({}),
+  // Client -> Server: ask for the caller's own running score for the current week. Unlike
+  // leaderboardUpdate (which only ever carries the top N), this always answers with the caller's
+  // real total - the server keeps every player's score, not just the top N, it just never
+  // broadcasts the rest. Sent once on scene load so a player outside the top N sees their real
+  // score instead of the fresh client's totalScore of 0.
+  requestMyScore: Schemas.Map({}),
+  // Server -> Client: the caller's own score for the current week.
+  myScoreUpdate: Schemas.Map({ score: Schemas.Number }),
   // Server -> Client: periodic heartbeat so clients can tell the server is alive.
   serverTick: Schemas.Map({ tick: Schemas.Number }),
   // Client -> Server: ask for the caller's personal best time on a board (e.g. when it's opened).

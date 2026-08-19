@@ -1226,6 +1226,13 @@ export function setupUi() {
   }))
   room.send('requestLeaderboard', {})
 
+  // Fills in totalScore with the caller's real score even when it's outside the top N (see
+  // adoptLeaderboardScore above - that path only fires for players who make the leaderboard cut).
+  room.onMessage('myScoreUpdate', (data) => guard('myScoreUpdate', () => {
+    totalScore = data.score
+  }))
+  room.send('requestMyScore', {})
+
   room.onMessage('serverTick', (data) => guard('serverTick', () => {
     lastServerTick = data.tick
     lastServerTickAt = elapsedTime
