@@ -1,6 +1,6 @@
-import { engine, Transform, MainCamera, VirtualCamera, InputModifier, type Entity } from '@dcl/sdk/ecs'
+import { engine, Transform, MainCamera, VirtualCamera, InputModifier, timers, type Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
-import { triggerEmote } from '~system/RestrictedActions'
+import { triggerEmote, movePlayerTo } from '~system/RestrictedActions'
 
 // Celebration cinematic camera: orbits halfway (180°) around the player over this many seconds.
 const CAM_DURATION = 3
@@ -19,12 +19,20 @@ const PREDEFINED_EMOTES = new Set([
   'crafting', 'snowballhit', 'snowballthrow', 'cry', 'hands_in_the_air'
 ])
 
+// A looping emote never stops on its own client-side (see startEmote's comment on why we don't
+// fight the emote system directly). Instead, after this many seconds we nudge the player a tiny,
+// imperceptible distance via movePlayerTo - movement is what makes the client end a scene emote,
+// so a scripted micro-step does the same job as the player taking a real step themselves.
+const EMOTE_LOOP_CUTOFF_SECONDS = 15
+const EMOTE_LOOP_CUTOFF_NUDGE = 0.1
+
 let camParent: Entity
 let camEntity: Entity
 let lookAtEntity: Entity
 let active = false
 let elapsed = 0
 let orbitStartAngleDeg = 0
+let emoteCutoffTimer: number | null = null
 
 // Creates the celebration camera rig. Call once from setupUi().
 export function setupCelebrationCamera() {
@@ -117,12 +125,21 @@ export function triggerDefeatEmote() {
 //      resolves to a clip - so it never leaves that state. That is what left the player with a
 //      dead emote wheel and dead WASD after every win and every loss, escapable only by jumping.
 //
-// So: trigger the emote and leave it alone. The id is validated because an unknown one silently
-// re-creates bug (2) rather than failing loudly.
+// So: trigger the emote and leave it alone - don't call stopEmote or another emote id to end it.
+// The id is validated because an unknown one silently re-creates bug (2) rather than failing loudly.
+// EMOTE_LOOP_CUTOFF_SECONDS below doesn't violate this: it ends the loop by moving the player, the
+// same mechanism the client already uses when the player steps away on their own.
 function startEmote(predefinedEmote: string) {
   if (!PREDEFINED_EMOTES.has(predefinedEmote)) {
     console.error(`celebration: '${predefinedEmote}' is not a predefined emote - skipping`)
     return
   }
   void triggerEmote({ predefinedEmote })
+
+  if (emoteCutoffTimer !== null) timers.clearTimeout(emoteCutoffTimer)
+  emoteCutoffTimer = timers.setTimeout(() => {
+    emoteCutoffTimer = null
+    const pos = Transform.get(engine.PlayerEntity).position
+    void movePlayerTo({ newRelativePosition: Vector3.create(pos.x + EMOTE_LOOP_CUTOFF_NUDGE, pos.y, pos.z) })
+  }, EMOTE_LOOP_CUTOFF_SECONDS * 1000)
 }
