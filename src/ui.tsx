@@ -22,6 +22,7 @@ import {
   DEBUG_CANVAS_INFO,
   DEBUG_DUMP_BEST_TIMES,
   DEBUG_TRIGGER_BACKUP,
+  DEBUG_TRIGGER_RESTORE,
   DEBUG_CODEX_SHOW_ALL_MONSTERS,
   DEBUG_SCORE_OVERRIDE,
   DEBUG_UNLOCK_ALL_CHECKPOINTS,
@@ -1266,6 +1267,15 @@ export function setupUi() {
       console.log(`[DEBUG_TRIGGER_BACKUP] Snapshot saved as '${data.snapshotKey}' (${data.playerCount} player(s))`)
     })
     room.send('requestBackup', {})
+  }
+
+  if (DEBUG_TRIGGER_RESTORE) {
+    room.onMessage('restoreComplete', (data) => {
+      console.log(
+        `[DEBUG_TRIGGER_RESTORE] Restored ${data.leaderboardCount} leaderboard week(s), ${data.playerCount} player(s)`
+      )
+    })
+    room.send('requestRestore', {})
   }
 
   // TEST: virtualWidth/virtualHeight lets the renderer scale raw-px sizes to fit any real screen,

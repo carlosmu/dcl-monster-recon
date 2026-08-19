@@ -1,0 +1,175 @@
+{
+  "players": {
+    "0x4b538e1e044922aec2f428ec7e17a99f44205ff9": {
+      "progress": {
+        "collectionCounts": [
+          6,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "collectedMonsters": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "highestUnlockedCheckpoint": 14
+      },
+      "bestTimes": {
+        "bestTime-1-0": 3.618000030517578,
+        "bestTime-1-1": 3.4060001373291016,
+        "bestTime-1-2": 6.795000076293945,
+        "bestTime-2-0": 5.250999927520752,
+        "bestTime-2-1": 4.647000312805176,
+        "bestTime-2-2": 8.029000282287598,
+        "bestTime-3-0": 3.4090001583099365,
+        "bestTime-3-1": 5.25600004196167,
+        "bestTime-3-2": 17.250999450683594,
+        "bestTime-4-0": 4.3470001220703125,
+        "bestTime-4-1": 5.260000228881836,
+        "bestTime-4-2": 15.869000434875488,
+        "bestTime-5-0": 7.404000282287598,
+        "bestTime-5-1": 4.89300012588501,
+        "bestTime-5-2": 14.8100004196167,
+        "bestTime-6-0": 12.729000091552734,
+        "bestTime-6-1": 16.746999740600586,
+        "bestTime-6-2": 40.15999984741211,
+        "bestTime-7-0": 14.395000457763672,
+        "bestTime-7-1": 14.736000061035156,
+        "bestTime-7-2": 26.974000930786133,
+        "bestTime-8-0": 14.030000686645508,
+        "bestTime-8-1": 14.60200023651123,
+        "bestTime-8-2": 18.298999786376953,
+        "bestTime-9-0": 14.97700023651123,
+        "bestTime-9-1": 18.43600082397461,
+        "bestTime-9-2": 26.3439998626709,
+        "bestTime-10-0": 18.138999938964844,
+        "bestTime-10-1": 16.29199981689453,
+        "bestTime-10-2": 24.46000099182129,
+        "bestTime-11-0": 26.836000442504883,
+        "bestTime-11-1": 35.347999572753906,
+        "bestTime-11-2": 48.479000091552734,
+        "bestTime-12-0": 20.85700035095215,
+        "bestTime-12-1": 29.597000122070312,
+        "bestTime-12-2": 32.06500244140625,
+        "bestTime-13-0": 17.743999481201172,
+        "bestTime-13-1": 19.564001083374023,
+        "bestTime-13-2": 33.845001220703125
+      }
+    }
+  },
+  "generatedAt": 1787110020642,
+  "leaderboards": {
+    "leaderboard-2026-08-17": {
+      "0x1e105bb213754519903788022b962fe2b9c4b263": {
+        "score": 453,
+        "playerName": "BayBackner"
+      },
+      "0x1e93e534c5e26b01ed242410b43ae23dd0faa52b": {
+        "score": 731,
+        "playerName": "ile"
+      },
+      "0x2fccbd73444193e1446ad4453a3e18a79d758a4a": {
+        "score": 1170,
+        "playerName": "vit"
+      },
+      "0x327f74101f930c76653fd11ac7c8ba3c8694678f": {
+        "score": 505,
+        "playerName": "DanL"
+      },
+      "0x33a7d139955c1b34033fa5187d752af986eace9e": {
+        "score": 716,
+        "playerName": "Cansy"
+      },
+      "0x4b538e1e044922aec2f428ec7e17a99f44205ff9": {
+        "score": 162,
+        "playerName": "carlosmu"
+      },
+      "0x74655ae4feb6af3cdee1d12d6a034c8f02901721": {
+        "score": 1483,
+        "playerName": "AntonioAzzolino"
+      },
+      "0x858343382132b9ab46c857a7d52fdbafc039f784": {
+        "score": 59,
+        "playerName": "Zino"
+      },
+      "0x8967ad851ccbd4c1a2d57a128d3c606fcab29bad": {
+        "score": 283,
+        "playerName": "KJwalker3D"
+      },
+      "0xa7cdf25a0211c089a0338c0e5b204a34ac180489": {
+        "score": 385,
+        "playerName": "Dafu"
+      },
+      "0xa9f07d4b9ff368851af454dffea60a3f7f587eee": {
+        "score": 203,
+        "playerName": "rezon"
+      },
+      "0xc3af1190dfc0cb4184c114baf5147512a6b8d257": {
+        "score": 673,
+        "playerName": "Rowan"
+      },
+      "0xc502975b49398f9754afc4e9693cf0e1594f3275": {
+        "score": 15,
+        "playerName": "thecodingcave"
+      },
+      "0xc9c29ab98e6bc42015985165a11153f564e9f8c2": {
+        "score": 131,
+        "playerName": "Ryumi"
+      },
+      "0xcec7e38e088a87d77f2b60fcae6840d00e018155": {
+        "score": 1073,
+        "playerName": "stom"
+      },
+      "0xd0ebb8b9dd58f9d00083bc6198b1f7f7248fc5f7": {
+        "score": 475,
+        "playerName": "zCayel"
+      },
+      "0xd8166f3e3cbbb70fb7ec78ad4238ec7a440c1ef4": {
+        "score": 1111,
+        "playerName": "pepino"
+      },
+      "0xe2912ebd119609859a07cb0b0d28329a6bba4b25": {
+        "score": 121,
+        "playerName": "Androide"
+      },
+      "0xf47095dcc83da989abf20edeefb08465fcbfcec0": {
+        "score": 2849,
+        "playerName": "BIBI"
+      }
+    }
+  }
+}

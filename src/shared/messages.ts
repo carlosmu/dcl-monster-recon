@@ -58,7 +58,13 @@ export const Messages = {
   // `sdk-commands storage scene get`. Ignored unless the caller is OWNER_ADDRESS (see server.ts).
   requestBackup: Schemas.Map({}),
   // Server -> Client: confirms the backup snapshot was written and under which key.
-  backupComplete: Schemas.Map({ snapshotKey: Schemas.String, playerCount: Schemas.Number })
+  backupComplete: Schemas.Map({ snapshotKey: Schemas.String, playerCount: Schemas.Number }),
+  // TEMP (carlosmu.dcl.eth -> monsterrecon.dcl.eth migration): Client -> Server, ask the server to
+  // write migrationSnapshot.json's leaderboard/player data into this world's storage. Ignored unless
+  // the caller is OWNER_ADDRESS. Remove once the migration is done and confirmed.
+  requestRestore: Schemas.Map({}),
+  // TEMP (migration): Server -> Client, confirms the restore finished and what it wrote.
+  restoreComplete: Schemas.Map({ leaderboardCount: Schemas.Number, playerCount: Schemas.Number })
 }
 
 export const room = registerMessages(Messages)

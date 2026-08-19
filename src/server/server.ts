@@ -2,6 +2,10 @@ import { engine } from '@dcl/sdk/ecs'
 import { Storage } from '@dcl/sdk/server'
 import { room } from '../shared/messages'
 import checkpointsData from '../checkpoints.json'
+// TEMP (carlosmu.dcl.eth -> monsterrecon.dcl.eth migration): snapshot pulled from carlosmu.dcl.eth
+// via requestBackup, replayed into this world's storage by requestRestore below. Remove this
+// import, migrationSnapshot.json, and the requestRestore handler once the migration is confirmed.
+import migrationSnapshotJson from './migrationSnapshot.json'
 
 // One leaderboard per week, each under its own key. Past weeks are simply never read again - they
 // stay archived in storage for a future history screen or prize payout.
@@ -56,6 +60,13 @@ function defaultProgress(): PlayerProgress {
     collectionCounts: new Array(TOTAL_CHECKPOINTS).fill(0)
   }
 }
+
+interface MigrationSnapshot {
+  leaderboards: Record<string, LeaderboardMap>
+  players: Record<string, { progress: PlayerProgress; bestTimes: Record<string, number> }>
+}
+
+const migrationSnapshot = migrationSnapshotJson as unknown as MigrationSnapshot
 
 // In-memory per-player progress, cached by the PROMISE (not just the resolved value) so
 // back-to-back reportBoardTime calls for the same player (e.g. clearing checkpoints 1, 2, 3 in
@@ -213,6 +224,48 @@ export async function startServer() {
       `[Server] Backup snapshot '${snapshotKey}': ${Object.keys(leaderboards).length} leaderboard week(s), ${Object.keys(players).length} player(s)`
     )
     room.send('backupComplete', { snapshotKey, playerCount: Object.keys(players).length }, { to: [context.from] })
+  })
+
+  // TEMP (migration): owner-only, writes migrationSnapshot's leaderboard/player data into this
+  // world's storage via real Storage.set/Storage.player.set calls (the CLI can only set one key at
+  // a time). Remove this handler, requestRestore/restoreComplete in messages.ts, and
+  // migrationSnapshot.json once the migration is confirmed.
+  room.onMessage('requestRestore', async (_data, context) => {
+    if (!context || context.from.toLowerCase() !== OWNER_ADDRESS.toLowerCase()) return
+
+    const addresses = new Set<string>()
+
+    for (const [key, value] of Object.entries(migrationSnapshot.leaderboards)) {
+      await Storage.set(key, value)
+      for (const address of Object.keys(value)) addresses.add(address)
+      // Refresh the in-memory leaderboard the running server already loaded for the current week,
+      // so it shows up immediately instead of waiting for the next rollover/restart.
+      if (key === LEADERBOARD_KEY_PREFIX + currentWeekId) {
+        leaderboard = value
+        broadcastLeaderboard(leaderboard, currentWeekId)
+      }
+    }
+
+    for (const [address, { progress, bestTimes }] of Object.entries(migrationSnapshot.players)) {
+      await Storage.player.set(address, PROGRESS_KEY, progress)
+      for (const [key, seconds] of Object.entries(bestTimes)) {
+        await Storage.player.set(address, key, seconds)
+      }
+      progressCache.set(address, Promise.resolve(progress))
+      addresses.add(address)
+    }
+
+    if (!knownPlayers) {
+      knownPlayers = (async () => new Set(((await Storage.get<string[]>(KNOWN_PLAYERS_KEY)) ?? [])))()
+    }
+    const players = await knownPlayers
+    for (const address of addresses) players.add(address)
+    await Storage.set(KNOWN_PLAYERS_KEY, [...players])
+
+    const leaderboardCount = Object.keys(migrationSnapshot.leaderboards).length
+    const playerCount = Object.keys(migrationSnapshot.players).length
+    console.log(`[Server] Restore complete: ${leaderboardCount} leaderboard week(s), ${playerCount} player(s)`)
+    room.send('restoreComplete', { leaderboardCount, playerCount }, { to: [context.from] })
   })
 
   let tick = 0

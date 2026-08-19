@@ -27,6 +27,13 @@ export const DEBUG_DUMP_BEST_TIMES = true
 // owner wallet, check the console for the resulting key, then flip back to false.
 export const DEBUG_TRIGGER_BACKUP = false
 
+// TEMP (carlosmu.dcl.eth -> monsterrecon.dcl.eth migration): fires requestRestore once on scene
+// load, which asks the server to replay migrationSnapshot.json into this world's storage (server
+// ignores the request unless the caller is OWNER_ADDRESS in server.ts). Flip to true, deploy, load
+// the scene as the owner wallet, check the console for confirmation, then flip back to false and
+// redeploy. Remove along with requestRestore/restoreComplete/migrationSnapshot.json once confirmed.
+export const DEBUG_TRIGGER_RESTORE = false
+
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 export const DEBUG_CODEX_SHOW_ALL_MONSTERS = false
