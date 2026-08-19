@@ -52,7 +52,13 @@ export const Messages = {
   // {boardIndex} key. Remove once calibration is done.
   allBestTimesUpdate: Schemas.Map({
     entries: Schemas.Array(Schemas.Map({ key: Schemas.String, seconds: Schemas.Number }))
-  })
+  }),
+  // Client -> Server: ask the server to consolidate every leaderboard week and every known
+  // player's progress/best-times into one dated snapshot key, so it can be pulled with a single
+  // `sdk-commands storage scene get`. Ignored unless the caller is OWNER_ADDRESS (see server.ts).
+  requestBackup: Schemas.Map({}),
+  // Server -> Client: confirms the backup snapshot was written and under which key.
+  backupComplete: Schemas.Map({ snapshotKey: Schemas.String, playerCount: Schemas.Number })
 }
 
 export const room = registerMessages(Messages)

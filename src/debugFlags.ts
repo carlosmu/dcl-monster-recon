@@ -21,6 +21,12 @@ export const DEBUG_CANVAS_INFO = true
 // remove, along with requestAllBestTimes/allBestTimesUpdate in messages.ts/server.ts) once done.
 export const DEBUG_DUMP_BEST_TIMES = true
 
+// Manual backup trigger: fires requestBackup once on scene load, which asks the server to
+// consolidate all leaderboard/progress/best-time data into one dated snapshot key (server ignores
+// the request unless the caller is OWNER_ADDRESS in server.ts). Flip to true, load the scene as the
+// owner wallet, check the console for the resulting key, then flip back to false.
+export const DEBUG_TRIGGER_BACKUP = false
+
 // Visual-only: shows every monster in the Codex as if collected, to check the prize sprite sheet.
 // Does not touch real collection progress. Flip to false to see actual player progress.
 export const DEBUG_CODEX_SHOW_ALL_MONSTERS = false

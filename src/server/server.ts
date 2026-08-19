@@ -11,9 +11,16 @@ const SERVER_TICK_INTERVAL = 1 // seconds between heartbeat broadcasts
 const NO_BEST_TIME = -1
 const TOTAL_CHECKPOINTS = checkpointsData.length
 const PROGRESS_KEY = 'progress'
+const BEST_TIME_KEY_PREFIX = 'bestTime-'
+// Same wallet listed in scene.json's logsPermissions - only this address may trigger requestBackup.
+const OWNER_ADDRESS = '0x4B538E1E044922aec2F428EC7E17A99f44205fF9'
+// Every wallet the server has ever seen a message from, so requestBackup knows whose player
+// storage to dump (player storage has no "list all addresses" API). Persisted under this key so
+// the list survives a server restart.
+const KNOWN_PLAYERS_KEY = 'known-players'
 
 function bestTimeKey(checkpoint: number, boardIndex: number): string {
-  return `bestTime-${checkpoint}-${boardIndex}`
+  return `${BEST_TIME_KEY_PREFIX}${checkpoint}-${boardIndex}`
 }
 
 // Identifies a week by the UTC date of its Monday (YYYY-MM-DD), so keys sort chronologically under
@@ -66,6 +73,23 @@ function getPlayerProgress(address: string): Promise<PlayerProgress> {
   return progress
 }
 
+// In-memory mirror of KNOWN_PLAYERS_KEY, cached by PROMISE (same reasoning as progressCache above)
+// so back-to-back messages from players not yet loaded all await the same in-flight read instead of
+// each writing their own partial view back and clobbering one another.
+let knownPlayers: Promise<Set<string>> | null = null
+
+function trackPlayer(address: string): void {
+  void (async () => {
+    if (!knownPlayers) {
+      knownPlayers = (async () => new Set(((await Storage.get<string[]>(KNOWN_PLAYERS_KEY)) ?? [])))()
+    }
+    const players = await knownPlayers
+    if (players.has(address)) return
+    players.add(address)
+    await Storage.set(KNOWN_PLAYERS_KEY, [...players])
+  })()
+}
+
 export async function startServer() {
   let currentWeekId = weekIdFor(Date.now())
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY_PREFIX + currentWeekId)) ?? {}
@@ -84,6 +108,7 @@ export async function startServer() {
 
   room.onMessage('reportScore', async (data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     await rolloverIfNeeded()
     const address = context.from
     const previousScore = leaderboard[address]?.score ?? 0
@@ -98,11 +123,13 @@ export async function startServer() {
 
   room.onMessage('requestLeaderboard', (_data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     broadcastLeaderboard(leaderboard, currentWeekId, [context.from])
   })
 
   room.onMessage('requestBestTime', async (data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     const key = bestTimeKey(data.checkpoint, data.boardIndex)
     const best = await Storage.player.get<number>(context.from, key)
     room.send(
@@ -114,6 +141,7 @@ export async function startServer() {
 
   room.onMessage('reportBoardTime', async (data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     const key = bestTimeKey(data.checkpoint, data.boardIndex)
     const current = await Storage.player.get<number>(context.from, key)
     const best = current === null || data.timeSeconds < current ? data.timeSeconds : current
@@ -127,6 +155,7 @@ export async function startServer() {
 
   room.onMessage('reportMonsterCaught', async (data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     const progress = await getPlayerProgress(context.from)
     progress.collectedMonsters[data.checkpoint - 1] = true
     progress.collectionCounts[data.checkpoint - 1] = (progress.collectionCounts[data.checkpoint - 1] ?? 0) + 1
@@ -139,6 +168,7 @@ export async function startServer() {
 
   room.onMessage('requestProgress', async (_data, context) => {
     if (!context) return
+    trackPlayer(context.from)
     const progress = await getPlayerProgress(context.from)
     room.send('progressUpdate', progress, { to: [context.from] })
   })
@@ -147,9 +177,42 @@ export async function startServer() {
   // checkpoints.json durations have been recalibrated from a real playthrough.
   room.onMessage('requestAllBestTimes', async (_data, context) => {
     if (!context) return
-    const { data } = await Storage.player.getValues(context.from, { prefix: 'bestTime-', limit: 200 })
+    const { data } = await Storage.player.getValues(context.from, { prefix: BEST_TIME_KEY_PREFIX, limit: 200 })
     const entries = data.map(({ key, value }) => ({ key, seconds: value as number }))
     room.send('allBestTimesUpdate', { entries }, { to: [context.from] })
+  })
+
+  // Owner-only: consolidates every leaderboard week and every known player's progress/best-times
+  // into one dated snapshot key, so the whole dataset can be pulled with a single
+  // `sdk-commands storage scene get backup-<key>` instead of enumerating keys by hand.
+  room.onMessage('requestBackup', async (_data, context) => {
+    if (!context || context.from.toLowerCase() !== OWNER_ADDRESS.toLowerCase()) return
+
+    const leaderboards: Record<string, LeaderboardMap> = {}
+    let offset = 0
+    for (;;) {
+      const { data, pagination } = await Storage.getValues({ prefix: LEADERBOARD_KEY_PREFIX, limit: 100, offset })
+      for (const { key, value } of data) leaderboards[key] = value as LeaderboardMap
+      offset += data.length
+      if (data.length === 0 || offset >= pagination.total) break
+    }
+
+    const players: Record<string, { progress: PlayerProgress; bestTimes: Record<string, number> }> = {}
+    const knownAddresses = await (knownPlayers ?? Promise.resolve(new Set<string>()))
+    for (const address of knownAddresses) {
+      const progress = (await Storage.player.get<PlayerProgress>(address, PROGRESS_KEY)) ?? defaultProgress()
+      const { data: bestTimeEntries } = await Storage.player.getValues(address, { prefix: BEST_TIME_KEY_PREFIX, limit: 200 })
+      const bestTimes: Record<string, number> = {}
+      for (const { key, value } of bestTimeEntries) bestTimes[key] = value as number
+      players[address] = { progress, bestTimes }
+    }
+
+    const snapshotKey = `backup-${Date.now()}`
+    await Storage.set(snapshotKey, { generatedAt: Date.now(), leaderboards, players })
+    console.log(
+      `[Server] Backup snapshot '${snapshotKey}': ${Object.keys(leaderboards).length} leaderboard week(s), ${Object.keys(players).length} player(s)`
+    )
+    room.send('backupComplete', { snapshotKey, playerCount: Object.keys(players).length }, { to: [context.from] })
   })
 
   let tick = 0
