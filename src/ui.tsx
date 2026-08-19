@@ -14,6 +14,7 @@ import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
 import { setupLeaderboard3d, updateLeaderboard3d } from './leaderboard3d'
+import { EntityNames } from '../assets/scene/entity-names'
 import { room } from './shared/messages'
 import { guard, getCapturedError } from './errorTrap'
 import {
@@ -707,6 +708,9 @@ interface LeaderboardEntry {
 // Seeded with the fake roster (rather than only swapping it in on leaderboardUpdate) so the boards
 // show it even with no server reply - e.g. a preview run with no scores recorded yet.
 let leaderboard: LeaderboardEntry[] = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : []
+// All-time (never resets) counterpart to `leaderboard` above, feeding only the LBoard_All_Time 3D
+// panel - the 2D leaderboard screen stays weekly-only.
+let leaderboardAllTime: LeaderboardEntry[] = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : []
 // UTC date of the current week's Monday, as reported by the server. Only used to detect a rollover
 // while connected - see adoptLeaderboardScore.
 let leaderboardWeekId: string | null = null
@@ -1212,9 +1216,11 @@ export function setupUi() {
 
   setupCelebrationCamera()
   setupLeaderboard3d()
-  // Paints whatever `leaderboard` already holds - nothing in the normal case, the fake roster under
-  // DEBUG_FAKE_LEADERBOARD. Without this the 3D panel would stay blank until a leaderboardUpdate.
-  updateLeaderboard3d(leaderboard)
+  // Paints whatever `leaderboard`/`leaderboardAllTime` already hold - nothing in the normal case,
+  // the fake roster under DEBUG_FAKE_LEADERBOARD. Without this the 3D panels would stay blank until
+  // their first update message.
+  updateLeaderboard3d(EntityNames.LBoard_Weekly, leaderboard)
+  updateLeaderboard3d(EntityNames.LBoard_All_Time, leaderboardAllTime)
 
   room.onMessage('leaderboardUpdate', (data) => guard('leaderboardUpdate', () => {
     const weekRolledOver = leaderboardWeekId !== null && leaderboardWeekId !== data.weekId
@@ -1222,7 +1228,12 @@ export function setupUi() {
     leaderboard = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : data.entries
     prefetchLeaderboardFaces(leaderboard.map((entry) => entry.address))
     adoptLeaderboardScore(weekRolledOver)
-    updateLeaderboard3d(leaderboard)
+    updateLeaderboard3d(EntityNames.LBoard_Weekly, leaderboard)
+  }))
+  room.onMessage('leaderboardAllTimeUpdate', (data) => guard('leaderboardAllTimeUpdate', () => {
+    leaderboardAllTime = DEBUG_FAKE_LEADERBOARD ? DEBUG_FAKE_LEADERBOARD_ENTRIES : data.entries
+    prefetchLeaderboardFaces(leaderboardAllTime.map((entry) => entry.address))
+    updateLeaderboard3d(EntityNames.LBoard_All_Time, leaderboardAllTime)
   }))
   room.send('requestLeaderboard', {})
 

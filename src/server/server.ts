@@ -11,6 +11,10 @@ import migrationSnapshotJson from './migrationSnapshot.json'
 // stay archived in storage for a future history screen or prize payout.
 const LEADERBOARD_KEY_PREFIX = 'leaderboard-'
 const LEADERBOARD_TOP_N = 10
+// Running per-wallet total across every week, never reset. Deliberately outside the
+// LEADERBOARD_KEY_PREFIX namespace so it isn't picked up by the weekly prefix scans below
+// (backfillAllTime's own scan, requestBackup's).
+const ALL_TIME_KEY = 'alltime-leaderboard'
 const SERVER_TICK_INTERVAL = 1 // seconds between heartbeat broadcasts
 const NO_BEST_TIME = -1
 const TOTAL_CHECKPOINTS = checkpointsData.length
@@ -101,9 +105,31 @@ function trackPlayer(address: string): void {
   })()
 }
 
+// Builds the initial all-time total by summing every archived weekly leaderboard (including
+// migrated weeks) the first time ALL_TIME_KEY doesn't exist yet - after that it's only ever
+// incremented directly by reportScore, never recomputed from the weeks again.
+async function backfillAllTime(): Promise<LeaderboardMap> {
+  const allTime: LeaderboardMap = {}
+  let offset = 0
+  for (;;) {
+    const { data, pagination } = await Storage.getValues({ prefix: LEADERBOARD_KEY_PREFIX, limit: 100, offset })
+    for (const { value } of data) {
+      for (const [address, entry] of Object.entries(value as LeaderboardMap)) {
+        allTime[address] = { playerName: entry.playerName, score: (allTime[address]?.score ?? 0) + entry.score }
+      }
+    }
+    offset += data.length
+    if (data.length === 0 || offset >= pagination.total) break
+  }
+  await Storage.set(ALL_TIME_KEY, allTime)
+  console.log(`[Server] All-time leaderboard backfilled from ${offset} week(s), ${Object.keys(allTime).length} player(s)`)
+  return allTime
+}
+
 export async function startServer() {
   let currentWeekId = weekIdFor(Date.now())
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY_PREFIX + currentWeekId)) ?? {}
+  let allTime: LeaderboardMap = (await Storage.get<LeaderboardMap>(ALL_TIME_KEY)) ?? (await backfillAllTime())
 
   // Swaps in the new week's (empty, or whatever another instance already wrote) table once the clock
   // crosses Monday 00:00 UTC. currentWeekId is updated before the await so a second call from the
@@ -124,18 +150,24 @@ export async function startServer() {
     const address = context.from
     const previousScore = leaderboard[address]?.score ?? 0
     leaderboard[address] = { playerName: data.playerName, score: previousScore + data.points }
+    const previousAllTimeScore = allTime[address]?.score ?? 0
+    allTime[address] = { playerName: data.playerName, score: previousAllTimeScore + data.points }
 
     await Storage.set(LEADERBOARD_KEY_PREFIX + currentWeekId, leaderboard)
+    await Storage.set(ALL_TIME_KEY, allTime)
     broadcastLeaderboard(leaderboard, currentWeekId)
-    console.log(`[Server] ${data.playerName} (${address}) +${data.points} pts -> ${leaderboard[address].score}`)
+    broadcastAllTimeLeaderboard(allTime)
+    console.log(`[Server] ${data.playerName} (${address}) +${data.points} pts -> ${leaderboard[address].score} (all-time ${allTime[address].score})`)
   })
 
   broadcastLeaderboard(leaderboard, currentWeekId)
+  broadcastAllTimeLeaderboard(allTime)
 
   room.onMessage('requestLeaderboard', (_data, context) => {
     if (!context) return
     trackPlayer(context.from)
     broadcastLeaderboard(leaderboard, currentWeekId, [context.from])
+    broadcastAllTimeLeaderboard(allTime, [context.from])
   })
 
   room.onMessage('requestMyScore', async (_data, context) => {
@@ -296,4 +328,12 @@ function broadcastLeaderboard(leaderboard: LeaderboardMap, weekId: string, to?: 
     .sort((a, b) => b.score - a.score)
     .slice(0, LEADERBOARD_TOP_N)
   room.send('leaderboardUpdate', { weekId, entries }, to ? { to } : undefined)
+}
+
+function broadcastAllTimeLeaderboard(allTime: LeaderboardMap, to?: string[]) {
+  const entries = Object.entries(allTime)
+    .map(([address, entry]) => ({ ...entry, address }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, LEADERBOARD_TOP_N)
+  room.send('leaderboardAllTimeUpdate', { entries }, to ? { to } : undefined)
 }

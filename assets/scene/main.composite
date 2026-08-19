@@ -393,6 +393,27 @@
             },
             "parent": 0
           }
+        },
+        "529": {
+          "json": {
+            "position": {
+              "x": 30,
+              "y": 6.5,
+              "z": 18
+            },
+            "rotation": {
+              "x": 0,
+              "y": 1,
+              "z": 0,
+              "w": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "parent": 0
+          }
         }
       }
     },
@@ -529,7 +550,12 @@
         },
         "528": {
           "json": {
-            "value": "Leaderboard_parent"
+            "value": "LBoard_Weekly"
+          }
+        },
+        "529": {
+          "json": {
+            "value": "LBoard_All_Time"
           }
         }
       }
@@ -602,9 +628,9 @@
         "serializationType": "map"
       },
       "data": {
-        "0": {
+        "529": {
           "json": {
-            "gizmo": 0
+            "gizmo": 1
           }
         }
       }
@@ -658,6 +684,7 @@
                   513,
                   514,
                   528,
+                  529,
                   515
                 ]
               },
@@ -746,6 +773,10 @@
               {
                 "entity": 528,
                 "children": []
+              },
+              {
+                "entity": 529,
+                "children": []
               }
             ]
           }
@@ -818,6 +849,9 @@
           "json": {}
         },
         "528": {
+          "json": {}
+        },
+        "529": {
           "json": {}
         }
       }

@@ -15,6 +15,12 @@ export const Messages = {
   // server's own startup broadcast only reaches whoever is already connected at that instant,
   // which is never a client that joins afterward.
   requestLeaderboard: Schemas.Map({}),
+  // Server -> Client: current top-of-leaderboard snapshot for the all-time total (sum of every
+  // week's score per wallet, never resets). Sent alongside leaderboardUpdate on every reportScore
+  // and on requestLeaderboard.
+  leaderboardAllTimeUpdate: Schemas.Map({
+    entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String }))
+  }),
   // Client -> Server: ask for the caller's own running score for the current week. Unlike
   // leaderboardUpdate (which only ever carries the top N), this always answers with the caller's
   // real total - the server keeps every player's score, not just the top N, it just never

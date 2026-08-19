@@ -13,10 +13,10 @@ import { Color4, Vector3 } from '@dcl/sdk/math'
 import { EntityNames } from '../assets/scene/entity-names'
 import { getLeaderboardFaceUrl } from './leaderboardProfileCache'
 
-// In-world copy of the leaderboard's rows only - no title, no frame. Everything hangs off the
-// Leaderboard_parent entity placed in the Creator Hub, so moving/rotating/scaling the board there
-// moves the whole panel (the plane's own face is +Z, so the anchor's rotation aims it).
-const ANCHOR_NAME = EntityNames.Leaderboard_parent
+// In-world copy of the leaderboard's rows only - no title, no frame. Everything hangs off an
+// anchor entity placed in the Creator Hub (LBoard_Weekly, LBoard_All_Time), so moving/rotating/
+// scaling the board there moves the whole panel (the plane's own face is +Z, so the anchor's
+// rotation aims it). One independent set of rows is built per anchor - see Panel/panels below.
 const ROWS = 10
 
 // Column geometry lifted from the desktop rows in ui.tsx so the 3D panel reads the same: fixed rank
@@ -87,7 +87,22 @@ interface Row3d {
   appliedFaceUrl: string
 }
 
-let rows: Row3d[] | null = null
+interface Panel {
+  anchorName: EntityNames
+  rows: Row3d[] | null
+}
+
+const panels = new Map<EntityNames, Panel>()
+
+function getPanel(anchorName: EntityNames): Panel {
+  let panel = panels.get(anchorName)
+  if (panel === undefined) {
+    panel = { anchorName, rows: null }
+    panels.set(anchorName, panel)
+  }
+  return panel
+}
+
 let sinceFaceRefresh = 0
 
 // Left edge of the panel in the anchor's local space. Horizontally the board is centered on the
@@ -152,12 +167,12 @@ function createRow(parent: Entity, index: number): Row3d {
 
 // Built on the first update rather than at setup: the anchor comes from the scene composite, so
 // this stays correct even if the lookup isn't resolvable yet the first time around.
-function ensureRows(): Row3d[] | null {
-  if (rows !== null) return rows
-  const anchor = engine.getEntityOrNullByName(ANCHOR_NAME)
+function ensureRows(panel: Panel): Row3d[] | null {
+  if (panel.rows !== null) return panel.rows
+  const anchor = engine.getEntityOrNullByName(panel.anchorName)
   if (anchor === null) return null
-  rows = Array.from({ length: ROWS }, (_, index) => createRow(anchor, index))
-  return rows
+  panel.rows = Array.from({ length: ROWS }, (_, index) => createRow(anchor, index))
+  return panel.rows
 }
 
 function applyFace(row: Row3d) {
@@ -176,8 +191,8 @@ function truncateName(name: string): string {
   return chars.slice(0, NAME_MAX_CHARS).join('') + NAME_ELLIPSIS
 }
 
-export function updateLeaderboard3d(entries: Leaderboard3dEntry[]) {
-  const built = ensureRows()
+export function updateLeaderboard3d(anchorName: EntityNames, entries: Leaderboard3dEntry[]) {
+  const built = ensureRows(getPanel(anchorName))
   if (built === null) return
   built.forEach((row, index) => {
     const entry = entries[index]
@@ -191,10 +206,12 @@ export function updateLeaderboard3d(entries: Leaderboard3dEntry[]) {
 
 export function setupLeaderboard3d() {
   engine.addSystem((dt: number) => {
-    if (rows === null) return
     sinceFaceRefresh += dt
     if (sinceFaceRefresh < FACE_REFRESH_INTERVAL) return
     sinceFaceRefresh = 0
-    for (const row of rows) applyFace(row)
+    for (const panel of panels.values()) {
+      if (panel.rows === null) continue
+      for (const row of panel.rows) applyFace(row)
+    }
   })
 }
