@@ -122,8 +122,12 @@ const PRIZE_MARKER_NAMES: string[] = [
   EntityNames.prize_12
 ]
 
-// Seconds the prize stays at one spawn point before hopping to another.
-const HOP_DURATION = 5
+// Seconds the prize stays at one spawn point before hopping to another. Starts generous (12s) on
+// the earliest levels and tightens by 1s every two levels down to 3s from level 19 onward.
+function hopDurationForLevel(level: number): number {
+  return Math.max(3, 13 - Math.ceil(level / 2))
+}
+let hopDuration = hopDurationForLevel(1)
 // Total hops the player gets to catch it before the chase counts as failed.
 export const PRIZE_CHASE_MAX_ATTEMPTS = 5
 // Sphere trigger radius (metres) around the prize's current (bobbing) position - forgiving,
@@ -238,13 +242,15 @@ function spawnHop() {
 }
 
 // Spawns the first hop and starts the chase. icon selects which monster's art is painted onto the
-// plane (see applyPrizeIcon). onCaught fires once the player touches the prize; onFailed fires if
+// plane (see applyPrizeIcon). level (the current checkpoint number) sets how long each hop stays
+// put, via hopDurationForLevel. onCaught fires once the player touches the prize; onFailed fires if
 // MAX_ATTEMPTS hops pass with no catch; onMissed fires each time a hop times out and a new one
 // spawns (not on the very first hop). Exactly one of onCaught/onFailed fires, once.
-export function startPrizeChase(icon: PrizeIcon, onCaught: () => void, onFailed: () => void, onMissed: () => void) {
+export function startPrizeChase(level: number, icon: PrizeIcon, onCaught: () => void, onFailed: () => void, onMissed: () => void) {
   active = true
   attempt = 0
   lastMarkerName = null
+  hopDuration = hopDurationForLevel(level)
   currentIcon = icon
   onCaughtCallback = onCaught
   onFailedCallback = onFailed
@@ -256,7 +262,7 @@ export function startPrizeChase(icon: PrizeIcon, onCaught: () => void, onFailed:
 export function updatePrizeChase(dt: number) {
   if (!active) return
   hopElapsed += dt
-  if (hopElapsed < HOP_DURATION) return
+  if (hopElapsed < hopDuration) return
 
   if (attempt >= PRIZE_CHASE_MAX_ATTEMPTS) {
     active = false
@@ -273,9 +279,9 @@ export function updatePrizeChase(dt: number) {
   spawnHop()
 }
 
-// Seconds left on the current hop (HOP_DURATION..0), for the UI countdown.
+// Seconds left on the current hop (hopDuration..0), for the UI countdown.
 export function getPrizeChaseSecondsRemaining(): number {
-  return Math.max(0, HOP_DURATION - hopElapsed)
+  return Math.max(0, hopDuration - hopElapsed)
 }
 
 // Chances left, counting the current hop (PRIZE_CHASE_MAX_ATTEMPTS..1), for "Chances: X/Y" copy.

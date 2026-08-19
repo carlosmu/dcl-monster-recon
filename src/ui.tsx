@@ -1372,6 +1372,7 @@ export function setupUi() {
           playTickingSound()
           const wonCollection = getCollectionForSlot(wonMonsterQuadrant)
           startPrizeChase(
+            currentCheckpoint,
             {
               image: wonCollection.prizeImage,
               gridCols: wonCollection.prizeGridCols,
