@@ -15,7 +15,9 @@ import {
   ParticleSystem,
   PBParticleSystem_BlendMode,
   AudioSource,
-  type Entity
+  type Entity,
+  type PBTriggerAreaResult,
+  type DeepReadonlyObject
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Color4 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
@@ -194,11 +196,16 @@ function despawnCurrentHop() {
 
 // TEMP (crash diagnosis): guarded because this runs as an SDK trigger callback, where a throw would
 // take the whole scene down with no readable stack. See errorTrap.ts.
-function handleCatch() {
-  guard('prizeCatch', handleCatchInner)
+function handleCatch(result: DeepReadonlyObject<PBTriggerAreaResult>) {
+  guard('prizeCatch', () => handleCatchInner(result))
 }
 
-function handleCatchInner() {
+// Each client runs its own copy of the scene, and CL_PLAYER trigger areas fire for every player's
+// avatar that walks through them, not just this client's own. Without this check, another player
+// entering the catch radius awards the monster to the local player instead - the reported "captured
+// by the wrong player" / "received early automatically" bug.
+function handleCatchInner(result: DeepReadonlyObject<PBTriggerAreaResult>) {
+  if (result.trigger?.entity !== engine.PlayerEntity) return
   if (!active) return
   active = false
   const onCaught = onCaughtCallback
