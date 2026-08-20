@@ -2436,7 +2436,7 @@ const MemoryMatchUi = () => (
               )}
             </UiEntity>
             <Label
-              value="*Resets every Monday at 00:00 UTC."
+              value="*Resets every Monday at 10AM UTC."
               fontSize={LEADERBOARD_RESET_NOTE_FONT_SIZE_PX}
               color={SCREEN_TEXT_COLOR}
               textAlign="middle-center"

@@ -31,11 +31,15 @@ function bestTimeKey(checkpoint: number, boardIndex: number): string {
   return `${BEST_TIME_KEY_PREFIX}${checkpoint}-${boardIndex}`
 }
 
+// Reset happens at 10:00 UTC rather than midnight so it doesn't cut off night-owl EU players or
+// hit NA players mid-Sunday-evening.
+const WEEK_RESET_HOUR_UTC = 10
+
 // Identifies a week by the UTC date of its Monday (YYYY-MM-DD), so keys sort chronologically under
-// LEADERBOARD_KEY_PREFIX and the week boundary is exactly Monday 00:00 UTC - the reset the
+// LEADERBOARD_KEY_PREFIX and the week boundary is exactly Monday 10:00 UTC - the reset the
 // leaderboard screen advertises.
 function weekIdFor(timestamp: number): string {
-  const date = new Date(timestamp)
+  const date = new Date(timestamp - WEEK_RESET_HOUR_UTC * 60 * 60 * 1000)
   const daysSinceMonday = (date.getUTCDay() + 6) % 7 // getUTCDay(): 0 = Sunday
   return new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - daysSinceMonday)
@@ -132,7 +136,7 @@ export async function startServer() {
   let allTime: LeaderboardMap = (await Storage.get<LeaderboardMap>(ALL_TIME_KEY)) ?? (await backfillAllTime())
 
   // Swaps in the new week's (empty, or whatever another instance already wrote) table once the clock
-  // crosses Monday 00:00 UTC. currentWeekId is updated before the await so a second call from the
+  // crosses Monday 10:00 UTC. currentWeekId is updated before the await so a second call from the
   // next tick returns early instead of racing this one.
   async function rolloverIfNeeded(): Promise<void> {
     const weekId = weekIdFor(Date.now())
@@ -316,7 +320,7 @@ export async function startServer() {
       tick++
       room.send('serverTick', { tick })
       // Rolls the week over on an idle room too, so players sitting in the scene across Monday
-      // 00:00 UTC see the table clear instead of a stale one.
+      // 10:00 UTC see the table clear instead of a stale one.
       void rolloverIfNeeded()
     }
   })
