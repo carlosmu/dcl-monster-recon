@@ -10,9 +10,9 @@ import { isMobile } from '@dcl/sdk/platform'
 // Material.Texture.Common's offset/tiling can crop it directly instead of rotating UVs.
 const SPINNER_IMAGE = 'assets/images/alphas.png'
 const SPINNER_ATLAS_QUADRANTS = 2
-const SPINNER_PLANE_SIZE = 3 // metres
+const SPINNER_PLANE_SIZE = 2 // metres
 const SPINNER_FOOT_HEIGHT = -0.05 // just above ground, avoids z-fighting with the floor
-const SPINNER_DEGREES_PER_SECOND = 180
+const SPINNER_DEGREES_PER_SECOND = 90
 
 // Two independent top-level entities instead of a parent+children hierarchy - no parentEntity()
 // ordering to get right, just two Transforms this module writes directly every frame. Simpler to
