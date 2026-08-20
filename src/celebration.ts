@@ -23,7 +23,13 @@ const PREDEFINED_EMOTES = new Set([
 // fight the emote system directly). Instead, after this many seconds we nudge the player a tiny,
 // imperceptible distance via movePlayerTo - movement is what makes the client end a scene emote,
 // so a scripted micro-step does the same job as the player taking a real step themselves.
-const EMOTE_LOOP_CUTOFF_SECONDS = 15
+// Kept short (not the original 15s) because this timer lives in the scene's own runtime: nothing
+// stops the player from walking out of the scene's load radius before it fires (defeat doesn't
+// freeze movement - see triggerDefeatEmote/startEmote below), and if the scene unloads first, the
+// pending timer is discarded and the nudge that was supposed to end the loop never happens. That
+// matches a report of players stuck with dead emotes/WASD even after leaving the scene. Shortening
+// the window doesn't fully close it (a fast player can still outrun it) but cuts exposure a lot.
+const EMOTE_LOOP_CUTOFF_SECONDS = 4
 const EMOTE_LOOP_CUTOFF_NUDGE = 0.1
 
 let camParent: Entity
