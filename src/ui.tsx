@@ -2563,7 +2563,14 @@ const MemoryMatchUi = () => (
           justifyContent: 'center'
         }}
       >
-        <BitmapText text="Time's up" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={36} />
+        <UiEntity
+          uiTransform={{ padding: { top: 16, bottom: 16, left: 20, right: 20 }, borderRadius: 15 }}
+          // Same placeholder background as the win-sequence toasts (see the toast's own uiBackground
+          // below) - solid black at 85% opacity, until there's dedicated frame art.
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
+        >
+          <BitmapText text="Time's up" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={36} />
+        </UiEntity>
       </UiEntity>
     )}
 
