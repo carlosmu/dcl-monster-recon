@@ -92,7 +92,8 @@ export function updateCelebrationCamera(dt: number) {
 // nothing behind for the client to read as "restrictions lifted", so a frame where the delete is
 // missed leaves the player frozen with no way to recover. Writing a fully-permissive modifier
 // first makes the release unambiguous, and the delete then keeps the component pool clean.
-function releaseInput() {
+// Exported so other input-freezing flows (e.g. tutorialChase.ts) can reuse the same unfreeze logic.
+export function releaseInput() {
   InputModifier.createOrReplace(engine.PlayerEntity, {
     mode: InputModifier.Mode.Standard({
       disableAll: false,

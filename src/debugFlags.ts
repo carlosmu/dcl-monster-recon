@@ -47,6 +47,20 @@ export const DEBUG_SCORE_OVERRIDE = false
 // the way in, but nothing writes it back, so real stored progress is left untouched.
 export const DEBUG_UNLOCK_ALL_CHECKPOINTS = false
 
+// Fires the checkpoint-1 tutorial cinematic (see tutorialChase.ts) a couple seconds after scene
+// load, without needing to actually clear checkpoint 1's 3 boards first - to check the monster
+// spawn position, arrow, camera, and letterbox bars in isolation. Starts a real (but throwaway)
+// prize chase alongside it, same as the real flow does. Flip to false once done checking.
+export const DEBUG_TRIGGER_TUTORIAL_CHASE = false
+
+// Only matters while DEBUG_TRIGGER_TUTORIAL_CHASE is also true. Skips the timed camera/letterbox-
+// bars/input-freeze part of the cinematic entirely, so the monster and arrow just sit in place
+// (arrow never auto-hides, monster never hops - its hop timer only ever runs once the "find the
+// monster" toast is showing, which this debug path never triggers) with the normal free-look
+// camera, so you can walk/look around them from any angle to check positioning. Flip to false to
+// see the real timed cinematic again.
+export const DEBUG_FREEZE_TUTORIAL_CHASE = false
+
 // Visual-only: replaces the leaderboard with the 10 made-up players below, so the leaderboard
 // screen and the in-world 3D panel can both be checked full without 10 real wallets having played.
 // Nothing is sent to the server and no real score is touched - the fake addresses belong to nobody,

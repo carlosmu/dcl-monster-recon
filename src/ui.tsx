@@ -10,6 +10,7 @@ import {
 } from '@dcl/sdk/ecs'
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
+import { timers } from '@dcl-sdk/utils'
 import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
@@ -27,6 +28,7 @@ import {
   DEBUG_CODEX_SHOW_ALL_MONSTERS,
   DEBUG_SCORE_OVERRIDE,
   DEBUG_UNLOCK_ALL_CHECKPOINTS,
+  DEBUG_TRIGGER_TUTORIAL_CHASE,
   DEBUG_FAKE_LEADERBOARD,
   DEBUG_FAKE_LEADERBOARD_ENTRIES,
   DEBUG_BORDER_RED,
@@ -41,8 +43,10 @@ import {
   getPrizeChaseSecondsRemaining,
   getPrizeChaseChancesRemaining,
   stopPrizeChase,
+  getCurrentBobAnchor,
   PRIZE_CHASE_MAX_ATTEMPTS
 } from './prizeChase'
+import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTutorialCinematicActive, attachMonsterDialog } from './tutorialChase'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -1227,6 +1231,31 @@ export function setupUi() {
   AudioSource.create(loseAChanceEntity, { audioClipUrl: LOSE_A_CHANCE_CLIP, playing: false, loop: false, volume: 0.8, global: true })
 
   setupCelebrationCamera()
+  setupTutorialChase()
+
+  if (DEBUG_TRIGGER_TUTORIAL_CHASE) {
+    // Delayed so the player's Transform and camp.gltf are guaranteed to have loaded before
+    // startTutorialCinematic() reads them.
+    timers.setTimeout(() => {
+      const tutorialMonsterSpawnPos = startTutorialCinematic()
+      if (!tutorialMonsterSpawnPos) {
+        console.error('[DEBUG_TRIGGER_TUTORIAL_CHASE] camp.gltf not found - cannot compute a spawn position')
+        return
+      }
+      const collection = getCollectionForSlot(0)
+      startPrizeChase(
+        1,
+        { image: collection.prizeImage, gridCols: collection.prizeGridCols, gridRows: collection.prizeGridRows, localIndex: 0 - collection.start },
+        () => console.log('[DEBUG_TRIGGER_TUTORIAL_CHASE] caught'),
+        () => console.log('[DEBUG_TRIGGER_TUTORIAL_CHASE] failed'),
+        () => console.log('[DEBUG_TRIGGER_TUTORIAL_CHASE] missed'),
+        tutorialMonsterSpawnPos
+      )
+      const monsterEntity = getCurrentBobAnchor()
+      if (monsterEntity !== null) attachMonsterDialog(monsterEntity)
+    }, 2000)
+  }
+
   setupLeaderboard3d()
   // Paints whatever `leaderboard`/`leaderboardAllTime` already hold - nothing in the normal case,
   // the fake roster under DEBUG_FAKE_LEADERBOARD. Without this the 3D panels would stay blank until
@@ -1341,6 +1370,7 @@ export function setupUi() {
     }
 
     updateCelebrationCamera(dt)
+    updateTutorialChase(dt)
 
     if (screen === 'board' && !gameOver && !won && countdownStart === null) {
       timeRemaining = Math.max(0, timeRemaining - dt)
@@ -1387,6 +1417,12 @@ export function setupUi() {
           stopBoardMusic()
           playTickingSound()
           const wonCollection = getCollectionForSlot(wonMonsterQuadrant)
+          // Checkpoint 1 is every player's first encounter with the catch mechanic, so it gets a
+          // one-shot tutorial cinematic (rotate to face camp.gltf, fixed monster spot, over-the-
+          // shoulder camera + letterbox bars + monster_dialog) alongside the normal chase start -
+          // see tutorialChase.ts. Runs every time checkpoint 1 is completed, not just the player's
+          // first ever run of it.
+          const tutorialMonsterSpawnPos = currentCheckpoint === 1 ? startTutorialCinematic() : null
           startPrizeChase(
             currentCheckpoint,
             {
@@ -1397,8 +1433,13 @@ export function setupUi() {
             },
             handlePrizeCaught,
             handlePrizeChaseFailed,
-            handlePrizeMissed
+            handlePrizeMissed,
+            tutorialMonsterSpawnPos ?? undefined
           )
+          if (tutorialMonsterSpawnPos !== null) {
+            const monsterEntity = getCurrentBobAnchor()
+            if (monsterEntity !== null) attachMonsterDialog(monsterEntity)
+          }
           showToast('findMonster')
         })
       } else {
@@ -1593,6 +1634,10 @@ const TexturePreloader = () => (
     ))}
   </UiEntity>
 )
+
+// Height (raw px, 1920x1080 virtual reference) of each cinema-style letterbox bar shown during the
+// checkpoint-1 tutorial cinematic - see isTutorialCinematicActive() below.
+const TUTORIAL_BAR_HEIGHT_PX = 135 // 90 + 50%
 
 const MemoryMatchUi = () => (
   <UiEntity
@@ -2612,6 +2657,21 @@ const MemoryMatchUi = () => (
             <BitmapText text="Monster Not Collected" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
           )}
         </UiEntity>
+      </UiEntity>
+    )}
+
+    {/* Cinema-style letterbox bars for the checkpoint-1 tutorial cinematic (see tutorialChase.ts) -
+    last sibling so it draws over everything else, full-screen (not just canvas_main). */}
+    {isTutorialCinematicActive() && (
+      <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', position: { top: 0, left: 0 } }}>
+        <UiEntity
+          uiTransform={{ width: '100%', height: TUTORIAL_BAR_HEIGHT_PX, positionType: 'absolute', position: { top: 0, left: 0 } }}
+          uiBackground={{ color: Color4.Black() }}
+        />
+        <UiEntity
+          uiTransform={{ width: '100%', height: TUTORIAL_BAR_HEIGHT_PX, positionType: 'absolute', position: { bottom: 0, left: 0 } }}
+          uiBackground={{ color: Color4.Black() }}
+        />
       </UiEntity>
     )}
   </UiEntity>

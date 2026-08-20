@@ -14,6 +14,7 @@ import {
   triggerAreaEventsSystem,
   ParticleSystem,
   PBParticleSystem_BlendMode,
+  AudioSource,
   type Entity
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Color4 } from '@dcl/sdk/math'
@@ -76,6 +77,10 @@ let currentIcon: PrizeIcon | null = null
 // test plane before wiring it in here.
 const PRIZE_PLANE_WIDTH = 1.2
 const PRIZE_PLANE_HEIGHT = 1.5
+
+// Spatial (positional) sound while the prize is out - AudioSource defaults to spatial, so this is
+// left off global entirely (only the UI/music AudioSources elsewhere set global: true).
+const MONSTER_CACKLE_CLIP = 'assets/audio/witch_cackle.mp3'
 
 // Crops currentIcon's grid cell onto the plane's material, with cutout alpha and matching emissive
 // so the sprite reads clearly and glows in its own colors rather than relying on scene light.
@@ -153,6 +158,10 @@ let lastMarkerName: string | null = null
 let onCaughtCallback: (() => void) | null = null
 let onFailedCallback: (() => void) | null = null
 let onMissedCallback: (() => void) | null = null
+// Tutorial override (see startPrizeChase's firstHopWorldPosition param): when set, the very first
+// hop spawns here instead of at a random marker. Cleared after that hop so every hop from the 2nd
+// one on falls back to the normal random-marker behavior.
+let firstHopWorldPosition: Vector3 | null = null
 
 function pickRandomMarkerName(): string {
   const playerPos = Transform.get(engine.PlayerEntity).position
@@ -205,29 +214,46 @@ function spawnHop() {
   despawnCurrentHop()
   attempt++
 
-  const marker = engine.getEntityOrNullByName(pickRandomMarkerName())
-  if (!marker) {
-    console.error('[prizeChase] no prize_ marker entity found in the scene')
-    return
-  }
-
   const bobStart = Vector3.create(0, BOB_MIN_HEIGHT, 0)
   const bobEnd = Vector3.create(0, BOB_MAX_HEIGHT, 0)
 
   bobAnchor = engine.addEntity()
-  Transform.create(bobAnchor, {
-    parent: marker,
-    position: bobStart,
-    scale: Vector3.create(CATCH_RADIUS, CATCH_RADIUS, CATCH_RADIUS)
-  })
-  Tween.createOrReplace(bobAnchor, {
-    duration: BOB_LEG_DURATION_MS,
-    easingFunction: EasingFunction.EF_EASESINE,
-    mode: Tween.Mode.Move({ start: bobStart, end: bobEnd })
-  })
+
+  if (attempt === 1 && firstHopWorldPosition !== null) {
+    // Tutorial's fixed first spawn - no marker, no parent: bobAnchor's own position IS the world
+    // position (unparented root entity), so the bob offsets are just added directly onto it.
+    const origin = firstHopWorldPosition
+    firstHopWorldPosition = null
+    Transform.create(bobAnchor, {
+      position: Vector3.add(origin, bobStart),
+      scale: Vector3.create(CATCH_RADIUS, CATCH_RADIUS, CATCH_RADIUS)
+    })
+    Tween.createOrReplace(bobAnchor, {
+      duration: BOB_LEG_DURATION_MS,
+      easingFunction: EasingFunction.EF_EASESINE,
+      mode: Tween.Mode.Move({ start: Vector3.add(origin, bobStart), end: Vector3.add(origin, bobEnd) })
+    })
+  } else {
+    const marker = engine.getEntityOrNullByName(pickRandomMarkerName())
+    if (!marker) {
+      console.error('[prizeChase] no prize_ marker entity found in the scene')
+      return
+    }
+    Transform.create(bobAnchor, {
+      parent: marker,
+      position: bobStart,
+      scale: Vector3.create(CATCH_RADIUS, CATCH_RADIUS, CATCH_RADIUS)
+    })
+    Tween.createOrReplace(bobAnchor, {
+      duration: BOB_LEG_DURATION_MS,
+      easingFunction: EasingFunction.EF_EASESINE,
+      mode: Tween.Mode.Move({ start: bobStart, end: bobEnd })
+    })
+  }
   TweenSequence.createOrReplace(bobAnchor, { sequence: [], loop: TweenLoop.TL_YOYO })
   TriggerArea.setSphere(bobAnchor)
   triggerAreaEventsSystem.onTriggerEnter(bobAnchor, handleCatch)
+  AudioSource.create(bobAnchor, { audioClipUrl: MONSTER_CACKLE_CLIP, playing: true, loop: true })
 
   prizeModel = engine.addEntity()
   Transform.create(prizeModel, { parent: bobAnchor, scale: Vector3.create(PRIZE_PLANE_WIDTH, PRIZE_PLANE_HEIGHT, 1) })
@@ -246,7 +272,16 @@ function spawnHop() {
 // put, via hopDurationForLevel. onCaught fires once the player touches the prize; onFailed fires if
 // MAX_ATTEMPTS hops pass with no catch; onMissed fires each time a hop times out and a new one
 // spawns (not on the very first hop). Exactly one of onCaught/onFailed fires, once.
-export function startPrizeChase(level: number, icon: PrizeIcon, onCaught: () => void, onFailed: () => void, onMissed: () => void) {
+// firstHopWorldPosition (tutorial only, see tutorialChase.ts): spawns the very first hop at this
+// exact world position instead of a random marker; every hop after it is random as normal.
+export function startPrizeChase(
+  level: number,
+  icon: PrizeIcon,
+  onCaught: () => void,
+  onFailed: () => void,
+  onMissed: () => void,
+  tutorialFirstHopPosition?: Vector3
+) {
   active = true
   attempt = 0
   lastMarkerName = null
@@ -255,7 +290,15 @@ export function startPrizeChase(level: number, icon: PrizeIcon, onCaught: () => 
   onCaughtCallback = onCaught
   onFailedCallback = onFailed
   onMissedCallback = onMissed
+  firstHopWorldPosition = tutorialFirstHopPosition ?? null
   spawnHop()
+}
+
+// The monster's current bob anchor - see tutorialChase.ts's attachMonsterDialog, which parents a UI
+// element to it so that element inherits the bobbing Tween. null between hops (despawnCurrentHop)
+// and once no chase is active.
+export function getCurrentBobAnchor(): Entity | null {
+  return bobAnchor
 }
 
 // Call every frame while a chase is active (the caller decides when that is).
