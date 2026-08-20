@@ -401,16 +401,16 @@
               "y": 6.5,
               "z": 18
             },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
             "rotation": {
               "x": 0,
               "y": 1,
               "z": 0,
               "w": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
             },
             "parent": 0
           }
@@ -628,9 +628,9 @@
         "serializationType": "map"
       },
       "data": {
-        "529": {
+        "0": {
           "json": {
-            "gizmo": 1
+            "gizmo": 0
           }
         }
       }
