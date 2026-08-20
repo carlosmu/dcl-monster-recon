@@ -47,6 +47,7 @@ import {
   PRIZE_CHASE_MAX_ATTEMPTS
 } from './prizeChase'
 import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTutorialCinematicActive, attachMonsterDialog } from './tutorialChase'
+import { showPlayerFloorSpinner, updatePlayerFloorSpinner, hidePlayerFloorSpinner } from './floorSpinner'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -1057,6 +1058,7 @@ function flipCell(cell: CellState) {
         triggerCelebrationCamera(isNewBestTime ? 'disco' : 'handsair', 0)
         const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
+        if (checkpointComplete) hidePlayerFloorSpinner()
         room.send('reportBoardTime', {
           checkpoint: currentCheckpoint,
           boardIndex: currentBoardIndex,
@@ -1371,11 +1373,13 @@ export function setupUi() {
 
     updateCelebrationCamera(dt)
     updateTutorialChase(dt)
+    updatePlayerFloorSpinner(dt)
 
     if (screen === 'board' && !gameOver && !won && countdownStart === null) {
       timeRemaining = Math.max(0, timeRemaining - dt)
       if (timeRemaining === 0) {
         gameOver = true
+        hidePlayerFloorSpinner()
         stopBoardMusic()
         playTimeoutSound()
         triggerDefeatEmote()
@@ -1568,10 +1572,12 @@ function startBoard(checkpoint: number, boardIndex: number) {
 }
 
 function startCheckpoint(checkpoint: number) {
+  showPlayerFloorSpinner()
   startBoard(checkpoint, 0)
 }
 
 function closeBoard() {
+  hidePlayerFloorSpinner()
   stopBoardMusic()
   playAmbientMusic()
   screen = 'checkpointSelect'
