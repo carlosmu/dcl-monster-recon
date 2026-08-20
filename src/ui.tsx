@@ -554,7 +554,7 @@ function getToastShakeOffsetPx(): number {
 
 const BASE_POINTS_PER_PAIR = 5
 const TIME_BONUS_MAX = 10
-const ERROR_PENALTY = 0.5
+const ERROR_PENALTY = 1
 
 // Seconds the "Time's up" screen stays up before the board closes on its own.
 const END_SCREEN_DURATION = 3
@@ -1049,13 +1049,13 @@ function flipCell(cell: CellState) {
         playBoardEndSound()
         const pairCount = (COLS * ROWS) / 2
         const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
-        score = Math.max(0, Math.round(pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY))
+        score = Math.max(0, Math.round(pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY * SCORE_MULTIPLIER))
         totalScore += score
         reportScore(score)
         lastBoardTime = GAME_DURATION - timeRemaining
         const previousBest = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
         isNewBestTime = previousBest === undefined || previousBest === NO_BEST_TIME || lastBoardTime < previousBest
-        triggerCelebrationCamera(isNewBestTime ? 'disco' : 'handsair', 0)
+        triggerCelebrationCamera(isNewBestTime ? 'disco' : 'handsair', 0, true)
         const boardsInCheckpoint = CHECKPOINTS[currentCheckpoint - 1].boards.length
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
         if (checkpointComplete) hidePlayerFloorSpinner()
@@ -1510,7 +1510,7 @@ function handlePrizeCaught() {
   // Was 180 (the sweep's opposite half) so it picked up where the board-win orbit (0deg->180deg)
   // left off - but the catch now happens much later, disconnected from that shot, and 180deg
   // showed the player's back instead of their front. Same start as the board-win orbit fixes it.
-  triggerCelebrationCamera('fistpump', 0)
+  triggerCelebrationCamera('fistpump', 0, false)
   hideToast(() => showToast('monsterCollected'))
 }
 
