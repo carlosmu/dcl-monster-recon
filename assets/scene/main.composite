@@ -628,7 +628,7 @@
         "serializationType": "map"
       },
       "data": {
-        "0": {
+        "1": {
           "json": {
             "gizmo": 0
           }
@@ -1652,9 +1652,12 @@
             "ageRating": "A",
             "categories": [],
             "author": "SDK",
-            "email": "",
             "tags": [],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -1720,14 +1723,8 @@
                   "x": 3,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
-            "silenceVoiceChat": false,
-            "disablePortableExperiences": false,
             "spawnPoints": [
               {
                 "name": "SpawnArea1",
@@ -1741,11 +1738,8 @@
                     ]
                   },
                   "y": {
-                    "$case": "range",
-                    "value": [
-                      2,
-                      2
-                    ]
+                    "$case": "single",
+                    "value": 3
                   },
                   "z": {
                     "$case": "range",
@@ -1763,8 +1757,6 @@
               }
             ],
             "skyboxConfig": {},
-            "creator": "",
-            "disableNearbyVoiceChat": false,
             "hideLandscapeTerrain": true
           }
         }

@@ -401,6 +401,10 @@ const PLAY_GLOW_SCALE = 1.4
 const PLAY_GLOW_MIN_OPACITY = 0.1
 const PLAY_GLOW_MAX_OPACITY = 1
 
+// Loading-style spinner behind the Play button (see showingPlayButtonSpinner) - same renderSpinner
+// used by the Monster Collected toast, scaled off the button's own size like the glow above.
+const PLAY_SPINNER_SCALE = 2
+
 // Button+glow group scale (1x -> 1.2x -> 1x) and glow opacity (0.1 -> 1 -> 0.1) share the SAME
 // period below, so max scale always lands exactly on max opacity in time - they just use different
 // curve shapes (confirmed by ear: easeOutBack/easeInBack reads better for the scale pop, plain
@@ -435,6 +439,10 @@ function getPlayGlowOpacity(): number {
 
 function getPlayButtonHeightPx(): number {
   return isMobile() ? PLAY_BUTTON_HEIGHT_PX * PLAY_BUTTON_MOBILE_SCALE : PLAY_BUTTON_HEIGHT_PX
+}
+
+function showingPlayButtonSpinner(): boolean {
+  return playButtonSpinnerUntil !== null && elapsedTime < playButtonSpinnerUntil
 }
 
 const PLAY_BUTTON_BOTTOM_PERCENT_MOBILE = 8
@@ -722,6 +730,10 @@ const PLAY_AREA_MAX_X = 48
 const PLAY_AREA_MIN_Z = 16
 const PLAY_AREA_MAX_Z = 48
 let playerInPlayArea = false
+// Spinner behind the Play button, shown only for this many seconds right after the player enters
+// the play area (not for the whole time they stand in it) - set in tick() on the false->true edge.
+const PLAY_BUTTON_SPINNER_DURATION = 5
+let playButtonSpinnerUntil: number | null = null
 
 let screen: Screen = 'hidden'
 // Set to 'board' when checkpointSelect/inventory/leaderboard is opened while a board is in
@@ -1302,7 +1314,11 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
   const tick = (dt: number) => {
     elapsedTime += dt
+    const wasInPlayArea = playerInPlayArea
     playerInPlayArea = isPlayerInPlayArea()
+    if (playerInPlayArea && !wasInPlayArea) {
+      playButtonSpinnerUntil = elapsedTime + PLAY_BUTTON_SPINNER_DURATION
+    }
     if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) {
       preloadWarmupDone = true
       if (preloadEntity !== null) engine.removeEntity(preloadEntity)
@@ -1786,6 +1802,11 @@ const MemoryMatchUi = () => (
                     justifyContent: 'center'
                   }}
                 >
+                  {/* Spinner: shown only for PLAY_BUTTON_SPINNER_DURATION seconds right after entering
+                  the play area. Rendered first (behind the glow/button) as a normal flex child of this
+                  centered group - oversized so it overflows symmetrically, same technique as the
+                  Monster Collected toast's spinner. */}
+                  {showingPlayButtonSpinner() && renderSpinner(pulseWidth * PLAY_SPINNER_SCALE, pulseHeight * PLAY_SPINNER_SCALE)}
                   {/* Glow: dedicated sprite (PLAY_GLOW_UVS), 1.4x the button's size, pulsing opacity. */}
                   <UiEntity
                     uiTransform={{
