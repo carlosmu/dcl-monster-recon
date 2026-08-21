@@ -38,6 +38,7 @@ let lookAtEntity: Entity
 let active = false
 let elapsed = 0
 let orbitStartAngleDeg = 0
+let walkWasFrozen = false
 let emoteCutoffTimer: number | null = null
 
 // Creates the celebration camera rig. Call once from setupUi().
@@ -58,18 +59,21 @@ export function setupCelebrationCamera() {
 
 // Plays a celebration emote while the cinematic camera, parented at the player's position, sweeps
 // 180° around them starting at startAngleDeg. Used both for the per-board score screen (hands air/
-// disco, 0deg -> 180deg) and the monster-unlock screen (fist pump, 180deg -> 360deg).
-export function triggerCelebrationCamera(predefinedEmote: string, startAngleDeg: number) {
-  // The orbit is centered on a one-time position snapshot below, not tracked live - if the player
-  // is still moving (e.g. just having run up to catch the scene prize) they'd visibly walk off-
-  // center over the shot's duration, so walking is frozen for as long as the orbit is active.
-  //
+// disco, 0deg -> 180deg) and the monster-capture screen (fist pump, 180deg -> 360deg).
+// freezeWalk: the orbit is centered on a one-time position snapshot below, not tracked live - if
+// the player is still moving they'd visibly walk off-center over the shot's duration. Pass true to
+// freeze walking for that shot (board-win); the monster-capture cinematic passes false so the
+// player stays free to move while it plays.
+export function triggerCelebrationCamera(predefinedEmote: string, startAngleDeg: number, freezeWalk: boolean) {
   // Deliberately NOT disableAll: jumping is the client's built-in way to cancel an emote, and it's
   // the player's only escape hatch if anything goes wrong during the shot. Taking it away turns a
   // recoverable hiccup into a scene the player has to reload out of.
-  InputModifier.createOrReplace(engine.PlayerEntity, {
-    mode: InputModifier.Mode.Standard({ disableWalk: true, disableJog: true, disableRun: true })
-  })
+  if (freezeWalk) {
+    InputModifier.createOrReplace(engine.PlayerEntity, {
+      mode: InputModifier.Mode.Standard({ disableWalk: true, disableJog: true, disableRun: true })
+    })
+  }
+  walkWasFrozen = freezeWalk
 
   const playerPos = Transform.get(engine.PlayerEntity).position
   Transform.getMutable(camParent).position = Vector3.clone(playerPos)
@@ -90,7 +94,7 @@ export function updateCelebrationCamera(dt: number) {
   if (elapsed >= CAM_DURATION) {
     active = false
     MainCamera.getMutable(engine.CameraEntity).virtualCameraEntity = undefined
-    releaseInput()
+    if (walkWasFrozen) releaseInput()
   }
 }
 

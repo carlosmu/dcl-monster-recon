@@ -8,7 +8,6 @@ import {
   BillboardMode,
   VirtualCamera,
   MainCamera,
-  InputModifier,
   type Entity
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Quaternion } from '@dcl/sdk/math'
@@ -16,7 +15,6 @@ import { isMobile } from '@dcl/sdk/platform'
 import { getWorldPosition } from '@dcl-sdk/utils'
 import { movePlayerTo } from '~system/RestrictedActions'
 import { EntityNames } from '../assets/scene/entity-names'
-import { releaseInput } from './celebration'
 import { DEBUG_FREEZE_TUTORIAL_CHASE } from './debugFlags'
 
 // One-time-per-catch tutorial cinematic: plays whenever checkpoint 1's 3 boards are completed, to
@@ -122,7 +120,7 @@ export function attachMonsterDialog(monsterEntity: Entity) {
   Material.setPbrMaterial(monsterDialogEntity, buildMonsterDialogMaterial())
 }
 
-// Rotates the player to face camp.gltf, positions the cinematic camera, and freezes movement for
+// Rotates the player to face camp.gltf and positions the cinematic camera; movement stays free for
 // the duration. Returns a monster spot MONSTER_DISTANCE_FROM_PLAYER ahead of that new facing, for
 // the caller to pass into startPrizeChase's tutorialFirstHopPosition - once that spawns the monster's
 // bob anchor, the caller must also call attachMonsterDialog(anchor) separately (this function alone
@@ -145,7 +143,7 @@ export function startTutorialCinematic(): Vector3 | null {
   void movePlayerTo({ newRelativePosition: Vector3.clone(playerPos), avatarTarget: campPos })
 
   if (DEBUG_FREEZE_TUTORIAL_CHASE) {
-    // Debug positioning mode: skip the timed camera/letterbox-bars/input-freeze entirely, leaving
+    // Debug positioning mode: skip the timed camera/letterbox-bars entirely, leaving
     // the normal free-look camera so the monster + dialog can be checked from any angle. The dialog
     // stays attached indefinitely since updateTutorialChase never runs its auto-remove (active stays
     // false); the monster stays put too, since its hop timer only advances while the "find the
@@ -153,12 +151,6 @@ export function startTutorialCinematic(): Vector3 | null {
     active = false
     return monsterSpawnPos
   }
-
-  // Same partial freeze as celebration.ts's triggerCelebrationCamera: walking is locked so the
-  // player doesn't wander out of frame, but jumping is deliberately left alone as an escape hatch.
-  InputModifier.createOrReplace(engine.PlayerEntity, {
-    mode: InputModifier.Mode.Standard({ disableWalk: true, disableJog: true, disableRun: true })
-  })
 
   Transform.getMutable(camEntity).position = Vector3.add(playerPos, Vector3.rotate(CAM_LOCAL_OFFSET, facingRotation))
   Transform.getMutable(camEntity).rotation = facingRotation
@@ -170,7 +162,7 @@ export function startTutorialCinematic(): Vector3 | null {
 }
 
 // Advances the cinematic timer; call every frame from the main system loop. Hands control back
-// (camera, bars, dialog plane, input) once TUTORIAL_CINEMATIC_DURATION elapses - the chase
+// (camera, bars, dialog plane) once TUTORIAL_CINEMATIC_DURATION elapses - the chase
 // underneath just keeps going with its normal timer/hop behavior. Removing (not hiding) the dialog
 // plane here, well before hopDuration can ever elapse and despawn the bob anchor it's parented to,
 // is what keeps monsterDialogEntity from ever pointing at an already-removed entity.
@@ -185,7 +177,6 @@ export function updateTutorialChase(dt: number) {
     engine.removeEntity(monsterDialogEntity)
     monsterDialogEntity = null
   }
-  releaseInput()
 }
 
 // Drives the 2D letterbox bars in ui.tsx - they share this exact same window.
