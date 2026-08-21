@@ -656,10 +656,18 @@ function getNotificationActionText(event: NotificationEvent): string {
   }
 }
 
-const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on screen
+// Up to this many notifications stack at once, chat-log style - oldest on top, newest at the
+// bottom. A new arrival past the cap pushes the oldest one out immediately (see the
+// 'playerNotification' handler) - that alone keeps a busy feed moving fast, so the auto-dismiss
+// timer below only needs to handle the idle case (stack not full, nothing pushing it along).
+const NOTIFICATION_MAX_VISIBLE = 4
+// How long the oldest (front) notification stays before auto-dismissing on its own.
+const NOTIFICATION_DURATION_SEC = 10
 // Notification slide-in: starts 10vh below its resting position and slides up over this long.
 const NOTIFICATION_SLIDE_DURATION = 0.5
 const NOTIFICATION_SLIDE_DISTANCE_VH = 10
+// Vertical gap between stacked notifications (all but the topmost/oldest one).
+const NOTIFICATION_STACK_GAP_VH = 1.5
 // Profile pic is double the size used in the leaderboard (see LEADERBOARD_AVATAR_SIZE_PX).
 const NOTIFICATION_AVATAR_SIZE_PX = LEADERBOARD_AVATAR_SIZE_PX * 2
 const NOTIFICATION_NAME_FONT_SIZE_PX = 22
@@ -1029,11 +1037,14 @@ let toastExitCallback: (() => void) | null = null
 // Set on a missed hop (see triggerToastShake()); decays back to null-effect after TOAST_SHAKE_DURATION.
 let toastShakeStartedAt: number | null = null
 
-let notificationTimer = 0
-let currentNotification: NotificationEvent | null = null
-// Real events queue up here as they arrive from the server (see the 'playerNotification' handler)
-// and are shown one at a time by the tick below.
-const notificationQueue: NotificationEvent[] = []
+interface DisplayedNotification {
+  id: number
+  event: NotificationEvent
+  enteredAt: number
+}
+let notificationIdCounter = 0
+// Oldest first (rendered on top), newest last (rendered at the bottom) - see NOTIFICATION_MAX_VISIBLE above.
+const notificationStack: DisplayedNotification[] = []
 let matchAnimStart: number | null = null
 let countdownStart: number | null = null
 let musicMuted = false
@@ -1354,13 +1365,18 @@ export function setupUi() {
     const myAddress = getPlayer()?.userId
     if (myAddress && data.address.toLowerCase() === myAddress.toLowerCase()) return
     prefetchLeaderboardFaces([data.address])
-    notificationQueue.push({
-      playerName: data.playerName,
-      address: data.address,
-      kind: data.kind as NotificationKind,
-      amount: data.amount,
-      checkpoint: data.checkpoint
+    notificationStack.push({
+      id: notificationIdCounter++,
+      event: {
+        playerName: data.playerName,
+        address: data.address,
+        kind: data.kind as NotificationKind,
+        amount: data.amount,
+        checkpoint: data.checkpoint
+      },
+      enteredAt: elapsedTime
     })
+    if (notificationStack.length > NOTIFICATION_MAX_VISIBLE) notificationStack.shift()
   }))
 
   room.onMessage('progressUpdate', (data) => guard('progressUpdate', () => {
@@ -1536,15 +1552,10 @@ export function setupUi() {
       hideToast(() => resetToIdleAfterChase())
     }
 
-    if (currentNotification === null && notificationQueue.length > 0) {
-      currentNotification = notificationQueue.shift()!
-      notificationTimer = 0
-    } else if (currentNotification !== null) {
-      notificationTimer += dt
-      if (notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
-        currentNotification = null
-        notificationTimer = 0
-      }
+    // Only the front (oldest) item can possibly be due - everything behind it entered more
+    // recently and hasn't reached its own duration yet.
+    if (notificationStack.length > 0 && elapsedTime - notificationStack[0].enteredAt >= NOTIFICATION_DURATION_SEC) {
+      notificationStack.shift()
     }
   }
   engine.addSystem((dt: number) => guard('uiSystem', () => tick(dt)))
@@ -2598,66 +2609,70 @@ const MemoryMatchUi = () => (
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: { top: '30vh', right: '2vh' },
+        position: { top: '20vh', right: '2vh' },
         width: NOTIFICATION_SIDEBAR_WIDTH_PX,
         minHeight: 100,
         flexDirection: 'column',
         alignItems: 'center'
       }}
     >
-      {currentNotification &&
-        (() => {
-          const slideProgress = Math.min(1, notificationTimer / NOTIFICATION_SLIDE_DURATION)
-          const marginTopVh = (1 - slideProgress) * NOTIFICATION_SLIDE_DISTANCE_VH
-          return (
+      {notificationStack.map((item, index) => {
+        // Own entrance slide-in, independent of the others - an item that's been sitting in the
+        // stack for a while (slideProgress already at 1) doesn't re-animate when a new one is
+        // pushed below it, it just gets an extra top gap from NOTIFICATION_STACK_GAP_VH.
+        const slideProgress = Math.min(1, (elapsedTime - item.enteredAt) / NOTIFICATION_SLIDE_DURATION)
+        const marginTopVh = (1 - slideProgress) * NOTIFICATION_SLIDE_DISTANCE_VH + (index > 0 ? NOTIFICATION_STACK_GAP_VH : 0)
+        const event = item.event
+        return (
+          <UiEntity
+            key={item.id}
+            uiTransform={{
+              width: '100%',
+              flexDirection: 'row',
+              alignItems: 'center',
+              margin: { top: `${marginTopVh}vh` },
+              padding: { top: 10, bottom: 10, left: 12, right: 20 },
+              borderRadius: 16
+            }}
+            // Same placeholder background as the win-sequence toasts (see the toast's own
+            // uiBackground below) - solid black at 85% opacity, until there's dedicated frame art.
+            uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
+          >
             <UiEntity
               uiTransform={{
-                width: '100%',
-                flexDirection: 'row',
-                alignItems: 'center',
-                margin: { top: `${marginTopVh}vh` },
-                padding: { top: 10, bottom: 10, left: 12, right: 20 },
-                borderRadius: 16
+                width: NOTIFICATION_AVATAR_SIZE_PX,
+                height: NOTIFICATION_AVATAR_SIZE_PX,
+                flexShrink: 0,
+                borderRadius: 999,
+                margin: { right: NOTIFICATION_AVATAR_MARGIN_RIGHT_PX }
               }}
-              // Same placeholder background as the win-sequence toasts (see the toast's own
-              // uiBackground below) - solid black at 85% opacity, until there's dedicated frame art.
-              uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
-            >
-              <UiEntity
-                uiTransform={{
-                  width: NOTIFICATION_AVATAR_SIZE_PX,
-                  height: NOTIFICATION_AVATAR_SIZE_PX,
-                  flexShrink: 0,
-                  borderRadius: 999,
-                  margin: { right: NOTIFICATION_AVATAR_MARGIN_RIGHT_PX }
-                }}
-                uiBackground={{
-                  textureMode: 'stretch',
-                  texture: { src: getLeaderboardFaceUrl(currentNotification.address) ?? FALLBACK_PROFILE_PIC_IMAGE },
-                  uvs: [0, 0, 0, 1, 1, 1, 1, 0],
-                  color: Color4.White()
-                }}
+              uiBackground={{
+                textureMode: 'stretch',
+                texture: { src: getLeaderboardFaceUrl(event.address) ?? FALLBACK_PROFILE_PIC_IMAGE },
+                uvs: [0, 0, 0, 1, 1, 1, 1, 0],
+                color: Color4.White()
+              }}
+            />
+            <UiEntity uiTransform={{ flexDirection: 'column', flexGrow: 1 }}>
+              <BitmapText
+                text={event.playerName}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE}
+                fontSize={NOTIFICATION_NAME_FONT_SIZE_PX}
+                maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
               />
-              <UiEntity uiTransform={{ flexDirection: 'column', flexGrow: 1 }}>
-                <BitmapText
-                  text={currentNotification.playerName}
-                  font={GERM_ONE_FONT}
-                  image={GERM_ONE_IMAGE}
-                  fontSize={NOTIFICATION_NAME_FONT_SIZE_PX}
-                  maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
-                />
-                <BitmapText
-                  text={getNotificationActionText(currentNotification)}
-                  font={GERM_ONE_FONT}
-                  image={GERM_ONE_IMAGE}
-                  fontSize={NOTIFICATION_ACTION_FONT_SIZE_PX}
-                  uiTransform={{ margin: { top: 2 } }}
-                  maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
-                />
-              </UiEntity>
+              <BitmapText
+                text={getNotificationActionText(event)}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE}
+                fontSize={NOTIFICATION_ACTION_FONT_SIZE_PX}
+                uiTransform={{ margin: { top: 2 } }}
+                maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
+              />
             </UiEntity>
-          )
-        })()}
+          </UiEntity>
+        )
+      })}
     </UiEntity>
 
     {gameOver && !won && (
