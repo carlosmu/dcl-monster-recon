@@ -553,7 +553,7 @@ function getToastShakeOffsetPx(): number {
 }
 
 const BASE_POINTS_PER_PAIR = 5
-const TIME_BONUS_MAX = 10
+const TIME_BONUS_PER_PAIR = 2
 const ERROR_PENALTY = 1
 
 // Seconds the "Time's up" screen stays up before the board closes on its own.
@@ -1048,7 +1048,7 @@ function flipCell(cell: CellState) {
         won = true
         playBoardEndSound()
         const pairCount = (COLS * ROWS) / 2
-        const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_MAX * SCORE_MULTIPLIER)
+        const timeBonus = Math.round((timeRemaining / GAME_DURATION) * TIME_BONUS_PER_PAIR * pairCount * SCORE_MULTIPLIER)
         score = Math.max(0, Math.round(pairCount * BASE_POINTS_PER_PAIR * SCORE_MULTIPLIER + timeBonus - errors * ERROR_PENALTY * SCORE_MULTIPLIER))
         totalScore += score
         reportScore(score)
@@ -2042,20 +2042,33 @@ const MemoryMatchUi = () => (
                 borderColor: DEBUG_BORDER_WHITE
               }}
             />
-            <BitmapText
-              text={(() => {
-                const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
-                return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
-              })()}
-              font={GERM_ONE_FONT}
-              image={GERM_ONE_IMAGE_BROWN}
-              fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
+            <UiEntity
               uiTransform={{
-                margin: { bottom: 12 },
+                width: '80%',
+                flexDirection: 'row',
+                margin: { top: 16, bottom: 12 },
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                 borderColor: DEBUG_BORDER_WHITE
               }}
-            />
+            >
+              <BitmapText
+                text={`Mismatches: ${errors}`}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE_BROWN}
+                fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
+                uiTransform={{ width: '50%'}}
+              />
+              <BitmapText
+                text={(() => {
+                  const best = personalBests[bestTimeKey(currentCheckpoint, currentBoardIndex)]
+                  return best === undefined || best === NO_BEST_TIME ? 'Best Time: --' : `Best Time: ${best.toFixed(1)}s`
+                })()}
+                font={GERM_ONE_FONT}
+                image={GERM_ONE_IMAGE_BROWN}
+                fontSize={SCREEN_SUBTITLE_FONT_SIZE_PX}
+                uiTransform={{ width: '50%'}}
+              />
+            </UiEntity>
             <UiEntity
               uiTransform={{
                 width: `${BOARD_GRID_WIDTH_FRACTION * 100}%`,
