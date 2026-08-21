@@ -618,7 +618,7 @@ const MONSTER_NAMES = [
   'Rabid Cabbage',
   'Zombie Zucchini',
   'Furious Bell Pepper',
-  'Grumpy Potato',
+  'Grouch Potato',
   'Diabolical Eggplant',
   'Watchful Beet',
   'Infernal Corn',
@@ -665,9 +665,13 @@ const NOTIFICATION_AVATAR_SIZE_PX = LEADERBOARD_AVATAR_SIZE_PX * 2
 const NOTIFICATION_NAME_FONT_SIZE_PX = 22
 const NOTIFICATION_ACTION_FONT_SIZE_PX = 18
 const NOTIFICATION_AVATAR_MARGIN_RIGHT_PX = 10
-// canvas-sidebar is 25% of the 1920px virtual width; the box's own left/right padding (12+20px)
-// and the avatar column (its size + right margin) eat into that before text wrapping kicks in.
-const NOTIFICATION_TEXT_MAX_WIDTH_PX = 1920 * 0.25 - 32 - (NOTIFICATION_AVATAR_SIZE_PX + NOTIFICATION_AVATAR_MARGIN_RIGHT_PX)
+// canvas-sidebar's own width: raw px at the 1920x1080 virtual reference (scaled by
+// virtualWidth/virtualHeight, same approach as getCanvasMainWidthPx()) instead of '%', which
+// resolves against the true screen and drifts out of sync with every other raw-px measurement here.
+const NOTIFICATION_SIDEBAR_WIDTH_PX = 1920 * 0.2
+// The box's own left/right padding (12+20px) and the avatar column (its size + right margin) eat
+// into the sidebar's width before text wrapping should kick in.
+const NOTIFICATION_TEXT_MAX_WIDTH_PX = NOTIFICATION_SIDEBAR_WIDTH_PX - 32 - (NOTIFICATION_AVATAR_SIZE_PX + NOTIFICATION_AVATAR_MARGIN_RIGHT_PX)
 
 
 function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
@@ -1345,6 +1349,10 @@ export function setupUi() {
   }))
 
   room.onMessage('playerNotification', (data) => guard('playerNotification', () => {
+    // Broadcast reaches every connected client including the one who triggered it - skip our own
+    // events, this feed is meant to show what other players are doing.
+    const myAddress = getPlayer()?.userId
+    if (myAddress && data.address.toLowerCase() === myAddress.toLowerCase()) return
     prefetchLeaderboardFaces([data.address])
     notificationQueue.push({
       playerName: data.playerName,
@@ -2591,7 +2599,7 @@ const MemoryMatchUi = () => (
       uiTransform={{
         positionType: 'absolute',
         position: { top: '30vh', right: '2vh' },
-        width: '25%',
+        width: NOTIFICATION_SIDEBAR_WIDTH_PX,
         minHeight: 100,
         flexDirection: 'column',
         alignItems: 'center'
