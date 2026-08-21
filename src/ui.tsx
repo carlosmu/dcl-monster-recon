@@ -224,15 +224,15 @@ const LEADERBOARD_RESET_NOTE_FONT_SIZE_PX = 18
 // would now double-scale (it already read the true screen height, then virtualHeight would scale
 // it again).
 const FRAME_PADDING_PX = 48
-const FRAME_PADDING_MOBILE_PX = 72
+const FRAME_PADDING_MOBILE_PX = 42
 
 function getFramePaddingPx(): number {
   return isMobile() ? FRAME_PADDING_MOBILE_PX : FRAME_PADDING_PX
 }
-// Width of canvas_main (the safe-area column) as a fraction of screen width. Narrower on mobile
-// (35vw vs 40vw on desktop) - same 40vw felt too wide on narrow mobile screens.
+// Width of canvas_main (the safe-area column) as a fraction of screen width - same on mobile as
+// desktop (see getCanvasMainWidthPx() below).
 const CANVAS_MAIN_WIDTH_FRACTION = 0.4
-const CANVAS_MAIN_WIDTH_FRACTION_MOBILE = 0.35
+const CANVAS_MAIN_WIDTH_FRACTION_MOBILE = 0.4
 // TEST: canvas_main's own width, as raw px (virtualWidth * fraction) instead of '%' of the real
 // screen. This is the anchor fix for the header/L/R/body overflow bug on mobile: '%' NEVER goes
 // through the virtualWidth/virtualHeight scale factor (only raw numbers do - confirmed by reading
@@ -310,15 +310,26 @@ function isBoardReached(boardIndex: number): boolean {
 // smaller value buys more vertical headroom for every board uniformly. It doesn't guarantee a fit
 // on every possible device aspect ratio (that needs the frame's real available height, e.g. via
 // UiCanvasInformation - not done here), so overflow: 'hidden' on the frame (below) is the backstop.
-const BOARD_GRID_WIDTH_FRACTION = 0.75
+const BOARD_GRID_WIDTH_FRACTION = 0.85
+// Mobile phones can be much taller/narrower than desktop (e.g. ~20:9 vs 16:9) - the Godot mobile
+// client in particular showed the bottom row of the 4x4 board (rows/cols ratio of 1.0, the
+// tallest in checkpoints.json - see the comment above) spilling off the frame. Only boards at
+// least as tall as they are wide (rows >= cols - today that's just the 4x4s) get this smaller
+// fraction on mobile; shorter boards already fit. Starting guess - tune against a real device.
+const BOARD_GRID_WIDTH_FRACTION_MOBILE_TALL = 0.7
 // Cells always fill the full grid width, whatever the row count - a height-derived cap here
 // (tried previously) shrinks cells below the container width on boards with more rows (4x4, 5x4),
 // leaving a gap on the right since the grid/row don't center leftover space. If a tall board
 // (many rows, few cols) ever needs to fit a constrained vertical area again, that has to be solved
 // without capping width - e.g. capping the grid's own font/padding budget, not the cell size.
-function getBoardCellSizePx(cols: number): number {
+// The grid container's own width (see the JSX further down) must use this same fraction - a
+// mismatch would reproduce exactly that "gap on the right" problem for the mobile-tall case.
+function getBoardGridWidthFraction(cols: number, rows: number): number {
+  return isMobile() && rows >= cols ? BOARD_GRID_WIDTH_FRACTION_MOBILE_TALL : BOARD_GRID_WIDTH_FRACTION
+}
+function getBoardCellSizePx(cols: number, rows: number): number {
   const availableWidth = getCanvasMainWidthPx() - 2 * getFramePaddingPx()
-  return (availableWidth * BOARD_GRID_WIDTH_FRACTION) / cols
+  return (availableWidth * getBoardGridWidthFraction(cols, rows)) / cols
 }
 // Width is 10% of the containing frame (real, dynamic - every screen's frame is width: '100%' of
 // canvas_main). Height can't be '%' of one's own width or 'auto' (there's no aspect-ratio prop,
@@ -1984,7 +1995,10 @@ const MemoryMatchUi = () => (
               position: { top: BOARD_PROGRESS_TOP_INSET_VH, left: 0 },
               width: '100%',
               margin: { top: '3vh' },
-              justifyContent: 'center'
+              justifyContent: 'center',
+              // Every other UiEntity here is zIndex 0 (paint order otherwise falls back to JSX/tree
+              // order) - this bar overlaps the board frame below it and must always stay on top.
+              zIndex: 10
             }}
           >
             <UiEntity
@@ -2152,7 +2166,7 @@ const MemoryMatchUi = () => (
             </UiEntity>
             <UiEntity
               uiTransform={{
-                width: `${BOARD_GRID_WIDTH_FRACTION * 100}%`,
+                width: `${getBoardGridWidthFraction(COLS, ROWS) * 100}%`,
                 height: 'auto',
                 flexDirection: 'column',
                 borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -2164,7 +2178,7 @@ const MemoryMatchUi = () => (
                     key={rowIndex}
                     uiTransform={{
                       width: '100%',
-                      height: getBoardCellSizePx(COLS),
+                      height: getBoardCellSizePx(COLS, ROWS),
                       flexDirection: 'row',
                       flexShrink: 0,
                       borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
@@ -2175,8 +2189,8 @@ const MemoryMatchUi = () => (
                       <UiEntity
                         key={rowIndex * COLS + colIndex}
                         uiTransform={{
-                          width: getBoardCellSizePx(COLS),
-                          height: getBoardCellSizePx(COLS),
+                          width: getBoardCellSizePx(COLS, ROWS),
+                          height: getBoardCellSizePx(COLS, ROWS),
                           flexShrink: 0,
                           borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                           borderColor: DEBUG_BORDER_BLUE
@@ -2289,6 +2303,7 @@ const MemoryMatchUi = () => (
                     width: '100%',
                     height: getCheckpointSelectRowHeightPx(),
                     flexDirection: 'row',
+                    margin: { top: rowIndex === 0 ? 0 : 6 },
                     borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
                     borderColor: DEBUG_BORDER_GREEN
                   }}
@@ -2319,10 +2334,11 @@ const MemoryMatchUi = () => (
                           height: '100%',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          borderWidth: DEBUG_LAYOUT_BORDERS ? 2 : 0,
-                          borderColor: DEBUG_BORDER_BLUE
+                          borderWidth: 2,
+                          borderColor: SCREEN_TEXT_COLOR,
+                          borderRadius: 10,
+                          margin: 3
                         }}
-                        uiBackground={{ color: unlocked ? Color4.create(0.2, 0.6, 0.9, 0.6) : Color4.create(0, 0, 0, 0.5) }}
                         onMouseDown={unlocked ? () => startCheckpoint(checkpoint) : undefined}
                       >
                         {unlocked ? (
