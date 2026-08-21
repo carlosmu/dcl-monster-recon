@@ -608,22 +608,66 @@ const COUNTDOWN_BASE_FONT_SIZE = 60
 const COUNTDOWN_SCALE_MAX = 1.5
 const COUNTDOWN_CIRCLE_SIZE = 160
 
-// Placeholder notification copy — will be replaced with real event-driven messages later.
-const NOTIFICATION_MESSAGES = [
-  'Cryptonauta captured a mutant cucumber',
-  '0xGorducho found a laser-eyed snail',
-  'SatoshiWalker unearthed a toad with a space helmet',
-  'PixelKilla caught a bioluminescent spider',
-  'ByteHunter hunted down an octopus in a pilot cap'
+// Monster names awarded at each checkpoint (index 0 = checkpoint 1) - used to build the "caught
+// the X" notification copy below.
+const MONSTER_NAMES = [
+  'Rogue Tomato',
+  'Ferocious Carrot',
+  'Cursed Onion',
+  'Fanged Garlic',
+  'Rabid Cabbage',
+  'Zombie Zucchini',
+  'Furious Bell Pepper',
+  'Grumpy Potato',
+  'Diabolical Eggplant',
+  'Watchful Beet',
+  'Infernal Corn',
+  'Shadowy Mushroom',
+  'Tentacle Leek',
+  'Broccoli Beast',
+  'Lurking Chard',
+  'Three-Eyed Ginger',
+  'Demonic Chili',
+  'Cyclops Artichoke',
+  'Multi-Eyed Cauliflower',
+  'Halloween Pumpkin'
 ]
-const NOTIFICATION_INTERVAL = 10 // seconds between notifications
+
+// Mirrors the server's playerNotification message (see shared/messages.ts) - amount only means
+// something for 'points', checkpoint only for 'captured' (1-based, indexes MONSTER_NAMES above).
+type NotificationKind = 'points' | 'captured' | 'bestTime'
+interface NotificationEvent {
+  playerName: string
+  address: string
+  kind: NotificationKind
+  amount: number
+  checkpoint: number
+}
+
+// Second line of the notification - the action registered for the player named on the first line.
+function getNotificationActionText(event: NotificationEvent): string {
+  switch (event.kind) {
+    case 'points':
+      return `Earned ${event.amount} points`
+    case 'captured':
+      return `Caught the ${MONSTER_NAMES[event.checkpoint - 1] ?? 'monster'}`
+    case 'bestTime':
+      return 'Achieved a new Best Time'
+  }
+}
+
 const NOTIFICATION_VISIBLE_DURATION = 4 // seconds each notification stays on screen
 // Notification slide-in: starts 10vh below its resting position and slides up over this long.
 const NOTIFICATION_SLIDE_DURATION = 0.5
 const NOTIFICATION_SLIDE_DISTANCE_VH = 10
-// canvas-sidebar is 25% of the 1920px virtual width; the box's own left/right padding (20px each,
-// see below) eats into that before text wrapping should kick in.
-const NOTIFICATION_TEXT_MAX_WIDTH_PX = 1920 * 0.25 - 40
+// Profile pic is double the size used in the leaderboard (see LEADERBOARD_AVATAR_SIZE_PX).
+const NOTIFICATION_AVATAR_SIZE_PX = LEADERBOARD_AVATAR_SIZE_PX * 2
+const NOTIFICATION_NAME_FONT_SIZE_PX = 22
+const NOTIFICATION_ACTION_FONT_SIZE_PX = 18
+const NOTIFICATION_AVATAR_MARGIN_RIGHT_PX = 10
+// canvas-sidebar is 25% of the 1920px virtual width; the box's own left/right padding (12+20px)
+// and the avatar column (its size + right margin) eat into that before text wrapping kicks in.
+const NOTIFICATION_TEXT_MAX_WIDTH_PX = 1920 * 0.25 - 32 - (NOTIFICATION_AVATAR_SIZE_PX + NOTIFICATION_AVATAR_MARGIN_RIGHT_PX)
 
 
 function getUvsForBlock(col: number, row: number, colSpan: number, rowSpan: number, grid: number): number[] {
@@ -982,7 +1026,10 @@ let toastExitCallback: (() => void) | null = null
 let toastShakeStartedAt: number | null = null
 
 let notificationTimer = 0
-let currentNotification: string | null = null
+let currentNotification: NotificationEvent | null = null
+// Real events queue up here as they arrive from the server (see the 'playerNotification' handler)
+// and are shown one at a time by the tick below.
+const notificationQueue: NotificationEvent[] = []
 let matchAnimStart: number | null = null
 let countdownStart: number | null = null
 let musicMuted = false
@@ -1060,6 +1107,7 @@ function flipCell(cell: CellState) {
         checkpointComplete = currentBoardIndex === boardsInCheckpoint - 1
         if (checkpointComplete) hidePlayerFloorSpinner()
         room.send('reportBoardTime', {
+          playerName: getPlayer()?.name ?? 'Unknown',
           checkpoint: currentCheckpoint,
           boardIndex: currentBoardIndex,
           timeSeconds: lastBoardTime
@@ -1296,6 +1344,17 @@ export function setupUi() {
     personalBests[bestTimeKey(data.checkpoint, data.boardIndex)] = data.bestTimeSeconds
   }))
 
+  room.onMessage('playerNotification', (data) => guard('playerNotification', () => {
+    prefetchLeaderboardFaces([data.address])
+    notificationQueue.push({
+      playerName: data.playerName,
+      address: data.address,
+      kind: data.kind as NotificationKind,
+      amount: data.amount,
+      checkpoint: data.checkpoint
+    })
+  }))
+
   room.onMessage('progressUpdate', (data) => guard('progressUpdate', () => {
     if (!DEBUG_UNLOCK_ALL_CHECKPOINTS) highestUnlockedCheckpoint = data.highestUnlockedCheckpoint
     for (let i = 0; i < TOTAL_CHECKPOINTS; i++) {
@@ -1469,12 +1528,15 @@ export function setupUi() {
       hideToast(() => resetToIdleAfterChase())
     }
 
-    notificationTimer += dt
-    if (notificationTimer >= NOTIFICATION_INTERVAL) {
+    if (currentNotification === null && notificationQueue.length > 0) {
+      currentNotification = notificationQueue.shift()!
       notificationTimer = 0
-      currentNotification = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)]
-    } else if (currentNotification !== null && notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
-      currentNotification = null
+    } else if (currentNotification !== null) {
+      notificationTimer += dt
+      if (notificationTimer >= NOTIFICATION_VISIBLE_DURATION) {
+        currentNotification = null
+        notificationTimer = 0
+      }
     }
   }
   engine.addSystem((dt: number) => guard('uiSystem', () => tick(dt)))
@@ -1504,7 +1566,7 @@ function handlePrizeCaught() {
   if (currentCheckpoint === highestUnlockedCheckpoint && highestUnlockedCheckpoint < TOTAL_CHECKPOINTS) {
     highestUnlockedCheckpoint++
   }
-  room.send('reportMonsterCaught', { checkpoint: currentCheckpoint })
+  room.send('reportMonsterCaught', { playerName: getPlayer()?.name ?? 'Unknown', checkpoint: currentCheckpoint })
   stopTickingSound()
   playPrizeSound()
   // Was 180 (the sweep's opposite half) so it picked up where the board-win orbit (0deg->180deg)
@@ -2543,23 +2605,48 @@ const MemoryMatchUi = () => (
             <UiEntity
               uiTransform={{
                 width: '100%',
+                flexDirection: 'row',
+                alignItems: 'center',
                 margin: { top: `${marginTopVh}vh` },
-                padding: { top: 10, bottom: 10, left: 20, right: 20 },
+                padding: { top: 10, bottom: 10, left: 12, right: 20 },
                 borderRadius: 16
               }}
               // Same placeholder background as the win-sequence toasts (see the toast's own
               // uiBackground below) - solid black at 85% opacity, until there's dedicated frame art.
               uiBackground={{ color: Color4.create(0, 0, 0, 0.85) }}
             >
-              <BitmapText
-                text={currentNotification}
-                font={GERM_ONE_FONT}
-                image={GERM_ONE_IMAGE}
-                fontSize={24}
-                uiTransform={{ width: '100%' }}
-                align="center"
-                maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
+              <UiEntity
+                uiTransform={{
+                  width: NOTIFICATION_AVATAR_SIZE_PX,
+                  height: NOTIFICATION_AVATAR_SIZE_PX,
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  margin: { right: NOTIFICATION_AVATAR_MARGIN_RIGHT_PX }
+                }}
+                uiBackground={{
+                  textureMode: 'stretch',
+                  texture: { src: getLeaderboardFaceUrl(currentNotification.address) ?? FALLBACK_PROFILE_PIC_IMAGE },
+                  uvs: [0, 0, 0, 1, 1, 1, 1, 0],
+                  color: Color4.White()
+                }}
               />
+              <UiEntity uiTransform={{ flexDirection: 'column', flexGrow: 1 }}>
+                <BitmapText
+                  text={currentNotification.playerName}
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE}
+                  fontSize={NOTIFICATION_NAME_FONT_SIZE_PX}
+                  maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
+                />
+                <BitmapText
+                  text={getNotificationActionText(currentNotification)}
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE}
+                  fontSize={NOTIFICATION_ACTION_FONT_SIZE_PX}
+                  uiTransform={{ margin: { top: 2 } }}
+                  maxWidth={NOTIFICATION_TEXT_MAX_WIDTH_PX}
+                />
+              </UiEntity>
             </UiEntity>
           )
         })()}

@@ -38,6 +38,7 @@ export const Messages = {
   // reportMonsterCaught below, since completing the last board only spawns a catchable prize in
   // the scene, it doesn't unlock the checkpoint by itself.
   reportBoardTime: Schemas.Map({
+    playerName: Schemas.String,
     checkpoint: Schemas.Number,
     boardIndex: Schemas.Number,
     timeSeconds: Schemas.Number
@@ -46,7 +47,18 @@ export const Messages = {
   // after clearing a checkpoint's last board. This is what actually unlocks the monster/checkpoint -
   // the server updates collectedMonsters/collectionCounts/highestUnlockedCheckpoint for this player.
   // If the player exhausts their catch attempts instead, this is never sent and nothing unlocks.
-  reportMonsterCaught: Schemas.Map({ checkpoint: Schemas.Number }),
+  reportMonsterCaught: Schemas.Map({ playerName: Schemas.String, checkpoint: Schemas.Number }),
+  // Server -> Client (broadcast to everyone): a notable event just happened, for the "activity feed"
+  // sidebar. amount is only meaningful for kind 'points' (points earned); checkpoint is only
+  // meaningful for kind 'captured' (1-based, indexes MONSTER_NAMES client-side) - unused fields are
+  // sent as 0 since Schemas.Map has no optional fields. kind is 'points' | 'captured' | 'bestTime'.
+  playerNotification: Schemas.Map({
+    playerName: Schemas.String,
+    address: Schemas.String,
+    kind: Schemas.String,
+    amount: Schemas.Number,
+    checkpoint: Schemas.Number
+  }),
   // Server -> Client: the caller's personal best time for a board. bestTimeSeconds is -1 when no record exists yet.
   personalBestUpdate: Schemas.Map({ checkpoint: Schemas.Number, boardIndex: Schemas.Number, bestTimeSeconds: Schemas.Number }),
   // Client -> Server: ask for the caller's checkpoint/codex progress (e.g. on scene load).

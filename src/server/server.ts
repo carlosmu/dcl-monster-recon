@@ -161,6 +161,7 @@ export async function startServer() {
     await Storage.set(ALL_TIME_KEY, allTime)
     broadcastLeaderboard(leaderboard, currentWeekId)
     broadcastAllTimeLeaderboard(allTime)
+    room.send('playerNotification', { playerName: data.playerName, address, kind: 'points', amount: data.points, checkpoint: 0 })
     console.log(`[Server] ${data.playerName} (${address}) +${data.points} pts -> ${leaderboard[address].score} (all-time ${allTime[address].score})`)
   })
 
@@ -198,6 +199,9 @@ export async function startServer() {
     trackPlayer(context.from)
     const key = bestTimeKey(data.checkpoint, data.boardIndex)
     const current = await Storage.player.get<number>(context.from, key)
+    // Only a strictly better time than an existing record counts as "new best" - the very first
+    // clear of a board always has current === null, so it doesn't fire a notification.
+    const isNewBest = current !== null && data.timeSeconds < current
     const best = current === null || data.timeSeconds < current ? data.timeSeconds : current
     if (best !== current) await Storage.player.set(context.from, key, best)
     room.send(
@@ -205,6 +209,9 @@ export async function startServer() {
       { checkpoint: data.checkpoint, boardIndex: data.boardIndex, bestTimeSeconds: best },
       { to: [context.from] }
     )
+    if (isNewBest) {
+      room.send('playerNotification', { playerName: data.playerName, address: context.from, kind: 'bestTime', amount: 0, checkpoint: 0 })
+    }
   })
 
   room.onMessage('reportMonsterCaught', async (data, context) => {
@@ -218,6 +225,7 @@ export async function startServer() {
     }
     await Storage.player.set(context.from, PROGRESS_KEY, progress)
     room.send('progressUpdate', progress, { to: [context.from] })
+    room.send('playerNotification', { playerName: data.playerName, address: context.from, kind: 'captured', amount: 0, checkpoint: data.checkpoint })
   })
 
   room.onMessage('requestProgress', async (_data, context) => {
