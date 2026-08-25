@@ -8,6 +8,7 @@ export enum EntityNames {
   Admin_Tools = "Admin Tools",
   LBoard_All_Time = "LBoard_All_Time",
   LBoard_Weekly = "LBoard_Weekly",
+  MAIN_POSITION = "MAIN_POSITION",
   Prizes = "Prizes",
   camp_gltf = "camp.gltf",
   prize_1 = "prize_1",

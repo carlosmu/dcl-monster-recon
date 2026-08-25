@@ -2,6 +2,6 @@
   "version": 1,
   "data": {
     "freeCameraInvertRotation": false,
-    "autosaveEnabled": true
+    "autosaveEnabled": false
   }
 }

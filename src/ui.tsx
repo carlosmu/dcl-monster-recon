@@ -797,10 +797,10 @@ let leaderboardWeekId: string | null = null
 
 // Play button is only shown while the player stands inside this X/Z area (world coordinates),
 // checked each tick in tick() below. Ignores Y so it doesn't matter which floor/level the player is on.
-const PLAY_AREA_MIN_X = 16
-const PLAY_AREA_MAX_X = 48
-const PLAY_AREA_MIN_Z = 16
-const PLAY_AREA_MAX_Z = 48
+const PLAY_AREA_MIN_X = 16 + 32
+const PLAY_AREA_MAX_X = 48 + 32
+const PLAY_AREA_MIN_Z = 16 + 32
+const PLAY_AREA_MAX_Z = 48 + 32
 let playerInPlayArea = false
 // Spinner behind the Play button, shown only for this many seconds right after the player enters
 // the play area (not for the whole time they stand in it) - set in tick() on the false->true edge.
