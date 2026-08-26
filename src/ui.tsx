@@ -257,7 +257,12 @@ const FOOTER_MIN_HEIGHT_DESKTOP_PX = 100
 // PROVISIONAL: board-progress pips (1/2/3), shown just below the header while playing through a
 // checkpoint's 3 boards. Real screen units ('vh'/'%'), not raw px - this is a standalone strip,
 // not mixed with any raw-px sibling, so there's no virtual-scale mismatch to worry about here.
+// Top offset from 'body', whose top edge is the header's bottom edge (canvas_main is a column and
+// body is its middle child). Mobile pins the strip flush against the header; desktop keeps the
+// original 1vh inset + 3vh margin.
 const BOARD_PROGRESS_TOP_INSET_VH = '1vh'
+const BOARD_PROGRESS_TOP_MARGIN_VH = '3vh'
+const BOARD_PROGRESS_TOP_INSET_MOBILE_VH = '0vh'
 // The bar sizes itself to its content (label + pips) rather than to a fixed percentage: the label
 // is a bitmap text with an intrinsic width that can't shrink, so a rigid width made it overflow as
 // soon as the font or pip size grew. This is only an upper bound for very narrow screens.
@@ -1453,7 +1458,12 @@ export function setupUi() {
   // TEST: virtualWidth/virtualHeight lets the renderer scale raw-px sizes to fit any real screen,
   // per the build-ui skill. Trying it out on the R header icons first (see HEADER_RIGHT_ICON_SIZE_PX)
   // before migrating the rest of the manual vw/vh sizing done elsewhere in this file.
-  ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080 })
+  // screenInset: 'none' keeps the UI on the whole screen. The SDK now defaults it to 'device',
+  // which wraps the UI in a container inset by UiCanvasInformation.screenInsetArea (notch, status
+  // bar, home indicator) - so once the explorer started reporting real insets on mobile, the UI
+  // stopped filling the screen. canvas_main already reserves its own top/bottom margins, so the
+  // device inset was doubling up.
+  ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'none' })
   const tick = (dt: number) => {
     elapsedTime += dt
     const wasInPlayArea = playerInPlayArea
@@ -2017,9 +2027,9 @@ const MemoryMatchUi = () => (
           <UiEntity
             uiTransform={{
               positionType: 'absolute',
-              position: { top: BOARD_PROGRESS_TOP_INSET_VH, left: 0 },
+              position: { top: isMobile() ? BOARD_PROGRESS_TOP_INSET_MOBILE_VH : BOARD_PROGRESS_TOP_INSET_VH, left: 0 },
               width: '100%',
-              margin: { top: '3vh' },
+              margin: { top: isMobile() ? BOARD_PROGRESS_TOP_INSET_MOBILE_VH : BOARD_PROGRESS_TOP_MARGIN_VH },
               justifyContent: 'center',
               // Every other UiEntity here is zIndex 0 (paint order otherwise falls back to JSX/tree
               // order) - this bar overlaps the board frame below it and must always stay on top.
