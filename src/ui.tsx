@@ -818,7 +818,7 @@ const FALL_RESPAWN_Y = 5
 // Scene-local coordinates, the same frame as scene.json's spawnPoints (the base parcel is 0,0, so
 // these match world coordinates too). This is the middle of SpawnArea1 - keep it in sync if the
 // spawn point is ever moved in the Creator Hub.
-const SPAWN_POSITION = { x: 38.5, y: 13, z: 62.96 }
+const SPAWN_POSITION = { x: 38.5, y: 65, z: 62.96 }
 // movePlayerTo takes a frame or two to show up in the player Transform; without this guard the
 // call would repeat every tick in the meantime. Clears itself once the player is back above
 // FALL_RESPAWN_Y, so there is no timer to keep in sync.

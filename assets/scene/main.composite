@@ -419,42 +419,21 @@
           "json": {
             "position": {
               "x": 32,
-              "y": 10,
+              "y": 60,
               "z": 32
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
             },
             "scale": {
               "x": 1,
               "y": 1,
               "z": 1
             },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0,
-              "w": 1
-            },
             "parent": 0
-          }
-        },
-        "531": {
-          "json": {
-            "position": {
-              "x": 33.136390686035156,
-              "y": -57,
-              "z": 33.793304443359375
-            },
-            "scale": {
-              "x": 100,
-              "y": 100,
-              "z": 100
-            },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0,
-              "w": 1
-            },
-            "parent": 530
           }
         },
         "532": {
@@ -1172,13 +1151,6 @@
             "invisibleMeshesCollisionMask": 3
           }
         },
-        "531": {
-          "json": {
-            "src": "assets/models/env_rocks.glb",
-            "visibleMeshesCollisionMask": 0,
-            "invisibleMeshesCollisionMask": 3
-          }
-        },
         "532": {
           "json": {
             "src": "assets/models/pine.gltf",
@@ -1494,11 +1466,6 @@
             "value": "MAIN_POSITION"
           }
         },
-        "531": {
-          "json": {
-            "value": "env_rocks"
-          }
-        },
         "532": {
           "json": {
             "value": "pine.gltf"
@@ -1729,7 +1696,7 @@
         "serializationType": "map"
       },
       "data": {
-        "531": {
+        "1": {
           "json": {
             "gizmo": 0
           }
@@ -1884,13 +1851,8 @@
                   529,
                   514,
                   515,
-                  534,
-                  531
+                  534
                 ]
-              },
-              {
-                "entity": 531,
-                "children": []
               },
               {
                 "entity": 532,
@@ -2128,9 +2090,6 @@
           "json": {}
         },
         "530": {
-          "json": {}
-        },
-        "531": {
           "json": {}
         },
         "532": {
@@ -3022,14 +2981,18 @@
         "0": {
           "json": {
             "name": "Monster Recon",
-            "description": "Board Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
-            "thumbnail": "assets/scene/Images/thumbnail.png",
+            "description": "Race against the clock in fast Memory Match rounds, then dash through camp to hunt down your monsters. Build your Codex with rare, exotic, and epic finds, compare discoveries with friends, beat your best times, and battle for the top of the monster leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
+            "thumbnail": "assets/images/thumbnail.png",
             "ageRating": "A",
             "categories": [],
             "author": "SDK",
-            "email": "",
+            "email": "carlos.damian.munoz@gmail.com",
             "tags": [],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -3287,14 +3250,8 @@
                   "x": 7,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
-            "silenceVoiceChat": false,
-            "disablePortableExperiences": false,
             "spawnPoints": [
               {
                 "name": "SpawnArea1",
@@ -3308,11 +3265,8 @@
                     ]
                   },
                   "y": {
-                    "$case": "range",
-                    "value": [
-                      13,
-                      13
-                    ]
+                    "$case": "single",
+                    "value": 65
                   },
                   "z": {
                     "$case": "range",
@@ -3324,14 +3278,13 @@
                 },
                 "cameraTarget": {
                   "x": 40.790000915527344,
-                  "y": 12,
+                  "y": 62,
                   "z": 64.79000091552734
                 }
               }
             ],
             "skyboxConfig": {},
-            "creator": "",
-            "disableNearbyVoiceChat": false,
+            "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
             "hideLandscapeTerrain": true
           }
         }

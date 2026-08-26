@@ -3,14 +3,14 @@
   "runtimeVersion": "7",
   "display": {
     "title": "Monster Recon",
-    "description": "Board Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
+    "description": "Race against the clock in fast Memory Match rounds, then dash through camp to hunt down your monsters. Build your Codex with rare, exotic, and epic finds, compare discoveries with friends, beat your best times, and battle for the top of the monster leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
     "favicon": "favicon_asset",
-    "navmapThumbnail": "assets/scene/Images/thumbnail.png"
+    "navmapThumbnail": "assets/images/thumbnail.png"
   },
   "owner": "",
   "contact": {
     "name": "SDK",
-    "email": ""
+    "email": "carlos.damian.munoz@gmail.com"
   },
   "main": "bin/index.js",
   "tags": [],
@@ -93,8 +93,8 @@
           38.849998474121094
         ],
         "y": [
-          13,
-          13
+          65,
+          65
         ],
         "z": [
           62.7599983215332,
@@ -103,7 +103,7 @@
       },
       "cameraTarget": {
         "x": 40.790000915527344,
-        "y": 12,
+        "y": 62,
         "z": 64.79000091552734
       }
     }
@@ -117,7 +117,7 @@
     "portableExperiences": "enabled",
     "nearbyVoiceChat": "enabled"
   },
-  "creator": "",
+  "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
   "skyboxConfig": {},
   "authoritativeMultiplayer": true,
   "worldConfiguration": {

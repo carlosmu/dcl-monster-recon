@@ -12,7 +12,6 @@ export enum EntityNames {
   PINES = "PINES",
   Prizes = "Prizes",
   camp_gltf = "camp.gltf",
-  env_rocks = "env_rocks",
   loc = "loc",
   pine_gltf = "pine.gltf",
   pine_gltf_10 = "pine.gltf_10",
