@@ -11,6 +11,7 @@ import {
 import { isMobile } from '@dcl/sdk/platform'
 import { getPlayer } from '@dcl/sdk/players'
 import { timers } from '@dcl-sdk/utils'
+import { movePlayerTo } from '~system/RestrictedActions'
 import checkpointsData from './checkpoints.json'
 import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
 import { prefetchLeaderboardFaces, getLeaderboardFaceUrl } from './leaderboardProfileCache'
@@ -807,6 +808,22 @@ let playerInPlayArea = false
 const PLAY_BUTTON_SPINNER_DURATION = 5
 let playButtonSpinnerUntil: number | null = null
 
+// The scene is a floating island: camp.gltf spans world y 7.8-38.4 (its walkable surface is at
+// y=11), and below it there is only the scene's invisible base plane at y=0, which a player who
+// walks off an edge lands on and keeps walking around. Crossing this Y on the way down puts them
+// back at the spawn point - checked each tick in tick() below, alongside the play-area check.
+// Has to sit between the base plane (0) and the underside of the island (7.8): a threshold of 0
+// never fires, because the fall ends at exactly 0 without ever going below it.
+const FALL_RESPAWN_Y = 5
+// Scene-local coordinates, the same frame as scene.json's spawnPoints (the base parcel is 0,0, so
+// these match world coordinates too). This is the middle of SpawnArea1 - keep it in sync if the
+// spawn point is ever moved in the Creator Hub.
+const SPAWN_POSITION = { x: 84, y: 13, z: 83 }
+// movePlayerTo takes a frame or two to show up in the player Transform; without this guard the
+// call would repeat every tick in the meantime. Clears itself once the player is back above
+// FALL_RESPAWN_Y, so there is no timer to keep in sync.
+let respawning = false
+
 let screen: Screen = 'hidden'
 // Set to 'board' when checkpointSelect/inventory/leaderboard is opened while a board is in
 // progress, so closing it resumes that board instead of stranding it on 'hidden' (the timer
@@ -1443,6 +1460,14 @@ export function setupUi() {
     playerInPlayArea = isPlayerInPlayArea()
     if (playerInPlayArea && !wasInPlayArea) {
       playButtonSpinnerUntil = elapsedTime + PLAY_BUTTON_SPINNER_DURATION
+    }
+    if (Transform.get(engine.PlayerEntity).position.y < FALL_RESPAWN_Y) {
+      if (!respawning) {
+        respawning = true
+        void movePlayerTo({ newRelativePosition: SPAWN_POSITION })
+      }
+    } else {
+      respawning = false
     }
     if (!preloadWarmupDone && elapsedTime >= PRELOAD_WARMUP_SECONDS) {
       preloadWarmupDone = true
