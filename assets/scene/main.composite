@@ -435,6 +435,216 @@
             },
             "parent": 0
           }
+        },
+        "531": {
+          "json": {
+            "position": {
+              "x": 68,
+              "y": -47,
+              "z": 68
+            },
+            "scale": {
+              "x": 100,
+              "y": 100,
+              "z": 100
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "parent": 0
+          }
+        },
+        "532": {
+          "json": {
+            "position": {
+              "x": 52.75,
+              "y": 1.5,
+              "z": 29
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "parent": 534
+          }
+        },
+        "533": {
+          "json": {
+            "position": {
+              "x": 52.75,
+              "y": 1.4373035430908203,
+              "z": 29
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "parent": 534
+          }
+        },
+        "534": {
+          "json": {
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1
+            },
+            "parent": 530
+          }
+        },
+        "535": {
+          "json": {
+            "position": {
+              "x": 51.5,
+              "y": 1.0044422149658203,
+              "z": 34.25
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0.5,
+              "z": 0,
+              "w": 0.8660253882408142
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
+        },
+        "537": {
+          "json": {
+            "position": {
+              "x": 55.80706024169922,
+              "y": 1.0044422149658203,
+              "z": 40.42713165283203
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0.5,
+              "z": 0,
+              "w": 0.8660253882408142
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
+        },
+        "538": {
+          "json": {
+            "position": {
+              "x": 59.61713409423828,
+              "y": 1.0044422149658203,
+              "z": 34.137550354003906
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0.2263268232345581,
+              "z": 0,
+              "w": 0.9740514159202576
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
+        },
+        "539": {
+          "json": {
+            "position": {
+              "x": 60.086090087890625,
+              "y": 1.0044422149658203,
+              "z": 24.99779510498047
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0.3680945336818695,
+              "z": 0,
+              "w": 0.92978835105896
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
+        },
+        "540": {
+          "json": {
+            "position": {
+              "x": 62.139625549316406,
+              "y": 1.0044422149658203,
+              "z": 18.692928314208984
+            },
+            "rotation": {
+              "x": 0,
+              "y": -0.37094613909721375,
+              "z": 0,
+              "w": 0.9286543726921082
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
+        },
+        "541": {
+          "json": {
+            "position": {
+              "x": 52.295616149902344,
+              "y": 1.0044422149658203,
+              "z": 21.182937622070312
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0.5181606411933899,
+              "z": 0,
+              "w": 0.8552833199501038
+            },
+            "scale": {
+              "x": 1.2000000476837158,
+              "y": 1.2000000476837158,
+              "z": 1.2000000476837158
+            },
+            "parent": 534
+          }
         }
       }
     },
@@ -475,6 +685,76 @@
         "514": {
           "json": {
             "src": "assets/models/camp.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "531": {
+          "json": {
+            "src": "assets/models/tripo.glb",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "532": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "533": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "535": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "536": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "537": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "538": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "539": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "540": {
+          "json": {
+            "src": "assets/models/pine.gltf",
+            "visibleMeshesCollisionMask": 0,
+            "invisibleMeshesCollisionMask": 3
+          }
+        },
+        "541": {
+          "json": {
+            "src": "assets/models/pine.gltf",
             "visibleMeshesCollisionMask": 0,
             "invisibleMeshesCollisionMask": 3
           }
@@ -583,6 +863,61 @@
           "json": {
             "value": "MAIN_POSITION"
           }
+        },
+        "531": {
+          "json": {
+            "value": "tripo.glb"
+          }
+        },
+        "532": {
+          "json": {
+            "value": "pine.gltf"
+          }
+        },
+        "533": {
+          "json": {
+            "value": "pine.gltf_2"
+          }
+        },
+        "534": {
+          "json": {
+            "value": "PINES"
+          }
+        },
+        "535": {
+          "json": {
+            "value": "pine.gltf_3"
+          }
+        },
+        "536": {
+          "json": {
+            "value": "pine.gltf_4"
+          }
+        },
+        "537": {
+          "json": {
+            "value": "pine.gltf_5"
+          }
+        },
+        "538": {
+          "json": {
+            "value": "pine.gltf_6"
+          }
+        },
+        "539": {
+          "json": {
+            "value": "pine.gltf_7"
+          }
+        },
+        "540": {
+          "json": {
+            "value": "pine.gltf_8"
+          }
+        },
+        "541": {
+          "json": {
+            "value": "pine.gltf_9"
+          }
         }
       }
     },
@@ -654,9 +989,9 @@
         "serializationType": "map"
       },
       "data": {
-        "1": {
+        "0": {
           "json": {
-            "gizmo": 0
+            "gizmo": 2
           }
         }
       }
@@ -708,7 +1043,8 @@
                 "open": true,
                 "children": [
                   513,
-                  530
+                  530,
+                  531
                 ]
               },
               {
@@ -807,8 +1143,64 @@
                   528,
                   529,
                   514,
-                  515
+                  515,
+                  534
                 ]
+              },
+              {
+                "entity": 531,
+                "children": []
+              },
+              {
+                "entity": 532,
+                "children": []
+              },
+              {
+                "entity": 533,
+                "children": []
+              },
+              {
+                "entity": 534,
+                "open": true,
+                "children": [
+                  532,
+                  533,
+                  535,
+                  537,
+                  538,
+                  539,
+                  540,
+                  541,
+                  536
+                ]
+              },
+              {
+                "entity": 535,
+                "children": []
+              },
+              {
+                "entity": 536,
+                "children": []
+              },
+              {
+                "entity": 537,
+                "children": []
+              },
+              {
+                "entity": 538,
+                "children": []
+              },
+              {
+                "entity": 539,
+                "children": []
+              },
+              {
+                "entity": 540,
+                "children": []
+              },
+              {
+                "entity": 541,
+                "children": []
               }
             ]
           }
@@ -887,6 +1279,39 @@
           "json": {}
         },
         "530": {
+          "json": {}
+        },
+        "531": {
+          "json": {}
+        },
+        "532": {
+          "json": {}
+        },
+        "533": {
+          "json": {}
+        },
+        "534": {
+          "json": {}
+        },
+        "535": {
+          "json": {}
+        },
+        "536": {
+          "json": {}
+        },
+        "537": {
+          "json": {}
+        },
+        "538": {
+          "json": {}
+        },
+        "539": {
+          "json": {}
+        },
+        "540": {
+          "json": {}
+        },
+        "541": {
           "json": {}
         }
       }
@@ -1985,7 +2410,8 @@
                 }
               }
             ],
-            "skyboxConfig": {}
+            "skyboxConfig": {},
+            "hideLandscapeTerrain": true
           }
         }
       }
