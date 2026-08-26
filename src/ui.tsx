@@ -798,10 +798,10 @@ let leaderboardWeekId: string | null = null
 
 // Play button is only shown while the player stands inside this X/Z area (world coordinates),
 // checked each tick in tick() below. Ignores Y so it doesn't matter which floor/level the player is on.
-const PLAY_AREA_MIN_X = 16 + 32
-const PLAY_AREA_MAX_X = 48 + 32
-const PLAY_AREA_MIN_Z = 16 + 32
-const PLAY_AREA_MAX_Z = 48 + 32
+const PLAY_AREA_MIN_X = 45
+const PLAY_AREA_MAX_X = 120
+const PLAY_AREA_MIN_Z = 0
+const PLAY_AREA_MAX_Z = 120
 let playerInPlayArea = false
 // Spinner behind the Play button, shown only for this many seconds right after the player enters
 // the play area (not for the whole time they stand in it) - set in tick() on the false->true edge.
@@ -818,7 +818,7 @@ const FALL_RESPAWN_Y = 5
 // Scene-local coordinates, the same frame as scene.json's spawnPoints (the base parcel is 0,0, so
 // these match world coordinates too). This is the middle of SpawnArea1 - keep it in sync if the
 // spawn point is ever moved in the Creator Hub.
-const SPAWN_POSITION = { x: 84, y: 13, z: 83 }
+const SPAWN_POSITION = { x: 38.5, y: 13, z: 62.96 }
 // movePlayerTo takes a frame or two to show up in the player Transform; without this guard the
 // call would repeat every tick in the meantime. Clears itself once the player is back above
 // FALL_RESPAWN_Y, so there is no timer to keep in sync.
