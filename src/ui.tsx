@@ -35,7 +35,8 @@ import {
   DEBUG_BORDER_RED,
   DEBUG_BORDER_GREEN,
   DEBUG_BORDER_BLUE,
-  DEBUG_BORDER_WHITE
+  DEBUG_BORDER_WHITE,
+  isPreviewRealm
 } from './debugFlags'
 import { setupCelebrationCamera, triggerCelebrationCamera, updateCelebrationCamera, triggerDefeatEmote } from './celebration'
 import {
@@ -2609,7 +2610,7 @@ const MemoryMatchUi = () => (
           borderColor: DEBUG_BORDER_RED
         }}
       >
-        {(() => {
+        {isPreviewRealm() && (() => {
           const serverOnline = lastServerTickAt !== null && elapsedTime - lastServerTickAt < SERVER_OFFLINE_THRESHOLD
           return (
             <UiEntity
@@ -2628,7 +2629,7 @@ const MemoryMatchUi = () => (
             </UiEntity>
           )
         })()}
-        {DEBUG_CANVAS_INFO &&
+        {DEBUG_CANVAS_INFO && isPreviewRealm() &&
           (() => {
             const canvasInfo = UiCanvasInformation.getOrNull(engine.RootEntity)
             return (

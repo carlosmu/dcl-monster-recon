@@ -3,6 +3,22 @@
 // settings - flip one here and re-deploy.
 
 import { Color4 } from '@dcl/sdk/math'
+import { executeTask } from '@dcl/sdk/ecs'
+import { getRealm } from '~system/Runtime'
+
+// The one runtime (not compile-time) gate in this file: true only while the scene runs as a local
+// preview (`npm run start`), false in any deployed build. Used to keep the footer readouts below
+// visible locally without having to remember to turn them off before every deploy. getRealm is
+// async, so this stays false for the first frames of a preview session and the readouts appear a
+// moment late - the UI re-renders every frame, so nothing else has to refresh.
+let previewRealm = false
+export function isPreviewRealm(): boolean {
+  return previewRealm
+}
+executeTask(async () => {
+  const { realmInfo } = await getRealm({})
+  previewRealm = realmInfo?.isPreview ?? false
+})
 
 // Overlays each board cell with its grid coordinate (A1, B3, ...), to reference specific cells when
 // reporting a layout or match bug.
@@ -13,7 +29,8 @@ export const DEBUG_CELL_LABELS = false
 export const DEBUG_LAYOUT_BORDERS = false
 
 // Pins a readout of UiCanvasInformation (real screen size, device pixel ratio) to the bottom-left,
-// for checking how the 1920x1080 virtual canvas maps onto a real screen.
+// for checking how the 1920x1080 virtual canvas maps onto a real screen. Preview-only either way:
+// isPreviewRealm() hides it in a deployed build even with this left on.
 export const DEBUG_CANVAS_INFO = true
 
 // TEMP (duration calibration): dumps every recorded board best-time to console on scene load, to
