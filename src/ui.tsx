@@ -781,6 +781,10 @@ interface CellState {
   revealed: boolean
   matched: boolean
   flippedAt: number | null
+  // How many times this card has been turned face-up, counting the flip in progress. A card's first
+  // reveal is information the player couldn't have had, so picking one as the second card of a pair
+  // doesn't count as a mismatch (see flipCell) - picking a card already seen does.
+  timesFlipped: number
 }
 
 // 'hidden' until the Play button (rendered in the body) opens the checkpoint select screen.
@@ -1111,7 +1115,7 @@ function buildCells(): CellState[] {
   shuffle(pool)
   const values = [...pool.slice(0, pairCount), ...pool.slice(0, pairCount)]
   shuffle(values)
-  return values.map((frontQuadrant) => ({ frontQuadrant, revealed: false, matched: false, flippedAt: null }))
+  return values.map((frontQuadrant) => ({ frontQuadrant, revealed: false, matched: false, flippedAt: null, timesFlipped: 0 }))
 }
 
 function hideCell(cell: CellState) {
@@ -1130,6 +1134,7 @@ function flipCell(cell: CellState) {
 
   cell.revealed = true
   cell.flippedAt = elapsedTime
+  cell.timesFlipped++
   revealedUnmatched.push(cell)
 
   if (revealedUnmatched.length === 2) {
@@ -1170,7 +1175,12 @@ function flipCell(cell: CellState) {
         showToast('boardComplete')
       }
     } else {
-      errors++
+      // Only the second card of the pair decides this: by the time it's picked the player knows what
+      // the first one is, so choosing a card they had already seen that doesn't match is an avoidable
+      // error. Choosing one never seen before is exploration - it still plays the fail sound, it just
+      // isn't scored. (The first card's own history doesn't matter: with no partner known yet, any
+      // opener is fair.)
+      if (b.timesFlipped > 1) errors++
       playFailSound()
     }
   }
