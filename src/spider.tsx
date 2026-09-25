@@ -22,11 +22,16 @@ const SPIDER_DESPAWN_MARGIN_PX = 100
 const SPIDER_LANE_COUNT = 8
 // Chance a new spider walks bottom-to-top instead of top-to-bottom.
 const SPIDER_UPWARD_CHANCE = 0.5
+// Chance a new spider turns around once, at a random point while fully on screen (the band below,
+// as fractions of the room it has to move in). Safe for overlap: it keeps its lane to itself.
+const SPIDER_TURN_CHANCE = 0.3
+const SPIDER_TURN_AT_MIN = 0.15
+const SPIDER_TURN_AT_MAX = 0.85
 // Must match setUiRenderer's virtualWidth/virtualHeight in ui.tsx.
 const VIRTUAL_WIDTH = 1920
 const VIRTUAL_HEIGHT = 1080
 
-type Spider = { id: number; lane: number; y: number; speed: number; timeOffset: number; upward: boolean }
+type Spider = { id: number; lane: number; y: number; speed: number; timeOffset: number; upward: boolean; turnAtY: number | null }
 
 const spiders: Spider[] = []
 let nextSpiderId = 0
@@ -68,13 +73,22 @@ engine.addSystem((dt: number) => {
         speed: randomBetween(SPIDER_SPEED_MIN_PX, SPIDER_SPEED_MAX_PX),
         // Desyncs the walk cycles so the spiders don't all step in unison.
         timeOffset: Math.random() * (SPIDER_FRAME_COUNT / SPIDER_FPS),
-        upward
+        upward,
+        turnAtY:
+          Math.random() < SPIDER_TURN_CHANCE
+            ? randomBetween(SPIDER_TURN_AT_MIN, SPIDER_TURN_AT_MAX) * (screen.height - SPIDER_SIZE_PX)
+            : null
       })
     }
   }
 
   for (let i = spiders.length - 1; i >= 0; i--) {
     const spider = spiders[i]
+    // Reversing flips `upward`, which also mirrors the sprite (see getSpiderUvs).
+    if (spider.turnAtY !== null && (spider.upward ? spider.y <= spider.turnAtY : spider.y >= spider.turnAtY)) {
+      spider.upward = !spider.upward
+      spider.turnAtY = null
+    }
     if (spider.upward) {
       spider.y -= spider.speed * dt
       if (spider.y + SPIDER_SIZE_PX < -SPIDER_DESPAWN_MARGIN_PX) spiders.splice(i, 1)
