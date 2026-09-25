@@ -50,7 +50,7 @@ import {
 } from './prizeChase'
 import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTutorialCinematicActive, attachMonsterDialog } from './tutorialChase'
 import { showPlayerFloorSpinner, updatePlayerFloorSpinner, hidePlayerFloorSpinner } from './floorSpinner'
-import { SpiderSprite } from './spider'
+import { SpiderRain } from './spider'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -2873,6 +2873,6 @@ const MemoryMatchUi = () => (
         />
       </UiEntity>
     )}
-    <SpiderSprite />
+    <SpiderRain />
   </UiEntity>
 )
