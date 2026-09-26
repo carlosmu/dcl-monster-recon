@@ -2375,6 +2375,11 @@
 		},
 		{
 			"doubleSided":true,
+			"emissiveFactor":[
+				0.30000001192092896,
+				0.30000001192092896,
+				0.30000001192092896
+			],
 			"name":"Emission",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
