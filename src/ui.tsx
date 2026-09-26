@@ -51,6 +51,7 @@ import {
 import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTutorialCinematicActive, attachMonsterDialog } from './tutorialChase'
 import { showPlayerFloorSpinner, updatePlayerFloorSpinner, hidePlayerFloorSpinner } from './floorSpinner'
 import { SpiderRain } from './spider'
+import { BatRain } from './bat'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -2874,5 +2875,6 @@ const MemoryMatchUi = () => (
       </UiEntity>
     )}
     <SpiderRain />
+    <BatRain />
   </UiEntity>
 )
