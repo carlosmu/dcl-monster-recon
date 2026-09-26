@@ -118,7 +118,9 @@
     "nearbyVoiceChat": "enabled"
   },
   "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
-  "skyboxConfig": {},
+  "skyboxConfig": {
+    "fixedTime": 86400
+  },
   "authoritativeMultiplayer": true,
   "worldConfiguration": {
     "name": "monsterrecon.dcl.eth"

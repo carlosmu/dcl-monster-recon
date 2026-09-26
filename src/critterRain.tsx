@@ -32,6 +32,9 @@ export type CritterRainConfig = {
   debugLabelTopPx: number
 }
 
+// DEBUG: set to true to show the live critter count labels.
+const SHOW_DEBUG_COUNT = false
+
 // Fixed lanes centered on the screen (8 x 192 = 1536px, i.e. the central 80% of 1920), SHARED by
 // every critter rain: only one critter of any kind per lane at a time, so spiders and bats never
 // overlap in X. A critter narrower than a lane is centered in it.
@@ -168,16 +171,18 @@ export function createCritterRain(config: CritterRainConfig) {
         />
       ))}
       {/* DEBUG: live critter count */}
-      <UiEntity
-        uiTransform={{
-          positionType: 'absolute',
-          position: { top: config.debugLabelTopPx, right: 16 },
-          padding: { top: 4, bottom: 4, left: 8, right: 8 }
-        }}
-        uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
-      >
-        <Label value={`${config.debugLabel}: ${critters.length}`} fontSize={24} color={Color4.White()} />
-      </UiEntity>
+      {SHOW_DEBUG_COUNT && (
+        <UiEntity
+          uiTransform={{
+            positionType: 'absolute',
+            position: { top: config.debugLabelTopPx, right: 16 },
+            padding: { top: 4, bottom: 4, left: 8, right: 8 }
+          }}
+          uiBackground={{ color: Color4.create(0, 0, 0, 0.6) }}
+        >
+          <Label value={`${config.debugLabel}: ${critters.length}`} fontSize={24} color={Color4.White()} />
+        </UiEntity>
+      )}
     </UiEntity>
   )
 }
