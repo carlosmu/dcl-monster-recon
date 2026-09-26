@@ -38,6 +38,13 @@ export type CritterRainConfig = {
 const LANE_COUNT = 8
 const LANE_WIDTH_PX = 192
 const occupiedLanes = new Set<number>()
+// Max critters alive at once across every rain (one per occupied lane). Lowering it doesn't remove
+// anyone: the extras just finish their walk and no new ones spawn until the count drops below it.
+let maxCritters = LANE_COUNT
+
+export function setMaxCritters(max: number): void {
+  maxCritters = Math.min(max, LANE_COUNT)
+}
 
 // Must match setUiRenderer's virtualWidth/virtualHeight in ui.tsx.
 const VIRTUAL_WIDTH = 1920
@@ -77,8 +84,8 @@ export function createCritterRain(config: CritterRainConfig) {
       for (let lane = 0; lane < LANE_COUNT; lane++) {
         if (!occupiedLanes.has(lane)) freeLanes.push(lane)
       }
-      // All lanes busy: skip this spawn rather than overlap.
-      if (freeLanes.length > 0) {
+      // All lanes busy or at the cap: skip this spawn rather than overlap.
+      if (freeLanes.length > 0 && occupiedLanes.size < maxCritters) {
         const upward = Math.random() < config.upwardChance
         const lane = freeLanes[Math.floor(Math.random() * freeLanes.length)]
         occupiedLanes.add(lane)

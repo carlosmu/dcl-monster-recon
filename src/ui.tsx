@@ -52,10 +52,12 @@ import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTuto
 import { showPlayerFloorSpinner, updatePlayerFloorSpinner, hidePlayerFloorSpinner } from './floorSpinner'
 import { SpiderRain } from './spider'
 import { BatRain } from './bat'
+import { setMaxCritters } from './critterRain'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
-const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
+// const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
+const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_02_halloween.mp3'
 const BOARD_MUSIC_CLIP = 'assets/audio/jazzyfrenchy.mp3'
 const BOARD_END_CLIP = 'assets/audio/get_points.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
@@ -73,8 +75,7 @@ const BOARD_FRAME_IMAGE = 'assets/images/frame_02.png'
 // corners (and the baked-in close button) don't get stretched.
 const FRAME_SLICE = 0.22
 const BACK_ATLAS_GRID = 8 // atlas_01.png grid
-const ALPHAS_IMAGE = 'assets/images/alphas.png'
-const ALPHAS_GRID = 8 // alphas.png grid
+const ATLAS_02_GRID = 8 // atlas_02.png grid
 // Shown in the leaderboard when a wallet has no Decentraland profile (the lambdas endpoint 404s for
 // guests and never-configured avatars) or while its face is still loading.
 const FALLBACK_PROFILE_PIC_IMAGE = 'assets/images/fallback_profile_pic.png'
@@ -159,7 +160,6 @@ const PRELOAD_TEXTURES: string[] = [
   BACK_IMAGE,
   ATLAS_02_IMAGE,
   BOARD_FRAME_IMAGE,
-  ALPHAS_IMAGE,
   FALLBACK_PROFILE_PIC_IMAGE,
   GERM_ONE_IMAGE,
   GERM_ONE_IMAGE_BROWN,
@@ -716,13 +716,13 @@ function getUvsForQuadrant(index: number, grid: number): number[] {
   return getUvsForBlock(index % grid, Math.floor(index / grid), 1, 1, grid)
 }
 
-// Loading spinner: A1-D4 as ONE combined 4x4 block of alphas.png (same span the old
+// Loading spinner: A1-D4 as ONE combined 4x4 block of atlas_02.png (same span the old
 // ALPHAS_COLLECTED_UVS used), spun by rotating its 4 UV corners around their own center each
 // frame - UiTransform has no rotate prop, but a quad's UV sampling can still be rotated
 // independently of its (fixed) screen position, which reads as the image itself spinning in place.
 // Unverified in the Explorer: rotated (non-axis-aligned) UV corners are standard for textured
 // quads, but this codebase has only ever fed PBUiBackground axis-aligned rectangles until now.
-const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 4, 4, ALPHAS_GRID)
+const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 4, 4, ATLAS_02_GRID)
 const SPINNER_DEGREES_PER_SECOND = 90
 // Base unit for the spinner behind the Monster Collected toast's icon - box is 3x this, spinner
 // itself is rendered at 4.5x (bigger than its box, so it overflows symmetrically behind the icon).
@@ -743,6 +743,12 @@ function rotateUvsAroundCenter(uvs: number[], angleDeg: number): number[] {
   return rotated
 }
 
+// Spiders + bats alive at once (see critterRain.tsx): calmer outside a board, busier later on.
+function getMaxCritters(): number {
+  if (screen !== 'board') return 3
+  return currentCheckpoint <= 10 ? 5 : 8
+}
+
 function getSpinnerUvs(): number[] {
   const angle = (elapsedTime * SPINNER_DEGREES_PER_SECOND) % 360
   return rotateUvsAroundCenter(SPINNER_BASE_UVS, angle)
@@ -754,7 +760,7 @@ function renderSpinner(widthPx: number, heightPx: number = widthPx) {
   return (
     <UiEntity
       uiTransform={{ width: widthPx, height: heightPx, flexShrink: 0 }}
-      uiBackground={{ textureMode: 'stretch', texture: { src: ALPHAS_IMAGE }, uvs: getSpinnerUvs() }}
+      uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: getSpinnerUvs() }}
     />
   )
 }
@@ -1479,6 +1485,7 @@ export function setupUi() {
   ReactEcsRenderer.setUiRenderer(MemoryMatchUi, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'none' })
   const tick = (dt: number) => {
     elapsedTime += dt
+    setMaxCritters(getMaxCritters())
     const wasInPlayArea = playerInPlayArea
     playerInPlayArea = isPlayerInPlayArea()
     if (playerInPlayArea && !wasInPlayArea) {

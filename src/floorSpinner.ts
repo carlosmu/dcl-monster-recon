@@ -5,10 +5,10 @@ import { isMobile } from '@dcl/sdk/platform'
 
 // Loading-style ring shown at the player's feet while a checkpoint's boards are in play (see
 // showPlayerFloorSpinner/updatePlayerFloorSpinner/hidePlayerFloorSpinner callers in ui.tsx). Same
-// source art as the 2D loading spinner (ui.tsx's ALPHAS_IMAGE/SPINNER_BASE_UVS): A1-D4, the
-// top-left quadrant of alphas.png's 8x8 grid - expressed here as a 2x2 super-grid so
+// source art as the 2D loading spinner (ui.tsx's ATLAS_02_IMAGE/SPINNER_BASE_UVS): A1-D4, the
+// top-left quadrant of atlas_02.png's 8x8 grid - expressed here as a 2x2 super-grid so
 // Material.Texture.Common's offset/tiling can crop it directly instead of rotating UVs.
-const SPINNER_IMAGE = 'assets/images/alphas.png'
+const SPINNER_IMAGE = 'assets/images/atlas_02.png'
 const SPINNER_ATLAS_QUADRANTS = 2
 const SPINNER_PLANE_SIZE = 2 // metres
 const SPINNER_FOOT_HEIGHT = -0.05 // just above ground, avoids z-fighting with the floor
