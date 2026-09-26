@@ -1,15 +1,11 @@
 import { engine, Transform, MeshRenderer, Material, MaterialTransparencyMode, type Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
-import { Vector2, Vector3, Quaternion, Color3 } from '@dcl/sdk/math'
-import { isMobile } from '@dcl/sdk/platform'
+import { Vector3, Quaternion, Color3 } from '@dcl/sdk/math'
 
 // Loading-style ring shown at the player's feet while a checkpoint's boards are in play (see
 // showPlayerFloorSpinner/updatePlayerFloorSpinner/hidePlayerFloorSpinner callers in ui.tsx). Same
-// source art as the 2D loading spinner (ui.tsx's ATLAS_02_IMAGE/SPINNER_BASE_UVS): A1-D4, the
-// top-left quadrant of atlas_02.png's 8x8 grid - expressed here as a 2x2 super-grid so
-// Material.Texture.Common's offset/tiling can crop it directly instead of rotating UVs.
-const SPINNER_IMAGE = 'assets/images/atlas_02.png'
-const SPINNER_ATLAS_QUADRANTS = 2
+// source art as the 2D loading spinner (ui.tsx's SPINNER_IMAGE), used whole.
+const SPINNER_IMAGE = 'assets/images/spinner.png'
 const SPINNER_PLANE_SIZE = 2 // metres
 const SPINNER_FOOT_HEIGHT = -0.05 // just above ground, avoids z-fighting with the floor
 const SPINNER_DEGREES_PER_SECOND = 90
@@ -21,17 +17,10 @@ let spinnerPlaneA: Entity | null = null
 let spinnerPlaneB: Entity | null = null
 let spinAngleDeg = 0
 
-// Crops the spinner's quadrant onto the plane's material, with cutout alpha and matching emissive
-// so it reads clearly and glows in its own colors. Row 0 (top row of the sheet): the desktop
-// Explorer's V=0 is the texture's BOTTOM edge so the top row needs a 0.5 V offset, while the
-// mobile (Godot) renderer's V=0 is the TOP edge so it needs none - same convention as
-// prizeChase.ts's applyPrizeIcon.
+// Puts the spinner onto the plane's material, with cutout alpha and matching emissive so it reads
+// clearly and glows in its own colors.
 function applySpinnerMaterial(entity: Entity) {
-  const texture = Material.Texture.Common({
-    src: SPINNER_IMAGE,
-    offset: Vector2.create(0, isMobile() ? 0 : 1 / SPINNER_ATLAS_QUADRANTS),
-    tiling: Vector2.create(1 / SPINNER_ATLAS_QUADRANTS, 1 / SPINNER_ATLAS_QUADRANTS)
-  })
+  const texture = Material.Texture.Common({ src: SPINNER_IMAGE })
   Material.setPbrMaterial(entity, {
     texture,
     alphaTexture: texture,

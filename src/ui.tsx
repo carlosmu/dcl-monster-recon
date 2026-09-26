@@ -56,6 +56,7 @@ import { setMaxCritters } from './critterRain'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
+const SPINNER_IMAGE = 'assets/images/spinner.png'
 // const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
 const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_02_halloween.mp3'
 // const BOARD_MUSIC_CLIP = 'assets/audio/ingame_01.mp3'
@@ -160,6 +161,7 @@ const RESOLVED_COLLECTIONS: ResolvedCollection[] = (() => {
 const PRELOAD_TEXTURES: string[] = [
   BACK_IMAGE,
   ATLAS_02_IMAGE,
+  SPINNER_IMAGE,
   BOARD_FRAME_IMAGE,
   FALLBACK_PROFILE_PIC_IMAGE,
   GERM_ONE_IMAGE,
@@ -717,13 +719,14 @@ function getUvsForQuadrant(index: number, grid: number): number[] {
   return getUvsForBlock(index % grid, Math.floor(index / grid), 1, 1, grid)
 }
 
-// Loading spinner: A1-D4 as ONE combined 4x4 block of atlas_02.png (same span the old
-// ALPHAS_COLLECTED_UVS used), spun by rotating its 4 UV corners around their own center each
-// frame - UiTransform has no rotate prop, but a quad's UV sampling can still be rotated
+// Loading spinner: the whole of spinner.png, spun by rotating its 4 UV corners around their own
+// center each frame - UiTransform has no rotate prop, but a quad's UV sampling can still be rotated
 // independently of its (fixed) screen position, which reads as the image itself spinning in place.
 // Unverified in the Explorer: rotated (non-axis-aligned) UV corners are standard for textured
 // quads, but this codebase has only ever fed PBUiBackground axis-aligned rectangles until now.
-const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 4, 4, ATLAS_02_GRID)
+// Rotated corners reach outside 0..1; its own file with 'clamp' wrap (transparent edges) keeps
+// that from sampling neighboring atlas art, as it did when this was a block of atlas_02.png.
+const SPINNER_BASE_UVS = getUvsForBlock(0, 0, 1, 1, 1)
 const SPINNER_DEGREES_PER_SECOND = 90
 // Base unit for the spinner behind the Monster Collected toast's icon - box is 3x this, spinner
 // itself is rendered at 4.5x (bigger than its box, so it overflows symmetrically behind the icon).
@@ -761,7 +764,7 @@ function renderSpinner(widthPx: number, heightPx: number = widthPx) {
   return (
     <UiEntity
       uiTransform={{ width: widthPx, height: heightPx, flexShrink: 0 }}
-      uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: getSpinnerUvs() }}
+      uiBackground={{ textureMode: 'stretch', texture: { src: SPINNER_IMAGE, wrapMode: 'clamp' }, uvs: getSpinnerUvs() }}
     />
   )
 }
