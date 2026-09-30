@@ -52,6 +52,7 @@ import { setupTutorialChase, startTutorialCinematic, updateTutorialChase, isTuto
 import { showPlayerFloorSpinner, updatePlayerFloorSpinner, hidePlayerFloorSpinner } from './floorSpinner'
 import { SpiderRain } from './spider'
 import { BatRain } from './bat'
+import { Splash } from './splash'
 import { setMaxCritters } from './critterRain'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
@@ -2889,5 +2890,6 @@ const MemoryMatchUi = () => (
     )}
     <SpiderRain />
     <BatRain />
+    <Splash />
   </UiEntity>
 )

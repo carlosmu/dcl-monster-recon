@@ -1684,26 +1684,6 @@
       }
     },
     {
-      "name": "inspector::Selection",
-      "jsonSchema": {
-        "type": "object",
-        "properties": {
-          "gizmo": {
-            "type": "integer",
-            "serializationType": "int32"
-          }
-        },
-        "serializationType": "map"
-      },
-      "data": {
-        "514": {
-          "json": {
-            "gizmo": 0
-          }
-        }
-      }
-    },
-    {
       "name": "inspector::Nodes",
       "jsonSchema": {
         "type": "object",
@@ -2984,13 +2964,17 @@
           "json": {
             "name": "Monster Recon",
             "description": "Race against the clock in fast Memory Match rounds, then dash through camp to hunt down your monsters. Build your Codex with rare, exotic, and epic finds, compare discoveries with friends, beat your best times, and battle for the top of the monster leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
-            "thumbnail": "assets/images/thumbnail.png",
+            "thumbnail": "assets/Images/thumbnail-halloween.png",
             "ageRating": "A",
             "categories": [],
             "author": "SDK",
             "email": "carlos.damian.munoz@gmail.com",
             "tags": [],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -3248,11 +3232,7 @@
                   "x": 7,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
             "silenceVoiceChat": false,
             "disablePortableExperiences": false,
@@ -3290,7 +3270,9 @@
                 }
               }
             ],
-            "skyboxConfig": {},
+            "skyboxConfig": {
+              "fixedTime": 86400
+            },
             "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
             "disableNearbyVoiceChat": false,
             "hideLandscapeTerrain": true
