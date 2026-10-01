@@ -9,7 +9,10 @@ export const Messages = {
   // in the top N" (keep my score) apart from "the week rolled over" (my score is back to 0).
   leaderboardUpdate: Schemas.Map({
     weekId: Schemas.String,
-    entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String }))
+    // level: highest level the wallet has won (0 = none), same as leaderboardAllTimeUpdate's.
+    entries: Schemas.Array(
+      Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String, level: Schemas.Number })
+    )
   }),
   // Client -> Server: ask for the current leaderboard snapshot (e.g. on scene load) - the
   // server's own startup broadcast only reaches whoever is already connected at that instant,
@@ -17,9 +20,11 @@ export const Messages = {
   requestLeaderboard: Schemas.Map({}),
   // Server -> Client: current top-of-leaderboard snapshot for the all-time total (sum of every
   // week's score per wallet, never resets). Sent alongside leaderboardUpdate on every reportScore
-  // and on requestLeaderboard.
+  // and on requestLeaderboard. level is the highest level the wallet has won (0 = none).
   leaderboardAllTimeUpdate: Schemas.Map({
-    entries: Schemas.Array(Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String }))
+    entries: Schemas.Array(
+      Schemas.Map({ playerName: Schemas.String, score: Schemas.Number, address: Schemas.String, level: Schemas.Number })
+    )
   }),
   // Client -> Server: ask for the caller's own running score for the current week. Unlike
   // leaderboardUpdate (which only ever carries the top N), this always answers with the caller's

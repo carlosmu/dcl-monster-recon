@@ -32,6 +32,9 @@ const AVATAR_SIZE_PX = 42 // LEADERBOARD_AVATAR_SIZE_PX
 // need more separation than they do on a flat screen to stop reading as one run-on line.
 const AVATAR_GAP_PX = 14
 const FONT_SIZE_PX = 16 // LEADERBOARD_ROW_NAME/SCORE_FONT_SIZE_PX
+// Center of the Level column, between the end of a NAME_MAX_CHARS name and
+// the left edge of a 5-6 digit score. No desktop counterpart - the 2D list has no level column.
+const LEVEL_CENTER_PX = 470
 
 const PANEL_WIDTH_M = 3.6
 const PX_TO_M = PANEL_WIDTH_M / ROW_WIDTH_PX
@@ -41,6 +44,9 @@ const PX_TO_M = PANEL_WIDTH_M / ROW_WIDTH_PX
 // pics keep their own size, so this is air, not scale.
 const ROW_SPACING_FACTOR = 1.35
 const ROW_HEIGHT_M = ROW_HEIGHT_PX * PX_TO_M * ROW_SPACING_FACTOR
+// Shifts the whole table (header and rows) down from the anchor, in the same px units as above.
+const TOP_OFFSET_PX = 50
+const TOP_OFFSET_M = TOP_OFFSET_PX * PX_TO_M
 
 // The only value here that isn't a pure ratio: TextShape's fontSize isn't in metres and the
 // protocol doesn't define its unit, so this converts the desktop px size into whatever TextShape
@@ -76,12 +82,15 @@ export interface Leaderboard3dEntry {
   playerName: string
   score: number
   address: string
+  // Highest level won; without it (e.g. DEBUG_FAKE_LEADERBOARD's roster) the Level column stays blank.
+  level?: number
 }
 
 interface Row3d {
   rank: Entity
   avatar: Entity
   name: Entity
+  level: Entity
   score: Entity
   address: string // '' while the row is empty
   appliedFaceUrl: string
@@ -142,9 +151,9 @@ function createText(parent: Entity, x: number, y: number, textAlign: TextAlignMo
 
 function createRow(parent: Entity, index: number): Row3d {
   // The anchor is the top edge: row 1 hangs directly below it and each row after that goes further
-  // down, so wherever the anchor sits is exactly where "1." lands. Rows that run past whatever's
+  // down, so "1." lands just under the anchor (TOP_OFFSET_M below it). Rows that run past whatever's
   // visible down there are the ones that get cut off, never the top of the table.
-  const y = -(index + 0.5) * ROW_HEIGHT_M
+  const y = -(index + 0.5) * ROW_HEIGHT_M - TOP_OFFSET_M
 
   const avatar = engine.addEntity()
   Transform.create(avatar, {
@@ -159,10 +168,22 @@ function createRow(parent: Entity, index: number): Row3d {
     rank: createText(parent, LEFT + RANK_W, y, TextAlignMode.TAM_MIDDLE_RIGHT, NUMBER_COLOR),
     avatar,
     name: createText(parent, NAME_LEFT, y, TextAlignMode.TAM_MIDDLE_LEFT, TEXT_COLOR),
+    level: createText(parent, LEFT + LEVEL_CENTER_PX * PX_TO_M, y, TextAlignMode.TAM_MIDDLE_CENTER, TEXT_COLOR),
     score: createText(parent, LEFT + PANEL_WIDTH_M, y, TextAlignMode.TAM_MIDDLE_RIGHT, NUMBER_COLOR),
     address: '',
     appliedFaceUrl: ''
   }
+}
+
+// Column titles, only over the two numeric columns - rank, face and name read fine without one.
+// Sits one row above row 1 (see createRow).
+function createHeader(parent: Entity) {
+  const y = 0.5 * ROW_HEIGHT_M - TOP_OFFSET_M
+  TextShape.getMutable(
+    createText(parent, LEFT + LEVEL_CENTER_PX * PX_TO_M, y, TextAlignMode.TAM_MIDDLE_CENTER, TEXT_COLOR)
+  ).text = 'LvL'
+  TextShape.getMutable(createText(parent, LEFT + PANEL_WIDTH_M, y, TextAlignMode.TAM_MIDDLE_RIGHT, TEXT_COLOR)).text =
+    'Score'
 }
 
 // Built on the first update rather than at setup: the anchor comes from the scene composite, so
@@ -171,6 +192,7 @@ function ensureRows(panel: Panel): Row3d[] | null {
   if (panel.rows !== null) return panel.rows
   const anchor = engine.getEntityOrNullByName(panel.anchorName)
   if (anchor === null) return null
+  createHeader(anchor)
   panel.rows = Array.from({ length: ROWS }, (_, index) => createRow(anchor, index))
   return panel.rows
 }
@@ -199,6 +221,7 @@ export function updateLeaderboard3d(anchorName: EntityNames, entries: Leaderboar
     row.address = entry?.address ?? ''
     TextShape.getMutable(row.rank).text = entry ? `${index + 1}.` : ''
     TextShape.getMutable(row.name).text = entry ? truncateName(entry.playerName) : ''
+    TextShape.getMutable(row.level).text = entry?.level !== undefined ? `${entry.level}` : ''
     TextShape.getMutable(row.score).text = entry ? `${entry.score}` : ''
     applyFace(row)
   })

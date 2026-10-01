@@ -809,6 +809,7 @@ interface LeaderboardEntry {
   playerName: string
   score: number
   address: string
+  level?: number // highest level won - see leaderboardUpdate/leaderboardAllTimeUpdate
 }
 
 // Seeded with the fake roster (rather than only swapping it in on leaderboardUpdate) so the boards

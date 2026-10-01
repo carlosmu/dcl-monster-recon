@@ -27,6 +27,12 @@ const OWNER_ADDRESS = '0x4B538E1E044922aec2F428EC7E17A99f44205fF9'
 // the list survives a server restart.
 const KNOWN_PLAYERS_KEY = 'known-players'
 
+// Highest level (1-based) the player has won, i.e. caught its monster - 0 if none yet. Levels
+// unlock in order, so this also means every level below it was won.
+function highestWonLevel(progress: PlayerProgress): number {
+  return progress.collectedMonsters.lastIndexOf(true) + 1
+}
+
 function bestTimeKey(checkpoint: number, boardIndex: number): string {
   return `${BEST_TIME_KEY_PREFIX}${checkpoint}-${boardIndex}`
 }
@@ -134,6 +140,12 @@ export async function startServer() {
   let currentWeekId = weekIdFor(Date.now())
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY_PREFIX + currentWeekId)) ?? {}
   let allTime: LeaderboardMap = (await Storage.get<LeaderboardMap>(ALL_TIME_KEY)) ?? (await backfillAllTime())
+  // Per-wallet highestWonLevel for everyone on the all-time board (which includes everyone on the
+  // weekly one), shown as both boards' Level column and used to break score ties. Loaded once here, then kept current by reportMonsterCaught.
+  const levels = new Map<string, number>()
+  await Promise.all(
+    Object.keys(allTime).map(async (address) => levels.set(address, highestWonLevel(await getPlayerProgress(address))))
+  )
 
   // Swaps in the new week's (empty, or whatever another instance already wrote) table once the clock
   // crosses Monday 10:00 UTC. currentWeekId is updated before the await so a second call from the
@@ -143,7 +155,7 @@ export async function startServer() {
     if (weekId === currentWeekId) return
     currentWeekId = weekId
     leaderboard = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY_PREFIX + weekId)) ?? {}
-    broadcastLeaderboard(leaderboard, currentWeekId)
+    broadcastLeaderboard(leaderboard, currentWeekId, levels)
     console.log(`[Server] Leaderboard rolled over to week ${weekId}`)
   }
 
@@ -156,23 +168,24 @@ export async function startServer() {
     leaderboard[address] = { playerName: data.playerName, score: previousScore + data.points }
     const previousAllTimeScore = allTime[address]?.score ?? 0
     allTime[address] = { playerName: data.playerName, score: previousAllTimeScore + data.points }
+    if (!levels.has(address)) levels.set(address, highestWonLevel(await getPlayerProgress(address)))
 
     await Storage.set(LEADERBOARD_KEY_PREFIX + currentWeekId, leaderboard)
     await Storage.set(ALL_TIME_KEY, allTime)
-    broadcastLeaderboard(leaderboard, currentWeekId)
-    broadcastAllTimeLeaderboard(allTime)
+    broadcastLeaderboard(leaderboard, currentWeekId, levels)
+    broadcastAllTimeLeaderboard(allTime, levels)
     room.send('playerNotification', { playerName: data.playerName, address, kind: 'points', amount: data.points, checkpoint: 0 })
     console.log(`[Server] ${data.playerName} (${address}) +${data.points} pts -> ${leaderboard[address].score} (all-time ${allTime[address].score})`)
   })
 
-  broadcastLeaderboard(leaderboard, currentWeekId)
-  broadcastAllTimeLeaderboard(allTime)
+  broadcastLeaderboard(leaderboard, currentWeekId, levels)
+  broadcastAllTimeLeaderboard(allTime, levels)
 
   room.onMessage('requestLeaderboard', (_data, context) => {
     if (!context) return
     trackPlayer(context.from)
-    broadcastLeaderboard(leaderboard, currentWeekId, [context.from])
-    broadcastAllTimeLeaderboard(allTime, [context.from])
+    broadcastLeaderboard(leaderboard, currentWeekId, levels, [context.from])
+    broadcastAllTimeLeaderboard(allTime, levels, [context.from])
   })
 
   room.onMessage('requestMyScore', async (_data, context) => {
@@ -225,6 +238,12 @@ export async function startServer() {
     }
     await Storage.player.set(context.from, PROGRESS_KEY, progress)
     room.send('progressUpdate', progress, { to: [context.from] })
+    const level = highestWonLevel(progress)
+    if (level !== (levels.get(context.from) ?? 0)) {
+      levels.set(context.from, level)
+      if (leaderboard[context.from]) broadcastLeaderboard(leaderboard, currentWeekId, levels)
+      if (allTime[context.from]) broadcastAllTimeLeaderboard(allTime, levels)
+    }
     room.send('playerNotification', { playerName: data.playerName, address: context.from, kind: 'captured', amount: 0, checkpoint: data.checkpoint })
   })
 
@@ -293,7 +312,7 @@ export async function startServer() {
       // so it shows up immediately instead of waiting for the next rollover/restart.
       if (key === LEADERBOARD_KEY_PREFIX + currentWeekId) {
         leaderboard = value
-        broadcastLeaderboard(leaderboard, currentWeekId)
+        broadcastLeaderboard(leaderboard, currentWeekId, levels)
       }
     }
 
@@ -334,18 +353,20 @@ export async function startServer() {
   })
 }
 
-function broadcastLeaderboard(leaderboard: LeaderboardMap, weekId: string, to?: string[]) {
+function broadcastLeaderboard(leaderboard: LeaderboardMap, weekId: string, levels: Map<string, number>, to?: string[]) {
   const entries = Object.entries(leaderboard)
-    .map(([address, entry]) => ({ ...entry, address }))
-    .sort((a, b) => b.score - a.score)
+    .map(([address, entry]) => ({ ...entry, address, level: levels.get(address) ?? 0 }))
+    // Score first; level only breaks ties.
+    .sort((a, b) => b.score - a.score || b.level - a.level)
     .slice(0, LEADERBOARD_TOP_N)
   room.send('leaderboardUpdate', { weekId, entries }, to ? { to } : undefined)
 }
 
-function broadcastAllTimeLeaderboard(allTime: LeaderboardMap, to?: string[]) {
+function broadcastAllTimeLeaderboard(allTime: LeaderboardMap, levels: Map<string, number>, to?: string[]) {
   const entries = Object.entries(allTime)
-    .map(([address, entry]) => ({ ...entry, address }))
-    .sort((a, b) => b.score - a.score)
+    .map(([address, entry]) => ({ ...entry, address, level: levels.get(address) ?? 0 }))
+    // Score first; level only breaks ties.
+    .sort((a, b) => b.score - a.score || b.level - a.level)
     .slice(0, LEADERBOARD_TOP_N)
   room.send('leaderboardAllTimeUpdate', { entries }, to ? { to } : undefined)
 }
