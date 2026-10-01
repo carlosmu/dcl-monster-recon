@@ -32,12 +32,19 @@ const AVATAR_SIZE_PX = 42 // LEADERBOARD_AVATAR_SIZE_PX
 // need more separation than they do on a flat screen to stop reading as one run-on line.
 const AVATAR_GAP_PX = 14
 const FONT_SIZE_PX = 16 // LEADERBOARD_ROW_NAME/SCORE_FONT_SIZE_PX
+// Width added past the desktop row (~4 characters at FONT_SIZE_PX), so a name cut at
+// NAME_MAX_CHARS no longer runs into the level column. Only the panel grows - PX_TO_M stays tied to the desktop row, so text and the
+// other columns keep their size and the level/score columns simply sit further right.
+const NAME_EXTRA_WIDTH_PX = 40
+// Same idea for the score column (~2 characters): widens the panel without moving the level column,
+// so the gap between level and score grows.
+const SCORE_EXTRA_WIDTH_PX = 20
 // Center of the Level column, between the end of a NAME_MAX_CHARS name and
 // the left edge of a 5-6 digit score. No desktop counterpart - the 2D list has no level column.
-const LEVEL_CENTER_PX = 470
+const LEVEL_CENTER_PX = 470 + NAME_EXTRA_WIDTH_PX
 
-const PANEL_WIDTH_M = 3.6
-const PX_TO_M = PANEL_WIDTH_M / ROW_WIDTH_PX
+const PX_TO_M = 3.6 / ROW_WIDTH_PX // a desktop row spans 3.6m
+const PANEL_WIDTH_M = (ROW_WIDTH_PX + NAME_EXTRA_WIDTH_PX + SCORE_EXTRA_WIDTH_PX) * PX_TO_M
 // Extra vertical air on top of the desktop row height. The 2D list is read straight on at arm's
 // length, where its 4px row padding is enough; in-world the rows are read from a distance and at an
 // angle, and that tight spacing runs them together. Only the pitch between rows grows - the profile

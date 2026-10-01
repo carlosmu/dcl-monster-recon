@@ -85,20 +85,26 @@ export const DEBUG_FREEZE_TUTORIAL_CHASE = false
 export const DEBUG_FAKE_LEADERBOARD = false
 
 // Deliberately awkward on purpose: a name long enough to run into the score column, a single-letter
-// name, and a 5-digit score, so the layout is checked at its extremes rather than at a comfortable
-// average. The addresses are placeholders - no profile exists for them, so every row falls back to
-// fallback_profile_pic.png. Swap one for your own wallet to see a real face in the mix.
-export const DEBUG_FAKE_LEADERBOARD_ENTRIES: Array<{ playerName: string; score: number; address: string }> = [
-  { playerName: 'MonsterHunter99', score: 12480, address: '0x1000000000000000000000000000000000000001' },
-  { playerName: 'Luz', score: 9975, address: '0x1000000000000000000000000000000000000002' },
-  { playerName: 'thegreatpumpkinsmasher', score: 8210, address: '0x1000000000000000000000000000000000000003' },
-  { playerName: 'Nyx', score: 7640, address: '0x1000000000000000000000000000000000000004' },
-  { playerName: 'Vittorio', score: 6155, address: '0x1000000000000000000000000000000000000005' },
-  { playerName: 'dcl_wanderer', score: 5030, address: '0x1000000000000000000000000000000000000006' },
-  { playerName: 'Ramona', score: 4415, address: '0x1000000000000000000000000000000000000007' },
-  { playerName: 'K', score: 3200, address: '0x1000000000000000000000000000000000000008' },
-  { playerName: 'PixelPirate', score: 1875, address: '0x1000000000000000000000000000000000000009' },
-  { playerName: 'zzz_lastplace_zzz', score: 640, address: '0x100000000000000000000000000000000000000a' }
+// name, a 5-digit score and both 2-digit and 0 levels, so the layout is checked at its extremes
+// rather than at a comfortable average. The addresses are placeholders - no profile exists for
+// them, so every row falls back to fallback_profile_pic.png. Swap one for your own wallet to see a
+// real face in the mix.
+export const DEBUG_FAKE_LEADERBOARD_ENTRIES: Array<{
+  playerName: string
+  score: number
+  address: string
+  level: number
+}> = [
+  { playerName: 'MonsterHunter99', score: 12480, address: '0x1000000000000000000000000000000000000001', level: 20 },
+  { playerName: 'Luz', score: 9975, address: '0x1000000000000000000000000000000000000002', level: 20 },
+  { playerName: 'thegreatpumpkinsmasher', score: 8210, address: '0x1000000000000000000000000000000000000003', level: 19 },
+  { playerName: 'Nyx', score: 7640, address: '0x1000000000000000000000000000000000000004', level: 15 },
+  { playerName: 'Vittorio', score: 6155, address: '0x1000000000000000000000000000000000000005', level: 12 },
+  { playerName: 'dcl_wanderer', score: 5030, address: '0x1000000000000000000000000000000000000006', level: 9 },
+  { playerName: 'Ramona', score: 4415, address: '0x1000000000000000000000000000000000000007', level: 7 },
+  { playerName: 'K', score: 3200, address: '0x1000000000000000000000000000000000000008', level: 3 },
+  { playerName: 'PixelPirate', score: 1875, address: '0x1000000000000000000000000000000000000009', level: 1 },
+  { playerName: 'zzz_lastplace_zzz', score: 640, address: '0x100000000000000000000000000000000000000a', level: 0 }
 ]
 
 // Debug layout border colors at 100% opacity, so they're clearly visible outlining containers.
