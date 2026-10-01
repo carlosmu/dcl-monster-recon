@@ -19,3 +19,6 @@ README.md
 *.rar
 *.md
 src
+
+# Local storage backups (player wallets/progress) - never deploy
+backups

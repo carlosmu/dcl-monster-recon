@@ -3,7 +3,7 @@ import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 
 // Full-screen image shown on scene start: holds fully opaque, then fades out and is removed.
-const SPLASH_IMAGE = 'assets/images/thumbnail-halloween.png'
+const SPLASH_IMAGE = 'assets/images/thumbnail.png'
 const SPLASH_HOLD_S = 2
 const SPLASH_FADE_S = 2
 

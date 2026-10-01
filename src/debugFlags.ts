@@ -42,7 +42,7 @@ export const DEBUG_DUMP_BEST_TIMES = true
 // consolidate all leaderboard/progress/best-time data into one dated snapshot key (server ignores
 // the request unless the caller is OWNER_ADDRESS in server.ts). Flip to true, load the scene as the
 // owner wallet, check the console for the resulting key, then flip back to false.
-export const DEBUG_TRIGGER_BACKUP = false
+export const DEBUG_TRIGGER_BACKUP = true
 
 // TEMP (carlosmu.dcl.eth -> monsterrecon.dcl.eth migration): fires requestRestore once on scene
 // load, which asks the server to replay migrationSnapshot.json into this world's storage (server
