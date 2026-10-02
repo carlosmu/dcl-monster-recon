@@ -141,11 +141,29 @@ export async function startServer() {
   let leaderboard: LeaderboardMap = (await Storage.get<LeaderboardMap>(LEADERBOARD_KEY_PREFIX + currentWeekId)) ?? {}
   let allTime: LeaderboardMap = (await Storage.get<LeaderboardMap>(ALL_TIME_KEY)) ?? (await backfillAllTime())
   // Per-wallet highestWonLevel for everyone on the all-time board (which includes everyone on the
-  // weekly one), shown as both boards' Level column and used to break score ties. Loaded once here, then kept current by reportMonsterCaught.
+  // weekly one), shown as both boards' Level column and used to break score ties. Kept current by
+  // reportMonsterCaught; a wallet not loaded yet just shows 0.
   const levels = new Map<string, number>()
-  await Promise.all(
-    Object.keys(allTime).map(async (address) => levels.set(address, highestWonLevel(await getPlayerProgress(address))))
-  )
+
+  // Never throws: a failed read leaves the wallet at 0 and is dropped from progressCache, so the
+  // next getPlayerProgress retries instead of reusing the rejected promise.
+  async function loadLevel(address: string): Promise<void> {
+    try {
+      levels.set(address, highestWonLevel(await getPlayerProgress(address)))
+    } catch (error) {
+      progressCache.delete(address)
+      console.log(`[Server] Could not load level for ${address}: ${error}`)
+    }
+  }
+
+  // In the background, one wallet at a time, so the handlers below are registered (and the boards
+  // answer) right away instead of waiting on ~100 player-storage reads. Re-broadcasts once done.
+  void (async () => {
+    for (const address of Object.keys(allTime)) await loadLevel(address)
+    broadcastLeaderboard(leaderboard, currentWeekId, levels)
+    broadcastAllTimeLeaderboard(allTime, levels)
+    console.log(`[Server] Levels loaded for ${levels.size} player(s)`)
+  })()
 
   // Swaps in the new week's (empty, or whatever another instance already wrote) table once the clock
   // crosses Monday 10:00 UTC. currentWeekId is updated before the await so a second call from the
@@ -168,7 +186,7 @@ export async function startServer() {
     leaderboard[address] = { playerName: data.playerName, score: previousScore + data.points }
     const previousAllTimeScore = allTime[address]?.score ?? 0
     allTime[address] = { playerName: data.playerName, score: previousAllTimeScore + data.points }
-    if (!levels.has(address)) levels.set(address, highestWonLevel(await getPlayerProgress(address)))
+    if (!levels.has(address)) await loadLevel(address)
 
     await Storage.set(LEADERBOARD_KEY_PREFIX + currentWeekId, leaderboard)
     await Storage.set(ALL_TIME_KEY, allTime)
