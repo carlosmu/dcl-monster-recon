@@ -156,10 +156,18 @@ export async function startServer() {
     }
   }
 
-  // In the background, one wallet at a time, so the handlers below are registered (and the boards
-  // answer) right away instead of waiting on ~100 player-storage reads. Re-broadcasts once done.
+  // The wallets actually shown on either board (top N by score) load first, in parallel - at most
+  // 2 x LEADERBOARD_TOP_N reads - and requestLeaderboard waits on this, so a player joining right
+  // after a restart sees real levels instead of a board full of 0s.
+  const shownLevelsLoaded = Promise.all(
+    [...new Set([...topAddresses(leaderboard), ...topAddresses(allTime)])].map(loadLevel)
+  )
+
+  // Then everyone else in the background, one wallet at a time, so the handlers below are registered
+  // right away instead of waiting on ~100 player-storage reads. Re-broadcasts once done.
   void (async () => {
-    for (const address of Object.keys(allTime)) await loadLevel(address)
+    await shownLevelsLoaded
+    for (const address of Object.keys(allTime)) if (!levels.has(address)) await loadLevel(address)
     broadcastLeaderboard(leaderboard, currentWeekId, levels)
     broadcastAllTimeLeaderboard(allTime, levels)
     console.log(`[Server] Levels loaded for ${levels.size} player(s)`)
@@ -196,12 +204,15 @@ export async function startServer() {
     console.log(`[Server] ${data.playerName} (${address}) +${data.points} pts -> ${leaderboard[address].score} (all-time ${allTime[address].score})`)
   })
 
-  broadcastLeaderboard(leaderboard, currentWeekId, levels)
-  broadcastAllTimeLeaderboard(allTime, levels)
+  void shownLevelsLoaded.then(() => {
+    broadcastLeaderboard(leaderboard, currentWeekId, levels)
+    broadcastAllTimeLeaderboard(allTime, levels)
+  })
 
-  room.onMessage('requestLeaderboard', (_data, context) => {
+  room.onMessage('requestLeaderboard', async (_data, context) => {
     if (!context) return
     trackPlayer(context.from)
+    await shownLevelsLoaded
     broadcastLeaderboard(leaderboard, currentWeekId, levels, [context.from])
     broadcastAllTimeLeaderboard(allTime, levels, [context.from])
   })
@@ -369,6 +380,14 @@ export async function startServer() {
       void rolloverIfNeeded()
     }
   })
+}
+
+// Addresses of the top LEADERBOARD_TOP_N by score - the rows a board actually shows.
+function topAddresses(board: LeaderboardMap): string[] {
+  return Object.entries(board)
+    .sort(([, a], [, b]) => b.score - a.score)
+    .slice(0, LEADERBOARD_TOP_N)
+    .map(([address]) => address)
 }
 
 function broadcastLeaderboard(leaderboard: LeaderboardMap, weekId: string, levels: Map<string, number>, to?: string[]) {
