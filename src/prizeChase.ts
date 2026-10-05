@@ -20,7 +20,6 @@ import {
   type DeepReadonlyObject
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Color4 } from '@dcl/sdk/math'
-import { isMobile } from '@dcl/sdk/platform'
 import { getWorldPosition, timers } from '@dcl-sdk/utils'
 import { EntityNames } from '../assets/scene/entity-names'
 import { guard } from './errorTrap'
@@ -91,12 +90,9 @@ function applyPrizeIcon(entity: Entity) {
   const { image, gridCols, gridRows, localIndex } = currentIcon
   const col = localIndex % gridCols
   const row = Math.floor(localIndex / gridCols)
-  // The two renderers disagree on where V=0 sits. In the desktop Explorer it's the BOTTOM of the
-  // texture, so row 0 (A1, the sheet's top row) has to be flipped to land on the right cell - the
-  // same top-row flip the 2D UI's getUvsForPrizeQuadrant does. The mobile (Godot) renderer puts
-  // V=0 at the TOP, so applying that flip there mirrors the sheet vertically: A1 lands on the
-  // bottom row and every row is off. Only this axis differs; the column math is identical on both.
-  const rowOffset = isMobile() ? row / gridRows : (gridRows - row - 1) / gridRows
+  // V=0 is the BOTTOM of the texture, so row 0 (A1, the sheet's top row) has to be flipped to land
+  // on the right cell - the same top-row flip the 2D UI's getUvsForPrizeQuadrant does.
+  const rowOffset = (gridRows - row - 1) / gridRows
   const iconTexture = Material.Texture.Common({
     src: image,
     offset: Vector2.create(col / gridCols, rowOffset),

@@ -11,7 +11,6 @@ import {
   type Entity
 } from '@dcl/sdk/ecs'
 import { Vector3, Vector2, Color3, Quaternion } from '@dcl/sdk/math'
-import { isMobile } from '@dcl/sdk/platform'
 import { getWorldPosition } from '@dcl-sdk/utils'
 import { movePlayerTo } from '~system/RestrictedActions'
 import { EntityNames } from '../assets/scene/entity-names'
@@ -79,13 +78,10 @@ export function setupTutorialChase() {
   })
 }
 
-// Same top-row V-flip split as applyPrizeIcon in prizeChase.ts: the desktop Explorer and the mobile
-// (Godot) renderer disagree on which end of the texture V=0 sits at. Generalized here for a
-// multi-row span (applyPrizeIcon only ever crops a single grid cell).
+// Same top-row V-flip as applyPrizeIcon in prizeChase.ts (V=0 is the bottom of the texture).
+// Generalized here for a multi-row span (applyPrizeIcon only ever crops a single grid cell).
 function buildMonsterDialogMaterial() {
-  const rowOffset = isMobile()
-    ? MONSTER_DIALOG_UV_ROW / MONSTER_DIALOG_UVS_GRID
-    : (MONSTER_DIALOG_UVS_GRID - MONSTER_DIALOG_UV_ROW - MONSTER_DIALOG_UV_ROW_SPAN) / MONSTER_DIALOG_UVS_GRID
+  const rowOffset = (MONSTER_DIALOG_UVS_GRID - MONSTER_DIALOG_UV_ROW - MONSTER_DIALOG_UV_ROW_SPAN) / MONSTER_DIALOG_UVS_GRID
   const texture = Material.Texture.Common({
     src: MONSTER_DIALOG_IMAGE,
     offset: Vector2.create(MONSTER_DIALOG_UV_COL / MONSTER_DIALOG_UVS_GRID, rowOffset),
