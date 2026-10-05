@@ -2866,7 +2866,12 @@ const MemoryMatchUi = () => (
             </UiEntity>
           )}
           {toastPhase === 'monsterCollected' && (
-            <BitmapText text="Monster Collected!" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
+            <BitmapText
+              text={`${MONSTER_NAMES[currentCheckpoint - 1] ?? 'Monster'} Collected!`}
+              font={GERM_ONE_FONT}
+              image={GERM_ONE_IMAGE}
+              fontSize={28}
+            />
           )}
           {toastPhase === 'monsterNotCollected' && (
             <BitmapText text="Monster Not Collected" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
