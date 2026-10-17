@@ -84,6 +84,10 @@ export const DEBUG_FREEZE_TUTORIAL_CHASE = false
 // so adoptLeaderboardScore never matches one and the header score is left alone.
 export const DEBUG_FAKE_LEADERBOARD = false
 
+// Visual-only: always shows the Weekly Rewards button's pulsing glow and "!" badge, regardless of
+// whether a level was completed today or the week's mission is done - for checking how they look.
+export const DEBUG_FORCE_WEEKLY_REWARDS_HINTS = true
+
 // Deliberately awkward on purpose: a name long enough to run into the score column, a single-letter
 // name, a 5-digit score and both 2-digit and 0 levels, so the layout is checked at its extremes
 // rather than at a comfortable average. The addresses are placeholders - no profile exists for

@@ -54,7 +54,7 @@ import { SpiderRain } from './spider'
 import { BatRain } from './bat'
 import { Splash } from './splash'
 import { setMaxCritters } from './critterRain'
-import { setupWeeklyRewards, WeeklyRewardsUi } from './weeklyRewards'
+import { setupWeeklyRewards, WeeklyRewardsUi, isWeeklyRewardsPanelOpen } from './weeklyRewards'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -785,12 +785,18 @@ const PLAY_GLOW_UVS = getUvsForBlock(0, 6, 4, 2, BACK_ATLAS_GRID) // A7-D8 - sam
 const SCORE_ICON_UVS = getUvsForBlock(6, 4, 2, 2, BACK_ATLAS_GRID) // G5-H6
 const TIMER_ICON_UVS = getUvsForBlock(4, 4, 2, 2, BACK_ATLAS_GRID) // E5-F6
 const CLOSE_BUTTON_UVS = getUvsForBlock(4, 1, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E2
+const WEEKLY_REWARDS_BUTTON_UVS = getUvsForBlock(4, 0, 4, 1, BACK_ATLAS_GRID) // atlas_02.png E1-H1
+const WEEKLY_REWARDS_ICON_UVS = getUvsForBlock(0, 0, 2, 2, BACK_ATLAS_GRID) // atlas_02.png A1-B2
+const WEEKLY_REWARDS_GLOW_UVS = getUvsForBlock(4, 5, 4, 1, BACK_ATLAS_GRID) // atlas_02.png E6-H6
+const WEEKLY_REWARDS_BADGE_UVS = getUvsForBlock(4, 3, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E4
+const WEEKLY_REWARDS_CLAIM_UVS = getUvsForBlock(5, 6, 3, 1, BACK_ATLAS_GRID) // atlas_02.png F7-H7
 const MUSIC_ON_UVS = getUvsForBlock(4, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E3
 const MUSIC_OFF_UVS = getUvsForBlock(5, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png F3
 const LOCK_ICON_UVS = getUvsForBlock(6, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png G3
 const COUNTDOWN_BACKGROUND_UVS = getUvsForBlock(6, 2, 2, 2, BACK_ATLAS_GRID) // atlas_01.png G3-H4
 // Backs the active pip in the board-progression bar - a single cell, unlike the countdown's 2x2.
 const BOARD_PROGRESS_PIP_UVS = getUvsForBlock(6, 6, 1, 1, BACK_ATLAS_GRID) // atlas_01.png G7
+const CALENDAR_ICON_UVS = getUvsForBlock(4, 6, 2, 2, BACK_ATLAS_GRID) // atlas_01.png E7-F8
 
 interface CellState {
   frontQuadrant: number
@@ -1981,7 +1987,7 @@ const MemoryMatchUi = () => (
           borderColor: DEBUG_BORDER_RED
         }}
       >
-        {screen === 'hidden' && playerInPlayArea &&
+        {screen === 'hidden' && playerInPlayArea && !isWeeklyRewardsPanelOpen() &&
           (() => {
             const pulseScale = getPlayButtonPulseScale()
             const pulseWidth = getPlayButtonWidthPx() * pulseScale
@@ -2892,7 +2898,16 @@ const MemoryMatchUi = () => (
       framePadding={getFramePaddingPx()}
       closeButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
       closeButtonSize={CLOSE_BUTTON_SIZE_PX}
-      textColor={SCREEN_TEXT_COLOR}
+      calendarIconBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CALENDAR_ICON_UVS }}
+      entryButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BUTTON_UVS }}
+      entryButtonIcon={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_ICON_UVS }}
+      entryButtonGlow={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_GLOW_UVS }}
+      entryButtonBadge={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BADGE_UVS }}
+      claimButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CLAIM_UVS }}
+      renderSpinner={renderSpinner}
+      // Same top inset (canvas_main's top padding) and height as the header's score box/icons.
+      hudTop={CANVAS_MAIN_PADDING_PX}
+      hudHeight={HEADER_RIGHT_ICON_SIZE_PX}
     />
 
     {/* Cinema-style letterbox bars for the checkpoint-1 tutorial cinematic (see tutorialChase.ts) -
