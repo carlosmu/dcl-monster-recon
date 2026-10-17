@@ -54,6 +54,7 @@ import { SpiderRain } from './spider'
 import { BatRain } from './bat'
 import { Splash } from './splash'
 import { setMaxCritters } from './critterRain'
+import { setupWeeklyRewards, WeeklyRewardsUi } from './weeklyRewards'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -1447,6 +1448,8 @@ export function setupUi() {
     }
   }))
   room.send('requestProgress', {})
+
+  setupWeeklyRewards()
 
   if (DEBUG_DUMP_BEST_TIMES) {
     room.onMessage('allBestTimesUpdate', (data) => {
@@ -2879,6 +2882,18 @@ const MemoryMatchUi = () => (
         </UiEntity>
       </UiEntity>
     )}
+
+    <WeeklyRewardsUi
+      frameBackground={{
+        textureMode: 'nine-slices',
+        texture: { src: BOARD_FRAME_IMAGE },
+        textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+      }}
+      framePadding={getFramePaddingPx()}
+      closeButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
+      closeButtonSize={CLOSE_BUTTON_SIZE_PX}
+      textColor={SCREEN_TEXT_COLOR}
+    />
 
     {/* Cinema-style letterbox bars for the checkpoint-1 tutorial cinematic (see tutorialChase.ts) -
     last sibling so it draws over everything else, full-screen (not just canvas_main). */}

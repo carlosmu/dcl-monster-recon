@@ -6,6 +6,7 @@ import checkpointsData from '../checkpoints.json'
 // via requestBackup, replayed into this world's storage by requestRestore below. Remove this
 // import, migrationSnapshot.json, and the requestRestore handler once the migration is confirmed.
 import migrationSnapshotJson from './migrationSnapshot.json'
+import { WEEKLY_REQUIRED_DAYS, WeeklyRewardsRecord, claimWeeklyReward, dayIdFor, getWeeklyRecord, registerLevelComplete } from './weeklyRewards'
 
 // One leaderboard per week, each under its own key. Past weeks are simply never read again - they
 // stay archived in storage for a future history screen or prize payout.
@@ -274,6 +275,25 @@ export async function startServer() {
       if (allTime[context.from]) broadcastAllTimeLeaderboard(allTime, levels)
     }
     room.send('playerNotification', { playerName: data.playerName, address: context.from, kind: 'captured', amount: 0, checkpoint: data.checkpoint })
+    // Catching the monster is what completes a level (same definition as highestWonLevel), so it's
+    // also the only thing that counts today toward Weekly Rewards - entering the scene, opening the
+    // panel or starting a level without finishing it never reaches here.
+    const now = Date.now()
+    sendWeeklyRewards(context.from, await registerLevelComplete(context.from, weekIdFor(now), dayIdFor(now)))
+  })
+
+  room.onMessage('requestWeeklyRewards', async (_data, context) => {
+    if (!context) return
+    trackPlayer(context.from)
+    sendWeeklyRewards(context.from, await getWeeklyRecord(context.from, weekIdFor(Date.now())))
+  })
+
+  room.onMessage('claimWeeklyReward', async (data, context) => {
+    if (!context) return
+    trackPlayer(context.from)
+    const weekId = weekIdFor(Date.now())
+    room.send('weeklyRewardClaimResult', await claimWeeklyReward(context.from, data.playerName, weekId), { to: [context.from] })
+    sendWeeklyRewards(context.from, await getWeeklyRecord(context.from, weekId))
   })
 
   room.onMessage('requestProgress', async (_data, context) => {
@@ -380,6 +400,11 @@ export async function startServer() {
       void rolloverIfNeeded()
     }
   })
+}
+
+function sendWeeklyRewards(address: string, record: WeeklyRewardsRecord) {
+  const { weekId, completedDays, progress, claimed } = record
+  room.send('weeklyRewardsUpdate', { weekId, completedDays, progress, requiredDays: WEEKLY_REQUIRED_DAYS, claimed }, { to: [address] })
 }
 
 // Addresses of the top LEADERBOARD_TOP_N by score - the rows a board actually shows.

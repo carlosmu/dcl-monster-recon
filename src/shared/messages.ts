@@ -75,6 +75,23 @@ export const Messages = {
     collectedMonsters: Schemas.Array(Schemas.Boolean),
     collectionCounts: Schemas.Array(Schemas.Number)
   }),
+  // Client -> Server: ask for the caller's Weekly Rewards status for the current week (scene load
+  // and every time the panel is opened). Day participation itself is never sent by the client - the
+  // server registers it on reportMonsterCaught (a level completed), see weeklyRewards.ts.
+  requestWeeklyRewards: Schemas.Map({}),
+  // Server -> Client: the caller's Weekly Rewards status. completedDays are UTC dates (YYYY-MM-DD),
+  // progress is their count capped at requiredDays.
+  weeklyRewardsUpdate: Schemas.Map({
+    weekId: Schemas.String,
+    completedDays: Schemas.Array(Schemas.String),
+    progress: Schemas.Number,
+    requiredDays: Schemas.Number,
+    claimed: Schemas.Boolean
+  }),
+  // Client -> Server: try to claim this week's reward. The server validates progress/claimed.
+  claimWeeklyReward: Schemas.Map({ playerName: Schemas.String }),
+  // Server -> Client: outcome of claimWeeklyReward, message is shown as-is.
+  weeklyRewardClaimResult: Schemas.Map({ success: Schemas.Boolean, claimed: Schemas.Boolean, message: Schemas.String }),
   // TEMP (duration calibration): Client -> Server, ask for every bestTime-* entry the caller has
   // recorded, so they can be dumped to console after a full playthrough and used to recalibrate
   // each board's `duration` in checkpoints.json. Remove once calibration is done.
