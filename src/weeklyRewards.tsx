@@ -5,7 +5,7 @@ import { getPlayer } from '@dcl/sdk/players'
 import { timers } from '@dcl-sdk/utils'
 import { room } from './shared/messages'
 import { guard } from './errorTrap'
-import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN } from './bitmapFont'
+import { BitmapText, GERM_ONE_FONT, GERM_ONE_IMAGE, GERM_ONE_IMAGE_BROWN, GERM_ONE_IMAGE_RED } from './bitmapFont'
 import { DEBUG_FORCE_WEEKLY_REWARDS_HINTS } from './debugFlags'
 
 // Weekly Rewards MVP: codex frame + bitmap font, solid-color buttons. All validation
@@ -25,6 +25,8 @@ let elapsedTime = 0
 let requiredDays = 2
 let claiming = false
 let message: string | null = null
+// Errors (e.g. claiming before the mission is complete) show in red instead of the usual brown.
+let messageIsError = false
 let loadTimeout: number | null = null
 
 // 3:1, same as the atlas_02 F7:H7 art.
@@ -91,11 +93,13 @@ function claim() {
     if (!claiming) return
     claiming = false
     message = 'Could not reach the server. Try again.'
+    messageIsError = true
   }, LOAD_TIMEOUT_MS)
   room.send('claimWeeklyReward', { playerName: getPlayer()?.name ?? 'Unknown' })
 }
 
-export function setupWeeklyRewards() {
+// onClaimed: fired once when the server confirms a successful claim (ui.tsx plays the celebration).
+export function setupWeeklyRewards(onClaimed: () => void) {
   room.onMessage('weeklyRewardsUpdate', (data) => guard('weeklyRewardsUpdate', () => {
     if (loadTimeout !== null) {
       timers.clearTimeout(loadTimeout)
@@ -109,6 +113,8 @@ export function setupWeeklyRewards() {
   room.onMessage('weeklyRewardClaimResult', (data) => guard('weeklyRewardClaimResult', () => {
     claiming = false
     message = data.message
+    messageIsError = !data.success && !data.claimed
+    if (data.success) onClaimed()
     if (data.claimed) state = 'claimed'
   }))
   engine.addSystem((dt: number) => {
@@ -319,7 +325,7 @@ export const WeeklyRewardsUi = (props: WeeklyRewardsUiProps) => (
             <BitmapText
               text={message}
               font={GERM_ONE_FONT}
-              image={GERM_ONE_IMAGE_BROWN}
+              image={messageIsError ? GERM_ONE_IMAGE_RED : GERM_ONE_IMAGE_BROWN}
               fontSize={22}
               maxWidth={600}
               align="center"

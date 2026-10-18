@@ -1455,7 +1455,11 @@ export function setupUi() {
   }))
   room.send('requestProgress', {})
 
-  setupWeeklyRewards()
+  setupWeeklyRewards(() => {
+    // Same celebration moment as catching a monster, with the money emote. Walking stays free.
+    playPrizeSound()
+    triggerCelebrationCamera('money', 0, false)
+  })
 
   if (DEBUG_DUMP_BEST_TIMES) {
     room.onMessage('allBestTimesUpdate', (data) => {

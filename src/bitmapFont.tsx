@@ -193,6 +193,8 @@ export const GERM_ONE_IMAGE = 'assets/images/germ_one.png'
 // isn't honored on mobile - see BitmapText's `image` doc below - so any bitmap text that needs a
 // fixed, non-white color must use a baked variant like this instead of tinting GERM_ONE_IMAGE.
 export const GERM_ONE_IMAGE_BROWN = 'assets/images/germ_one_brown.png'
+// Same again, pre-tinted red (germ_one.png multiplied by #be1e1e) for error messages.
+export const GERM_ONE_IMAGE_RED = 'assets/images/germ_one_red.png'
 
 // uvs go bottom-left, top-left, top-right, bottom-right (clockwise), per PBUiBackground - same
 // convention as getUvsForBlock in ui.tsx. The .fnt's x/y are pixel coords from the sheet's
