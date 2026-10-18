@@ -30,7 +30,6 @@ let loadTimeout: number | null = null
 // 3:1, same as the atlas_02 F7:H7 art.
 const CLAIM_BUTTON_WIDTH_PX = 240
 const CLAIM_BUTTON_HEIGHT_PX = 80
-const PROGRESS_BAR_BG_COLOR = Color4.create(0.25, 0.25, 0.25, 1)
 // Entry button width:height - 65% of the width of the atlas_02 E1:H1 art (4:1). Its height and top inset come from
 // the HUD (props.hudHeight / props.hudTop) so it lines up with the score box and header icons.
 const ENTRY_BUTTON_ASPECT = 4 * 0.65
@@ -43,7 +42,20 @@ const ENTRY_GLOW_PERIOD = 4 // seconds
 // "!" badge over the entry button's right edge, vertically centered, sticking out by a third of its size.
 const ENTRY_BADGE_SIZE_PX = 40
 
-const PROGRESS_BAR_FILL_COLOR = Color4.create(0.3, 0.75, 0.35, 1)
+// Progress bar: flat UI only (no textures). Wooden frame + warm dark track, and a fill whose
+// greens match the Claim button art (atlas_02 F7:H7). There's no gradient support, so the fill's
+// vertical gradient is faked by stacking rounded layers, darkest at the bottom.
+const PROGRESS_BAR_WIDTH_PX = 400
+const PROGRESS_BAR_HEIGHT_PX = 18
+const PROGRESS_BAR_BORDER_PX = 2
+const PROGRESS_BAR_INNER_RADIUS_PX = PROGRESS_BAR_HEIGHT_PX / 2 - PROGRESS_BAR_BORDER_PX
+const PROGRESS_BAR_FRAME_COLOR = Color4.create(0.33, 0.18, 0.08, 1)
+const PROGRESS_BAR_TRACK_COLOR = Color4.create(0.2, 0.11, 0.05, 1)
+const PROGRESS_BAR_INNER_SHADOW_COLOR = Color4.create(0, 0, 0, 0.35)
+const PROGRESS_BAR_FILL_DARK_COLOR = Color4.create(0.13, 0.42, 0.1, 1)
+const PROGRESS_BAR_FILL_MID_COLOR = Color4.create(0.24, 0.6, 0.16, 1)
+const PROGRESS_BAR_FILL_LIGHT_COLOR = Color4.create(0.42, 0.76, 0.28, 1)
+const PROGRESS_BAR_HIGHLIGHT_COLOR = Color4.create(1, 1, 1, 0.3)
 
 function requestStatus() {
   // Already-loaded states keep showing their last value while the refresh is in flight.
@@ -254,27 +266,53 @@ export const WeeklyRewardsUi = (props: WeeklyRewardsUiProps) => (
           <BitmapText text="Weekly Rewards" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={40} />
           <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center', margin: { top: 16 } }}>
             <UiEntity
-              uiTransform={{ width: 96, height: 96, flexShrink: 0, margin: { right: 16 } }}
+              uiTransform={{ width: 192, height: 192, flexShrink: 0, margin: { right: 16 } }}
               uiBackground={props.calendarIconBackground}
             />
             <BitmapText
-              text={'Visit Monster Recon on 2 different days this week.\nComplete at least 1 level each day to count your visit.'}
+              text={'Visit Monster Recon on 2 different days this week.\n\nComplete at least 1 level each day to count your visit.'}
               fontSize={22}
               font={GERM_ONE_FONT}
               image={GERM_ONE_IMAGE_BROWN}
-              maxWidth={480}
+              maxWidth={416}
             />
           </UiEntity>
           <BitmapText text={getProgressText()} font={GERM_ONE_FONT} image={GERM_ONE_IMAGE_BROWN} fontSize={26} uiTransform={{ margin: { top: 24 } }} />
           {state !== 'loading' && state !== 'error' && (
             <UiEntity
-              uiTransform={{ width: 400, height: 16, margin: { top: 12 }, borderRadius: 8 }}
-              uiBackground={{ color: PROGRESS_BAR_BG_COLOR }}
+              uiTransform={{
+                width: PROGRESS_BAR_WIDTH_PX,
+                height: PROGRESS_BAR_HEIGHT_PX,
+                margin: { top: 12 },
+                borderRadius: PROGRESS_BAR_HEIGHT_PX / 2,
+                borderWidth: PROGRESS_BAR_BORDER_PX,
+                borderColor: PROGRESS_BAR_FRAME_COLOR
+              }}
+              uiBackground={{ color: PROGRESS_BAR_TRACK_COLOR }}
             >
+              {/* Inner shadow along the track's top edge; the fill draws over it. */}
               <UiEntity
-                uiTransform={{ width: `${(Math.min(progress, requiredDays) / requiredDays) * 100}%`, height: '100%', borderRadius: 8 }}
-                uiBackground={{ color: PROGRESS_BAR_FILL_COLOR }}
+                uiTransform={{ positionType: 'absolute', position: { top: 0, left: 0 }, width: '100%', height: 4, borderRadius: PROGRESS_BAR_INNER_RADIUS_PX }}
+                uiBackground={{ color: PROGRESS_BAR_INNER_SHADOW_COLOR }}
               />
+              <UiEntity
+                uiTransform={{ width: `${(Math.min(progress, requiredDays) / requiredDays) * 100}%`, height: '100%', borderRadius: PROGRESS_BAR_INNER_RADIUS_PX }}
+                uiBackground={{ color: PROGRESS_BAR_FILL_DARK_COLOR }}
+              >
+                <UiEntity
+                  uiTransform={{ positionType: 'absolute', position: { top: 0, left: 0 }, width: '100%', height: '70%', borderRadius: PROGRESS_BAR_INNER_RADIUS_PX }}
+                  uiBackground={{ color: PROGRESS_BAR_FILL_MID_COLOR }}
+                />
+                <UiEntity
+                  uiTransform={{ positionType: 'absolute', position: { top: 0, left: 0 }, width: '100%', height: '40%', borderRadius: PROGRESS_BAR_INNER_RADIUS_PX }}
+                  uiBackground={{ color: PROGRESS_BAR_FILL_LIGHT_COLOR }}
+                />
+                {/* Glossy highlight, inset from the rounded ends. */}
+                <UiEntity
+                  uiTransform={{ positionType: 'absolute', position: { top: 2, left: 4, right: 4 }, height: 3, borderRadius: 2 }}
+                  uiBackground={{ color: PROGRESS_BAR_HIGHLIGHT_COLOR }}
+                />
+              </UiEntity>
             </UiEntity>
           )}
           {message !== null && (
