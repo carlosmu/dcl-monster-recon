@@ -1,4 +1,4 @@
-import ReactEcs, { UiEntity, UiBackgroundProps } from '@dcl/sdk/react-ecs'
+import ReactEcs, { UiEntity, UiBackgroundProps, Label } from '@dcl/sdk/react-ecs'
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { getPlayer } from '@dcl/sdk/players'
@@ -32,6 +32,9 @@ let loadTimeout: number | null = null
 // 3:1, same as the atlas_02 F7:H7 art.
 const CLAIM_BUTTON_WIDTH_PX = 240
 const CLAIM_BUTTON_HEIGHT_PX = 80
+// Same reset note as the leaderboard (LEADERBOARD_RESET_NOTE_FONT_SIZE_PX / SCREEN_TEXT_COLOR in ui.tsx).
+const RESET_NOTE_FONT_SIZE_PX = 18
+const RESET_NOTE_COLOR = Color4.fromHexString('#2c180b')
 // Entry button width:height - 65% of the width of the atlas_02 E1:H1 art (4:1). Its height and top inset come from
 // the HUD (props.hudHeight / props.hudTop) so it lines up with the score box and header icons.
 const ENTRY_BUTTON_ASPECT = 4 * 0.65
@@ -360,13 +363,22 @@ export const WeeklyRewardsUi = (props: WeeklyRewardsUiProps) => (
               </UiEntity>
             ) : (
               // Always pressable once loaded - the server answers with why a claim isn't allowed yet.
-              <Button
-                label={claiming ? 'Claiming...' : 'Claim Reward'}
-                background={props.claimButtonBackground}
-                width={CLAIM_BUTTON_WIDTH_PX}
-                height={CLAIM_BUTTON_HEIGHT_PX}
-                onPress={claim}
-              />
+              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+                <Button
+                  label={claiming ? 'Claiming...' : 'Claim Reward'}
+                  background={props.claimButtonBackground}
+                  width={CLAIM_BUTTON_WIDTH_PX}
+                  height={CLAIM_BUTTON_HEIGHT_PX}
+                  onPress={claim}
+                />
+                <Label
+                  value="*Resets every Monday at 10AM UTC."
+                  fontSize={RESET_NOTE_FONT_SIZE_PX}
+                  color={RESET_NOTE_COLOR}
+                  textAlign="middle-center"
+                  uiTransform={{ margin: { top: 12 } }}
+                />
+              </UiEntity>
             )}
           </UiEntity>
         </UiEntity>
