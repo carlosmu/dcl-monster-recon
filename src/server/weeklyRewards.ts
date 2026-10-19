@@ -87,7 +87,7 @@ export async function claimWeeklyReward(address: string, playerName: string, wee
   const record = await getWeeklyRecord(address, weekId)
   if (record.claimed) return { success: false, claimed: true, message: 'Reward already claimed this week.' }
   if (record.progress < WEEKLY_REQUIRED_DAYS) {
-    return { success: false, claimed: false, message: 'You must complete the weekly mission first.' }
+    return { success: false, claimed: false, message: 'Complete the mission to claim your reward' }
   }
   // Flipped before any await, so a second claim racing this one sees claimed === true and is rejected.
   const now = Date.now()

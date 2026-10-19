@@ -281,7 +281,7 @@ export const WeeklyRewardsUi = (props: WeeklyRewardsUiProps) => (
               uiBackground={props.calendarIconBackground}
             />
             <BitmapText
-              text={'Visit Monster Recon on 2 different days this week.\n\nComplete at least 1 level each day to count your visit.'}
+              text={'Mission of the week:\n\nComplete at least 1 level on 2 different days this week.'}
               fontSize={22}
               font={GERM_ONE_FONT}
               image={GERM_ONE_IMAGE_BROWN}
