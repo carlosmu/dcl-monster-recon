@@ -70,7 +70,8 @@ function requestStatus() {
   room.send('requestWeeklyRewards', {})
 }
 
-function openPanel() {
+// Exported so ui.tsx can bring the panel back once the claim celebration ends.
+export function openPanel() {
   panelOpen = true
   message = null
   requestStatus()
@@ -99,6 +100,7 @@ function claim() {
 }
 
 // onClaimed: fired once when the server confirms a successful claim (ui.tsx plays the celebration).
+// The panel closes first so the celebration's centered icon and toast aren't hidden behind it.
 export function setupWeeklyRewards(onClaimed: () => void) {
   room.onMessage('weeklyRewardsUpdate', (data) => guard('weeklyRewardsUpdate', () => {
     if (loadTimeout !== null) {
@@ -114,7 +116,10 @@ export function setupWeeklyRewards(onClaimed: () => void) {
     claiming = false
     message = data.message
     messageIsError = !data.success && !data.claimed
-    if (data.success) onClaimed()
+    if (data.success) {
+      closePanel()
+      onClaimed()
+    }
     if (data.claimed) state = 'claimed'
   }))
   engine.addSystem((dt: number) => {
@@ -333,14 +338,36 @@ export const WeeklyRewardsUi = (props: WeeklyRewardsUiProps) => (
             />
           )}
           <UiEntity uiTransform={{ flexDirection: 'row', margin: { top: 24 } }}>
-            {/* Always pressable once loaded - the server answers with why a claim isn't allowed yet. */}
-            <Button
-              label={claiming ? 'Claiming...' : state === 'claimed' ? 'Claimed' : 'Claim Reward'}
-              background={props.claimButtonBackground}
-              width={CLAIM_BUTTON_WIDTH_PX}
-              height={CLAIM_BUTTON_HEIGHT_PX}
-              onPress={claim}
-            />
+            {state === 'claimed' && !claiming ? (
+              // Already claimed this week: nothing left to press, so the button gives way to when
+              // the credits arrive (they're paid out manually from the weekly-rewards report).
+              <UiEntity uiTransform={{ flexDirection: 'column', alignItems: 'center' }}>
+                <BitmapText
+                  text="Claimed!"
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE_BROWN}
+                  fontSize={40}
+                  uiTransform={{ margin: { top: 8, bottom: 16 } }}
+                />
+                <BitmapText
+                  text="You'll receive your credits over the course of next week."
+                  font={GERM_ONE_FONT}
+                  image={GERM_ONE_IMAGE_BROWN}
+                  fontSize={22}
+                  maxWidth={600}
+                  align="center"
+                />
+              </UiEntity>
+            ) : (
+              // Always pressable once loaded - the server answers with why a claim isn't allowed yet.
+              <Button
+                label={claiming ? 'Claiming...' : 'Claim Reward'}
+                background={props.claimButtonBackground}
+                width={CLAIM_BUTTON_WIDTH_PX}
+                height={CLAIM_BUTTON_HEIGHT_PX}
+                onPress={claim}
+              />
+            )}
           </UiEntity>
         </UiEntity>
       </UiEntity>

@@ -54,7 +54,7 @@ import { SpiderRain } from './spider'
 import { BatRain } from './bat'
 import { Splash } from './splash'
 import { setMaxCritters } from './critterRain'
-import { setupWeeklyRewards, WeeklyRewardsUi, isWeeklyRewardsPanelOpen } from './weeklyRewards'
+import { setupWeeklyRewards, WeeklyRewardsUi, isWeeklyRewardsPanelOpen, openPanel as openWeeklyRewardsPanel } from './weeklyRewards'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -535,7 +535,7 @@ function getToastBottomPercent(): number {
 }
 
 // Swaps in a new toast phase and (re)starts its entrance animation.
-function showToast(phase: 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected') {
+function showToast(phase: 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected' | 'rewardClaimed') {
   toastPhase = phase
   toastPhaseStartedAt = elapsedTime
   toastExitStartedAt = null
@@ -1086,7 +1086,7 @@ let endScreenShownAt: number | null = null
 
 // Bottom "toast" for the win sequence (Board complete -> Find the monster -> Monster collected/Not
 // collected - see showToast()/hideToast()/getToastBottomPercent()). null means fully hidden.
-type ToastPhase = 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected' | null
+type ToastPhase = 'boardComplete' | 'findMonster' | 'monsterCollected' | 'monsterNotCollected' | 'rewardClaimed' | null
 let toastPhase: ToastPhase = null
 // When the current phase's entrance animation started (also doubles as its "how long has it been
 // showing" clock for the auto-advance timers below).
@@ -1456,9 +1456,11 @@ export function setupUi() {
   room.send('requestProgress', {})
 
   setupWeeklyRewards(() => {
-    // Same celebration moment as catching a monster, with the money emote. Walking stays free.
+    // Same celebration moment as catching a monster (see handlePrizeCaught), with the money emote
+    // and the reward icon. Walking stays free.
     playPrizeSound()
     triggerCelebrationCamera('money', 0, false)
+    hideToast(() => showToast('rewardClaimed'))
   })
 
   if (DEBUG_DUMP_BEST_TIMES) {
@@ -1637,6 +1639,17 @@ export function setupUi() {
       elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
     ) {
       hideToast(() => resetToIdleAfterChase())
+    }
+
+    // Weekly Rewards claim: same stay as Monster Collected, then back to the Weekly Rewards panel
+    // (now showing its claimed state) that was closed for the celebration.
+    if (
+      toastPhase === 'rewardClaimed' &&
+      toastExitStartedAt === null &&
+      toastPhaseStartedAt !== null &&
+      elapsedTime - toastPhaseStartedAt >= MONSTER_COLLECTED_STAY_DURATION
+    ) {
+      hideToast(() => openWeeklyRewardsPanel())
     }
 
     // Only the front (oldest) item can possibly be due - everything behind it entered more
@@ -1991,7 +2004,8 @@ const MemoryMatchUi = () => (
           borderColor: DEBUG_BORDER_RED
         }}
       >
-        {screen === 'hidden' && playerInPlayArea && !isWeeklyRewardsPanelOpen() &&
+        {/* Also hidden for the whole Weekly Rewards claim celebration (its toast's lifetime). */}
+        {screen === 'hidden' && playerInPlayArea && !isWeeklyRewardsPanelOpen() && toastPhase !== 'rewardClaimed' &&
           (() => {
             const pulseScale = getPlayButtonPulseScale()
             const pulseWidth = getPlayButtonWidthPx() * pulseScale
@@ -2791,12 +2805,14 @@ const MemoryMatchUi = () => (
 
     {/* Spinner + pulsing monster icon, centered on screen - separate from the bottom toast so it
     reads as "the reward", while the toast box below just carries the "Monster Collected!" text.
-    Visible for exactly as long as the toast phase is (including its slide in/out window). */}
-    {toastPhase === 'monsterCollected' && (
+    Visible for exactly as long as the toast phase is (including its slide in/out window). The
+    Weekly Rewards claim reuses it with the reward (gift) icon instead of the monster. */}
+    {(toastPhase === 'monsterCollected' || toastPhase === 'rewardClaimed') && (
       <UiEntity
         uiTransform={{
           positionType: 'absolute',
-          position: { top: '50%', left: '50%' },
+          // The reward version sits 15vh lower than the monster one.
+          position: { top: toastPhase === 'rewardClaimed' ? '65%' : '50%', left: '50%' },
           margin: { top: -(SPINNER_SIZE_PX * 3) / 2, left: -(SPINNER_SIZE_PX * 3) / 2 },
           width: SPINNER_SIZE_PX * 3,
           height: SPINNER_SIZE_PX * 3,
@@ -2817,7 +2833,14 @@ const MemoryMatchUi = () => (
             justifyContent: 'center'
           }}
         >
-          {renderMonsterIcon(wonMonsterQuadrant, 192 * getMonsterPulseScale())}
+          {toastPhase === 'rewardClaimed' ? (
+            <UiEntity
+              uiTransform={{ width: 192 * getMonsterPulseScale(), height: 192 * getMonsterPulseScale(), flexShrink: 0 }}
+              uiBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_ICON_UVS }}
+            />
+          ) : (
+            renderMonsterIcon(wonMonsterQuadrant, 192 * getMonsterPulseScale())
+          )}
         </UiEntity>
       </UiEntity>
     )}
@@ -2888,6 +2911,9 @@ const MemoryMatchUi = () => (
           )}
           {toastPhase === 'monsterNotCollected' && (
             <BitmapText text="Monster Not Collected" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
+          )}
+          {toastPhase === 'rewardClaimed' && (
+            <BitmapText text="Reward Claimed" font={GERM_ONE_FONT} image={GERM_ONE_IMAGE} fontSize={28} />
           )}
         </UiEntity>
       </UiEntity>
