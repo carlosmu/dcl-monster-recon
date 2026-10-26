@@ -1,0 +1,215 @@
+{
+  "game": "Monster Recon",
+  "tagline": "Flip. Match. Run.",
+  "link": "https://decentraland.org/jump/?realm=monsterrecon.dcl.eth",
+  "handle": "@yourhandle",
+  "listing": {
+    "short": "Flip cards against the clock in Memory Match, then chase the monster you won around camp. Collect all 20 and top the weekly leaderboard.",
+    "long": "Every checkpoint is a timed Memory Match board. Clear it and a monster appears in camp, hopping from spot to spot: you get five chances to catch it before it gets away. Twenty monsters fill your Monster Codex, from Common to Epic.\n\nYour best times go on a weekly leaderboard that resets every Monday at 10:00 UTC, with weekly rewards for players who complete the mission. Right now the camp is running its Halloween Edition.",
+    "handles": {
+      "x": "@yourhandle",
+      "instagram": "@yourhandle"
+    },
+    "events": "Weekly leaderboard and weekly rewards reset every Monday at 10:00 UTC."
+  },
+  "hashtags": {
+    "core": ["#MonsterRecon", "#Decentraland", "#MemoryGame"],
+    "extra": ["#Halloween", "#IndieGame", "#CasualGames", "#MemoryMatch", "#Web3Gaming"]
+  },
+  "brand": {
+    "text": "#FFF1D6",
+    "ink": "#160B2B",
+    "accent": "#FF8A1F",
+    "font": "C:/Windows/Fonts/impact.ttf",
+    "font_small": "C:/Windows/Fonts/bahnschrift.ttf"
+  },
+  "event_banners": false,
+  "images": {
+    "keyart_landscape": {
+      "file": "images/keyart/halloween_1920x1080.png",
+      "alt": "A runner with a pumpkin-shaped hood chases a grinning tomato monster under a wooden camp sign reading MONSTER RECON HALLOWEEN EDITION."
+    },
+    "keyart_square": {
+      "file": "images/keyart/square_1254.png",
+      "alt": "Square key art: the runner chasing the tomato monster under the MONSTER RECON camp sign, purple sky and full moon."
+    },
+    "codex_locked": {
+      "file": "images/social/codex_locked_1080.png",
+      "alt": "The Monster Codex: eighteen vegetable monsters in a grid, with the last two slots shown as dark locked silhouettes."
+    },
+    "monster_tomato": {
+      "file": "images/social/monster_tomato_1080.png",
+      "alt": "Rogue Tomato, a scowling tomato monster with fangs, labelled Common."
+    },
+    "monster_corn": {
+      "file": "images/social/monster_corn_1080.png",
+      "alt": "Infernal Corn, a corn cob monster wreathed in flames, labelled Rare."
+    },
+    "monster_leek": {
+      "file": "images/social/monster_leek_1080.png",
+      "alt": "Tentacle Leek, a leek monster with tentacle roots, labelled Rare."
+    },
+    "monster_artichoke": {
+      "file": "images/social/monster_artichoke_1080.png",
+      "alt": "Cyclops Artichoke, an artichoke with one giant eye and worms, labelled Exotic."
+    },
+    "quote_chances": {
+      "file": "images/social/quote_chances_1080.png",
+      "alt": "Ferocious Carrot with the line: Collect the monster. Chances: 5/5"
+    },
+    "quote_timesup": {
+      "file": "images/social/quote_timesup_1080.png",
+      "alt": "Grouch Potato with the line: Time's up"
+    },
+    "quote_collected": {
+      "file": "images/social/quote_collected_1080.png",
+      "alt": "Cursed Onion with the line: Monster Collected!"
+    }
+  },
+  "shotlist_tips": [
+    "Record in the Decentraland desktop Explorer at 1920x1080 or higher; keep the cursor out of frame.",
+    "The Memory Match board is screen UI: record it at full screen so the cards and the timer read on a phone.",
+    "For the chase, use third person and keep the hopping monster in the middle third of a 16:9 frame so a 9:16 crop keeps it.",
+    "Play with sound on: the match, countdown and Halloween stingers carry the clips.",
+    "Use Select checkpoint to replay an early level for the chase (12 s per hop) or a late one for panic (3 s per hop).",
+    "Keep the two Epic monsters out of public clips: stop before the last checkpoints and close the Codex before the Epic row is visible."
+  ],
+  "posts": [
+    {
+      "id": "launch-01",
+      "kind": "launch",
+      "title": "Launch: the promise",
+      "cta": true,
+      "text": "Flip. Match. Run.\n\nBeat the clock in Memory Match, then chase the monster you just won around camp before it gets away.\n\nMonster Recon: Halloween Edition is live on Decentraland:\n{LINK}",
+      "image": "keyart_landscape",
+      "ig_image": "keyart_square"
+    },
+    {
+      "id": "launch-02",
+      "kind": "launch",
+      "title": "Launch: it won't stand still",
+      "cta": true,
+      "text": "It won't stand still.\n\nEvery monster you win hops from spot to spot in camp. You get 5 chances to catch it. On the first levels it waits 12 seconds. By level 19 it waits 3.\n\nPlay Monster Recon: {LINK}",
+      "image": "monster_tomato"
+    },
+    {
+      "id": "launch-03",
+      "kind": "launch",
+      "title": "Launch: what the game is",
+      "cta": true,
+      "text": "20 monsters.\n8 Common. 6 Rare. 4 Exotic. 2 Epic.\n\nWin them on timed Memory Match boards, catch them in camp, fill your Monster Codex.\n\nMonster Recon, on Decentraland: {LINK}",
+      "image": "codex_locked"
+    },
+    {
+      "id": "launch-04",
+      "kind": "launch",
+      "title": "Launch: weekly leaderboard",
+      "cta": true,
+      "text": "Your best time goes on the weekly leaderboard.\nSo does your friend's.\n\nNew week every Monday at 10:00 UTC, with weekly rewards for players who complete the mission.\n\nMonster Recon: {LINK}",
+      "image": "keyart_square"
+    },
+    {
+      "id": "soon-01",
+      "kind": "soon",
+      "title": "Countdown: weekly reset",
+      "text": "{N} hours until the Monster Recon leaderboard resets.\n\nMonday, 10:00 UTC. Your best time is still beatable.",
+      "image": "keyart_square"
+    },
+    {
+      "id": "soon-02",
+      "kind": "soon",
+      "title": "Teaser: something in camp",
+      "text": "Something is hopping around the camp.\n\nIt has fangs. It has a name. It does not want to go in your Codex.",
+      "image": "monster_artichoke"
+    },
+    {
+      "id": "soon-03",
+      "kind": "soon",
+      "title": "Teaser: the Epic row",
+      "text": "18 monsters are in the picture.\nThe other 2 are Epic.\n\nNobody is posting what they look like. Go find out.",
+      "image": "codex_locked"
+    },
+    {
+      "id": "soon-04",
+      "kind": "soon",
+      "title": "Teaser: next collection",
+      "text": "[CHECK: is a second monster collection planned? Delete this post if not.]\n\nThe Codex has room for more.\n\nA new monster collection lands in Monster Recon {DATE}.",
+      "image": "codex_locked"
+    },
+    {
+      "id": "footage-01",
+      "kind": "footage",
+      "title": "Footage: MATCH!",
+      "text": "Flip. Match. MATCH!\n\n[FOOTAGE]",
+      "image": "keyart_square",
+      "footage": "Start a board from checkpoint 1 at full screen. Flip pairs quickly so two or three \"MATCH!\" popups float up in a row, then clear the board to \"Board complete!\". First-person screen capture, sound on for the match sound. 6 to 8 seconds. Cut on \"Board complete!\". Works as a vertical reel if cropped to the board."
+    },
+    {
+      "id": "footage-02",
+      "kind": "footage",
+      "title": "Footage: the chase",
+      "text": "5 chances. It knows.\n\n[FOOTAGE]",
+      "image": "monster_tomato",
+      "footage": "Right after a board, the monster appears in camp. Third person: run at it, miss as it hops away to a new spot, turn, sprint, catch it on the next hop for the sparkle burst. Keep the \"Chances\" counter visible. 10 to 12 seconds. Cut on the catch burst. Vertical reel: keep the monster in the middle third."
+    },
+    {
+      "id": "footage-03",
+      "kind": "footage",
+      "title": "Footage: Monster Collected!",
+      "text": "One more for the Codex.\n\n[FOOTAGE]",
+      "image": "codex_locked",
+      "footage": "Catch a Common or Rare monster, hold on the \"Monster Collected!\" toast, then open the Monster Codex and show the new monster in its row. 6 to 8 seconds. Cut before the Epic row comes into view; never show an unlocked Epic."
+    },
+    {
+      "id": "footage-04",
+      "kind": "footage",
+      "title": "Footage: the last 10 seconds",
+      "text": "Watch the timer. Not the cards. Wait. Watch the cards.\n\n[FOOTAGE]",
+      "image": "quote_timesup",
+      "footage": "Play a later board (use Select checkpoint) and let the timer drop under 10 seconds so it starts blinking red. Make the last match with 1 to 2 seconds left, or let it run out to \"Time's up\". Full-screen capture, sound on for the countdown. 6 to 10 seconds. Cut on the result."
+    },
+    {
+      "id": "footage-05",
+      "kind": "footage",
+      "title": "Footage: 30-second trailer",
+      "text": "Monster Recon: Halloween Edition. Flip. Match. Run.\n\n[FOOTAGE]\n\n{LINK}",
+      "image": "keyart_landscape",
+      "footage": "Trailer, 25 to 30 seconds, 16:9 1920x1080, plus a 9:16 vertical cut. 0-3 s: a monster hopping in camp with the player running at it (motion in the first three seconds). 3-10 s: fast Memory Match flips with \"MATCH!\" popups. 10-18 s: the chase, a miss, then the catch burst. 18-23 s: \"Monster Collected!\" and the Codex filling. 23-27 s: the weekly leaderboard. 27-30 s: the key art with the link. Captions on screen so it works muted. Keep the Epic monsters out."
+    },
+    {
+      "id": "quote-01",
+      "kind": "quote",
+      "title": "Quote: chances",
+      "text": "\"Collect the monster.\nChances: 5/5\"\n\nThe carrot has other plans.",
+      "image": "quote_chances"
+    },
+    {
+      "id": "quote-02",
+      "kind": "quote",
+      "title": "Quote: time's up",
+      "text": "\"Time's up\"\n\nThe timer starts blinking red at 10 seconds. The Grouch Potato is not sympathetic.",
+      "image": "quote_timesup"
+    },
+    {
+      "id": "quote-03",
+      "kind": "quote",
+      "title": "Quote: collected",
+      "text": "\"Monster Collected!\"\n\nOne down. Nineteen to go.",
+      "image": "quote_collected"
+    },
+    {
+      "id": "bts-01",
+      "kind": "bts",
+      "title": "Behind the scenes: the difficulty curve",
+      "text": "How Monster Recon gets harder:\n\nThe monster's hop timer starts at 12 seconds and drops 1 second every two levels, down to 3 seconds from level 19 on.\n\nThe boards tighten too: 20 seconds on the very first one, 13 on checkpoint 2's first board.\n\n#gamedev #SDK7",
+      "image": "monster_corn"
+    },
+    {
+      "id": "bts-02",
+      "kind": "bts",
+      "title": "Behind the scenes: the server keeps score",
+      "text": "Leaderboard times and weekly reward claims in Monster Recon don't trust the player's client. They go through an authoritative server that checks the mission before a claim is registered.\n\nThe week rolls over Monday 10:00 UTC, and past weeks stay archived.\n\n#gamedev #SDK7",
+      "image": "monster_leek"
+    }
+  ]
+}

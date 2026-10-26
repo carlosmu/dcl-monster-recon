@@ -22,3 +22,7 @@ src
 
 # Local storage backups (player wallets/progress) - never deploy
 backups
+
+# Marketing kit and design notes - never deploy
+promote
+design

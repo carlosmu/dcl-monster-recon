@@ -3,7 +3,7 @@
   "runtimeVersion": "7",
   "display": {
     "title": "Monster Recon",
-    "description": "Race against the clock in fast Memory Match rounds, then dash through camp to hunt down your monsters. Build your Codex with rare, exotic, and epic finds, compare discoveries with friends, beat your best times, and battle for the top of the monster leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
+    "description": "Flip cards against the clock in Memory Match, then chase the monster you won around camp. Collect all 20 and top the weekly leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
     "favicon": "favicon_asset",
     "navmapThumbnail": "assets/images/thumbnail.png"
   },
@@ -13,7 +13,7 @@
     "email": "carlos.damian.munoz@gmail.com"
   },
   "main": "bin/index.js",
-  "tags": [],
+  "tags": ["game"],
   "scene": {
     "base": "0,0",
     "parcels": [

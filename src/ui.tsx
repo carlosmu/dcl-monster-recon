@@ -54,7 +54,15 @@ import { SpiderRain } from './spider'
 import { BatRain } from './bat'
 import { Splash } from './splash'
 import { setMaxCritters } from './critterRain'
-import { setupWeeklyRewards, WeeklyRewardsUi, isWeeklyRewardsPanelOpen, openPanel as openWeeklyRewardsPanel } from './weeklyRewards'
+import {
+  setupWeeklyRewards,
+  WeeklyRewardsUi,
+  WeeklyRewardsPanel,
+  WeeklyRewardsUiProps,
+  isWeeklyRewardsPanelOpen,
+  openPanel as openWeeklyRewardsPanel,
+  closePanel as closeWeeklyRewardsPanel
+} from './weeklyRewards'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
@@ -797,6 +805,12 @@ const COUNTDOWN_BACKGROUND_UVS = getUvsForBlock(6, 2, 2, 2, BACK_ATLAS_GRID) // 
 // Backs the active pip in the board-progression bar - a single cell, unlike the countdown's 2x2.
 const BOARD_PROGRESS_PIP_UVS = getUvsForBlock(6, 6, 1, 1, BACK_ATLAS_GRID) // atlas_01.png G7
 const CALENDAR_ICON_UVS = getUvsForBlock(4, 6, 2, 2, BACK_ATLAS_GRID) // atlas_01.png E7-F8
+const WEEKLY_REWARDS_EARLY_ICON_UVS = getUvsForBlock(0, 2, 2, 2, BACK_ATLAS_GRID) // atlas_02.png A3-B4
+const WEEKLY_REWARDS_CHAMPION_ICON_UVS = getUvsForBlock(0, 4, 2, 2, BACK_ATLAS_GRID) // atlas_02.png A5-B6
+const WEEKLY_REWARDS_LUCKY_ICON_UVS = getUvsForBlock(0, 6, 2, 2, BACK_ATLAS_GRID) // atlas_02.png A7-B8
+const WEEKLY_REWARDS_CREDITS_ICON_UVS = getUvsForBlock(7, 2, 1, 1, BACK_ATLAS_GRID) // atlas_02.png H3
+const WEEKLY_REWARDS_CHECKBOX_OFF_UVS = getUvsForBlock(4, 4, 1, 1, BACK_ATLAS_GRID) // atlas_02.png E5
+const WEEKLY_REWARDS_CHECKBOX_ON_UVS = getUvsForBlock(5, 4, 1, 1, BACK_ATLAS_GRID) // atlas_02.png F5
 
 interface CellState {
   frontQuadrant: number
@@ -1777,7 +1791,15 @@ function closeCheckpointSelect() {
   previousScreen = null
 }
 
+// Leaderboard, Monster Codex and Weekly Rewards are mutually exclusive: opening one closes
+// whichever other is open. Switching between Codex and Leaderboard keeps previousScreen, so closing
+// the second one still returns to the board if the first was opened over it.
+function closeCodexOrLeaderboard() {
+  if (screen === 'inventory' || screen === 'leaderboard') closeInventory()
+}
+
 function showInventory() {
+  closeWeeklyRewardsPanel()
   if (screen === 'board') previousScreen = 'board'
   screen = 'inventory'
 }
@@ -1788,6 +1810,7 @@ function closeInventory() {
 }
 
 function showLeaderboard() {
+  closeWeeklyRewardsPanel()
   if (screen === 'board') previousScreen = 'board'
   screen = 'leaderboard'
 }
@@ -1795,6 +1818,38 @@ function showLeaderboard() {
 function closeLeaderboard() {
   screen = previousScreen === 'board' ? 'board' : 'hidden'
   previousScreen = null
+}
+
+// Shared by the Weekly Rewards entry button (WeeklyRewardsUi) and its panel (WeeklyRewardsPanel),
+// which render in different places.
+function getWeeklyRewardsUiProps(): WeeklyRewardsUiProps {
+  return {
+    frameBackground: {
+      textureMode: 'nine-slices',
+      texture: { src: BOARD_FRAME_IMAGE },
+      textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
+    },
+    framePadding: getFramePaddingPx(),
+    closeButtonBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS },
+    closeButtonSize: CLOSE_BUTTON_SIZE_PX,
+    calendarIconBackground: { textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CALENDAR_ICON_UVS },
+    earlyRewardIconBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_EARLY_ICON_UVS },
+    championIconBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CHAMPION_ICON_UVS },
+    luckyPlayerIconBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_LUCKY_ICON_UVS },
+    creditsIconBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CREDITS_ICON_UVS },
+    checkboxOnBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CHECKBOX_ON_UVS },
+    checkboxOffBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CHECKBOX_OFF_UVS },
+    entryButtonBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BUTTON_UVS },
+    entryButtonIcon: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_ICON_UVS },
+    entryButtonGlow: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_GLOW_UVS },
+    entryButtonBadge: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BADGE_UVS },
+    claimButtonBackground: { textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CLAIM_UVS },
+    renderSpinner,
+    onOpen: closeCodexOrLeaderboard,
+    // Same top inset (canvas_main's top padding) and height as the header's score box/icons.
+    hudTop: CANVAS_MAIN_PADDING_PX,
+    hudHeight: HEADER_RIGHT_ICON_SIZE_PX
+  }
 }
 
 // Draws every PRELOAD_TEXTURES sheet once, at 1x1 px in the screen corner, so the renderer fetches
@@ -2650,6 +2705,24 @@ const MemoryMatchUi = () => (
             />
           </UiEntity>
         )}
+        {/* Weekly Rewards panel: same slot and sizing as the Leaderboard/Monster Codex screens, but
+        layered over the body (with the body's own padding) instead of replacing `screen`, since it
+        can open over the board. */}
+        {isWeeklyRewardsPanelOpen() && (
+          <UiEntity
+            uiTransform={{
+              positionType: 'absolute',
+              position: { top: 0, left: 0 },
+              width: '100%',
+              height: '100%',
+              padding: { top: BODY_PADDING_PX, bottom: BODY_PADDING_PX },
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <WeeklyRewardsPanel {...getWeeklyRewardsUiProps()} />
+          </UiEntity>
+        )}
       </UiEntity>
 
       {/* footer */}
@@ -2919,26 +2992,7 @@ const MemoryMatchUi = () => (
       </UiEntity>
     )}
 
-    <WeeklyRewardsUi
-      frameBackground={{
-        textureMode: 'nine-slices',
-        texture: { src: BOARD_FRAME_IMAGE },
-        textureSlices: { top: FRAME_SLICE, bottom: FRAME_SLICE, left: FRAME_SLICE, right: FRAME_SLICE }
-      }}
-      framePadding={getFramePaddingPx()}
-      closeButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: CLOSE_BUTTON_UVS }}
-      closeButtonSize={CLOSE_BUTTON_SIZE_PX}
-      calendarIconBackground={{ textureMode: 'stretch', texture: { src: BACK_IMAGE }, uvs: CALENDAR_ICON_UVS }}
-      entryButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BUTTON_UVS }}
-      entryButtonIcon={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_ICON_UVS }}
-      entryButtonGlow={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_GLOW_UVS }}
-      entryButtonBadge={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_BADGE_UVS }}
-      claimButtonBackground={{ textureMode: 'stretch', texture: { src: ATLAS_02_IMAGE }, uvs: WEEKLY_REWARDS_CLAIM_UVS }}
-      renderSpinner={renderSpinner}
-      // Same top inset (canvas_main's top padding) and height as the header's score box/icons.
-      hudTop={CANVAS_MAIN_PADDING_PX}
-      hudHeight={HEADER_RIGHT_ICON_SIZE_PX}
-    />
+    <WeeklyRewardsUi {...getWeeklyRewardsUiProps()} />
 
     {/* Cinema-style letterbox bars for the checkpoint-1 tutorial cinematic (see tutorialChase.ts) -
     last sibling so it draws over everything else, full-screen (not just canvas_main). */}

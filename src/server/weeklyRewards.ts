@@ -5,12 +5,17 @@ import { Storage } from '@dcl/sdk/server'
 // leaderboard uses (weekIdFor in server.ts, Monday 10:00 UTC reset) - it's passed in rather than
 // recomputed here so both features always agree on which week it is.
 export const WEEKLY_REQUIRED_DAYS = 2
+// The first this many players to claim each week earn the instant reward. Everyone who claims (these
+// included) enters the Lucky Player raffle; the raffle and the Champion of the Week are picked
+// manually from the report and the leaderboard.
+export const WEEKLY_EARLY_SLOTS = 20
 
 // Player storage, one key per week, so past weeks stay archived and a new week starts empty.
 const WEEKLY_REWARDS_KEY_PREFIX = 'weeklyRewards-'
 // Scene storage, one key per week, next to leaderboard-<weekId> and with the same weekId: every
-// player who claimed that week. This is the payout report - credits are handed out manually to
-// everyone listed, so the amount never has to live in the scene. It's a mirror of the claimed
+// player who claimed that week, in claim order. This is the payout report - credits are handed out
+// manually (instant reward to earlyReward entries, raffle among everyone listed), so the amounts
+// never have to live in the server. It's a mirror of the claimed
 // player records above, which stay the authoritative copy for validating progress and claims.
 const WEEKLY_REPORT_KEY_PREFIX = 'weekly-rewards-'
 
@@ -21,6 +26,7 @@ export interface WeeklyRewardsRecord {
   progress: number // completedDays.length capped at WEEKLY_REQUIRED_DAYS
   claimed: boolean
   claimedAt?: number
+  claimOrder?: number // 1-based position among this week's claims; missing on claims made before it existed
   createdAt: number
   updatedAt: number
 }
@@ -30,6 +36,8 @@ interface WeeklyReportEntry {
   completedDays: string[]
   daysCompleted: number
   claimedAt: string // ISO timestamp
+  claimOrder?: number
+  earlyReward: boolean // claimOrder <= WEEKLY_EARLY_SLOTS
 }
 
 interface WeeklyReport {
@@ -46,6 +54,8 @@ const recordCache = new Map<string, Promise<WeeklyRewardsRecord>>()
 const reportCache = new Map<string, Promise<WeeklyReport>>()
 // Weeks whose last report write failed, so the next update rewrites it even if nothing changed.
 const unsavedReports = new Set<string>()
+// Next claimOrder to hand out per week. Assigned synchronously, so concurrent claims never share one.
+const nextClaimOrders = new Map<string, number>()
 
 export function dayIdFor(timestamp: number): string {
   return new Date(timestamp).toISOString().slice(0, 10)
@@ -94,21 +104,49 @@ export async function claimWeeklyReward(address: string, playerName: string, wee
   record.claimed = true
   record.claimedAt = now
   record.updatedAt = now
-  // Storage.set reports failure by resolving false, not by throwing.
-  if (!(await Storage.player.set(address, WEEKLY_REWARDS_KEY_PREFIX + weekId, record))) {
-    // Not saved, so not claimed: undo it so the player can simply retry.
+  const undo = () => {
     record.claimed = false
     delete record.claimedAt
+    delete record.claimOrder
+  }
+  // The claim order comes from the report, so a claim can't go through while it can't be read.
+  let report: WeeklyReport
+  try {
+    report = await getWeeklyReport(weekId)
+  } catch (error) {
+    undo()
+    console.error(`[Server] Weekly rewards report read failed for week ${weekId}`, error)
+    return { success: false, claimed: false, message: 'Could not save your claim. Please try again.' }
+  }
+  record.claimOrder = takeClaimOrder(report)
+  // Storage.set reports failure by resolving false, not by throwing.
+  if (!(await Storage.player.set(address, WEEKLY_REWARDS_KEY_PREFIX + weekId, record))) {
+    // Not saved, so not claimed: undo it so the player can simply retry (the order it took is skipped).
+    undo()
     console.error(`[Server] Weekly reward claim save failed for ${address} (week ${weekId})`)
     return { success: false, claimed: false, message: 'Could not save your claim. Please try again.' }
   }
   await updateReport(record, playerName)
-  console.log(`[Server] Weekly reward claimed by ${playerName} (${address}) for week ${weekId}`)
+  console.log(`[Server] Weekly reward claimed by ${playerName} (${address}) for week ${weekId}, #${record.claimOrder}`)
   return {
     success: true,
     claimed: true,
-    message: "We've registered your valid claim. You'll receive your credits over the course of next week."
+    message:
+      record.claimOrder <= WEEKLY_EARLY_SLOTS
+        ? `You're #${record.claimOrder}! You'll receive your credits over the course of next week, and you're in the Lucky Player raffle.`
+        : "You're in the Lucky Player raffle! Winners receive their credits over the course of next week."
   }
+}
+
+// Seeded from the stored report on first use, counting claims recorded before claimOrder existed.
+function takeClaimOrder(report: WeeklyReport): number {
+  let next = nextClaimOrders.get(report.weekId)
+  if (next === undefined) {
+    const entries = Object.values(report.players)
+    next = Math.max(entries.length, ...entries.map((entry) => entry.claimOrder ?? 0)) + 1
+  }
+  nextClaimOrders.set(report.weekId, next + 1)
+  return next
 }
 
 function getWeeklyReport(weekId: string): Promise<WeeklyReport> {
@@ -134,11 +172,14 @@ async function updateReport(record: WeeklyRewardsRecord, playerName?: string): P
   try {
     const report = await getWeeklyReport(weekId)
     const previous = report.players[address]
+    const claimOrder = record.claimOrder ?? previous?.claimOrder
     const entry: WeeklyReportEntry = {
       playerName: playerName ?? previous?.playerName ?? '',
       completedDays: [...record.completedDays],
       daysCompleted: record.completedDays.length,
-      claimedAt: new Date(record.claimedAt).toISOString()
+      claimedAt: new Date(record.claimedAt).toISOString(),
+      claimOrder,
+      earlyReward: claimOrder !== undefined && claimOrder <= WEEKLY_EARLY_SLOTS
     }
     if (!unsavedReports.has(weekId) && JSON.stringify(entry) === JSON.stringify(previous)) return
     report.players[address] = entry

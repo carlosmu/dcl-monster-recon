@@ -80,13 +80,17 @@ export const Messages = {
   // server registers it on reportMonsterCaught (a level completed), see weeklyRewards.ts.
   requestWeeklyRewards: Schemas.Map({}),
   // Server -> Client: the caller's Weekly Rewards status. completedDays are UTC dates (YYYY-MM-DD),
-  // progress is their count capped at requiredDays.
+  // progress is their count capped at requiredDays. claimOrder is the caller's 1-based claim position
+  // this week (0 = not claimed, or claimed before positions were tracked); the first earlySlots earn
+  // the instant reward.
   weeklyRewardsUpdate: Schemas.Map({
     weekId: Schemas.String,
     completedDays: Schemas.Array(Schemas.String),
     progress: Schemas.Number,
     requiredDays: Schemas.Number,
-    claimed: Schemas.Boolean
+    claimed: Schemas.Boolean,
+    claimOrder: Schemas.Number,
+    earlySlots: Schemas.Number
   }),
   // Client -> Server: try to claim this week's reward. The server validates progress/claimed.
   claimWeeklyReward: Schemas.Map({ playerName: Schemas.String }),

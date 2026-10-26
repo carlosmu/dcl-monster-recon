@@ -6,7 +6,7 @@ import checkpointsData from '../checkpoints.json'
 // via requestBackup, replayed into this world's storage by requestRestore below. Remove this
 // import, migrationSnapshot.json, and the requestRestore handler once the migration is confirmed.
 import migrationSnapshotJson from './migrationSnapshot.json'
-import { WEEKLY_REQUIRED_DAYS, WeeklyRewardsRecord, claimWeeklyReward, dayIdFor, getWeeklyRecord, registerLevelComplete } from './weeklyRewards'
+import { WEEKLY_EARLY_SLOTS, WEEKLY_REQUIRED_DAYS, WeeklyRewardsRecord, claimWeeklyReward, dayIdFor, getWeeklyRecord, registerLevelComplete } from './weeklyRewards'
 
 // One leaderboard per week, each under its own key. Past weeks are simply never read again - they
 // stay archived in storage for a future history screen or prize payout.
@@ -404,7 +404,11 @@ export async function startServer() {
 
 function sendWeeklyRewards(address: string, record: WeeklyRewardsRecord) {
   const { weekId, completedDays, progress, claimed } = record
-  room.send('weeklyRewardsUpdate', { weekId, completedDays, progress, requiredDays: WEEKLY_REQUIRED_DAYS, claimed }, { to: [address] })
+  room.send(
+    'weeklyRewardsUpdate',
+    { weekId, completedDays, progress, requiredDays: WEEKLY_REQUIRED_DAYS, claimed, claimOrder: record.claimOrder ?? 0, earlySlots: WEEKLY_EARLY_SLOTS },
+    { to: [address] }
+  )
 }
 
 // Addresses of the top LEADERBOARD_TOP_N by score - the rows a board actually shows.
