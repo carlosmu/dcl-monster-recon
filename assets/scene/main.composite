@@ -380,16 +380,16 @@
               "y": 6.5,
               "z": 18
             },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
             "rotation": {
               "x": 0,
               "y": 1,
               "z": 0,
               "w": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
             },
             "parent": 530
           }
@@ -401,16 +401,16 @@
               "y": 6.5,
               "z": 18
             },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
             "rotation": {
               "x": 0,
               "y": 1,
               "z": 0,
               "w": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
             },
             "parent": 530
           }
@@ -2963,14 +2963,22 @@
         "0": {
           "json": {
             "name": "Monster Recon",
-            "description": "Race against the clock in fast Memory Match rounds, then dash through camp to hunt down your monsters. Build your Codex with rare, exotic, and epic finds, compare discoveries with friends, beat your best times, and battle for the top of the monster leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
+            "description": "Flip cards against the clock in Memory Match, then chase the monster you won around camp. Collect all 20 and top the weekly leaderboard.\n--- Credits ---\nBoard Music by: Bensound (B. Tissot) | Lic: HS2MLQCYO5E1P2XY",
             "thumbnail": "assets/images/thumbnail.png",
             "ageRating": "A",
-            "categories": [],
-            "author": "SDK",
+            "categories": [
+              "game"
+            ],
+            "author": "carlosmu",
             "email": "carlos.damian.munoz@gmail.com",
-            "tags": [],
+            "tags": [
+              ""
+            ],
             "layout": {
+              "base": {
+                "x": 0,
+                "y": 0
+              },
               "parcels": [
                 {
                   "x": 0,
@@ -3228,11 +3236,7 @@
                   "x": 7,
                   "y": 0
                 }
-              ],
-              "base": {
-                "x": 0,
-                "y": 0
-              }
+              ]
             },
             "silenceVoiceChat": false,
             "disablePortableExperiences": false,
@@ -3249,11 +3253,8 @@
                     ]
                   },
                   "y": {
-                    "$case": "range",
-                    "value": [
-                      65,
-                      65
-                    ]
+                    "$case": "single",
+                    "value": 65
                   },
                   "z": {
                     "$case": "range",
@@ -3271,7 +3272,8 @@
               }
             ],
             "skyboxConfig": {
-              "fixedTime": 86400
+              "fixedTime": 86400,
+              "transitionMode": 0
             },
             "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
             "disableNearbyVoiceChat": false,

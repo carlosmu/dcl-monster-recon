@@ -9,11 +9,13 @@
   },
   "owner": "",
   "contact": {
-    "name": "SDK",
+    "name": "carlosmu",
     "email": "carlos.damian.munoz@gmail.com"
   },
   "main": "bin/index.js",
-  "tags": ["game"],
+  "tags": [
+    "game"
+  ],
   "scene": {
     "base": "0,0",
     "parcels": [
@@ -119,7 +121,8 @@
   },
   "creator": "0x4B538E1E044922aec2F428EC7E17A99f44205fF9",
   "skyboxConfig": {
-    "fixedTime": 86400
+    "fixedTime": 86400,
+    "transitionMode": 0
   },
   "authoritativeMultiplayer": true,
   "worldConfiguration": {
