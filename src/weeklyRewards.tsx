@@ -11,6 +11,10 @@ import { DEBUG_FORCE_WEEKLY_REWARDS_HINTS } from './debugFlags'
 // Weekly Rewards MVP: codex frame + bitmap font, solid-color buttons. All validation
 // lives on the server (src/server/weeklyRewards.ts) - this side only shows what the server says.
 
+// Hides the whole Weekly Rewards feature (top-right entry button, and with it the only way into the
+// panel). Flip to true to bring it back.
+export const WEEKLY_REWARDS_ENABLED = false
+
 type WeeklyRewardsState = 'loading' | 'ready' | 'claimable' | 'claimed' | 'error'
 
 // No answer in this long -> 'error' while loading, or a retry message while claiming (server down /

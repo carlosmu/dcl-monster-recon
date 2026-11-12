@@ -32,6 +32,10 @@ export type CritterRainConfig = {
   debugLabelTopPx: number
 }
 
+// Hides every critter rain (spiders and bats): nothing is drawn and no spawn system is registered.
+// Flip to true to bring them back.
+export const CRITTER_RAIN_ENABLED = false
+
 // DEBUG: set to true to show the live critter count labels.
 const SHOW_DEBUG_COUNT = false
 
@@ -70,6 +74,7 @@ function getScreenSizePx(): { width: number; height: number } {
 }
 
 export function createCritterRain(config: CritterRainConfig) {
+  if (!CRITTER_RAIN_ENABLED) return () => null
   const frameCount = config.grid * config.grid
   const critters: Critter[] = []
   let nextId = 0

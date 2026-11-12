@@ -61,16 +61,17 @@ import {
   WeeklyRewardsUiProps,
   isWeeklyRewardsPanelOpen,
   openPanel as openWeeklyRewardsPanel,
-  closePanel as closeWeeklyRewardsPanel
+  closePanel as closeWeeklyRewardsPanel,
+  WEEKLY_REWARDS_ENABLED
 } from './weeklyRewards'
 
 const BACK_IMAGE = 'assets/images/atlas_01.png'
 const ATLAS_02_IMAGE = 'assets/images/atlas_02.png'
 const SPINNER_IMAGE = 'assets/images/spinner.png'
-// const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
-const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_02_halloween.mp3'
-// const BOARD_MUSIC_CLIP = 'assets/audio/ingame_01.mp3'
-const BOARD_MUSIC_CLIP = 'assets/audio/ingame_02_halloween.mp3'
+const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_01.mp3'
+// const AMBIENT_MUSIC_CLIP = 'assets/audio/ambient_02_halloween.mp3'
+const BOARD_MUSIC_CLIP = 'assets/audio/ingame_01.mp3'
+// const BOARD_MUSIC_CLIP = 'assets/audio/ingame_02_halloween.mp3'
 const BOARD_END_CLIP = 'assets/audio/get_points.mp3'
 // const TIMEOUT_CLIP = 'assets/audio/timeout.mp3'
 const TIMEOUT_CLIP = 'assets/audio/timeout_halloween.mp3'
@@ -2992,7 +2993,7 @@ const MemoryMatchUi = () => (
       </UiEntity>
     )}
 
-    <WeeklyRewardsUi {...getWeeklyRewardsUiProps()} />
+    {WEEKLY_REWARDS_ENABLED && <WeeklyRewardsUi {...getWeeklyRewardsUiProps()} />}
 
     {/* Cinema-style letterbox bars for the checkpoint-1 tutorial cinematic (see tutorialChase.ts) -
     last sibling so it draws over everything else, full-screen (not just canvas_main). */}
